@@ -1,0 +1,110 @@
+<!doctype html>
+<!--
+  Source for Assets/DownloadButton-windows.png and -macos.png, the two download
+  buttons at the top of README.md.
+
+  They are images rather than shields.io badges for one reason: shields renders
+  every badge's text in white and offers no way to change it, and white on the
+  product's accent (#00ffcc) is roughly 1.5:1 — the exact combination the app's
+  own tokens forbid, since --color-accent-ink is black precisely because that is
+  what text sitting on an accent fill has to be. Rendering them here buys the
+  right ink, the product's own typeface, and a pixel-identical pair.
+
+  Rebuild both (Windows; adjust the Chrome path elsewhere). Scale factor 2 is
+  what keeps them crisp on a HiDPI screen at their 260px display width:
+
+    for p in windows macos; do
+      "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless \
+        --disable-gpu --allow-file-access-from-files --hide-scrollbars \
+        --force-device-scale-factor=2 --window-size=260,48 \
+        --screenshot=Assets/DownloadButton-$p.png \
+        "Assets/DownloadButton.html?p=$p"
+    done
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Plectrify download button</title>
+    <style>
+      @font-face {
+        font-family: 'Inter Variable';
+        font-weight: 100 900;
+        src: url('../site/static/fonts/inter-latin-wght-normal.woff2')
+          format('woff2-variations');
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      /* The page *is* the button: the viewport is the button's box, so the
+         screenshot needs no cropping and the two come out identical. */
+      html,
+      body {
+        width: 260px;
+        height: 48px;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      /* The fill lives on this wrapper and not on <body> on purpose. CSS
+         propagates a body background with no html background up to the canvas,
+         which paints it over the whole viewport square — border-radius and all
+         — so cornered buttons come out as rectangles. Rendered with Chrome's
+         --default-background-color=00000000, the corners are then transparent
+         and the button sits on either GitHub theme. */
+      .btn {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #2cffd6, #00ffcc 60%, #00e6b8);
+        font-family: 'Inter Variable', sans-serif;
+        /* --color-accent-ink. Black on the accent, never white. */
+        color: #000000;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      svg {
+        display: block;
+        fill: #000000;
+      }
+
+      span {
+        font-size: 16px;
+        font-weight: 650;
+        letter-spacing: -0.005em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="btn">
+      <!-- Simple monochrome platform marks, drawn here rather than fetched: the
+           page must stay self-contained for a file:// render. -->
+      <svg id="mark" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"></svg>
+      <span id="label"></span>
+    </div>
+
+    <script>
+      const MARKS = {
+        windows: {
+          label: 'Download for Windows',
+          path: 'M3 5.5 10.2 4.5v7.1H3V5.5Zm0 13 7.2 1v-7H3v6ZM11.4 4.3 21 3v8.6h-9.6V4.3Zm0 8.5H21V21l-9.6-1.3v-6.9Z',
+        },
+        macos: {
+          label: 'Download for macOS',
+          path: 'M16.4 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .8 1.1 1.7 2.3 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-1-2.5-3.6ZM14.2 5.9c.6-.8 1-1.9.9-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-.9 2.9 1 .1 2-.5 2.7-1.3Z',
+        },
+      };
+      const key = new URLSearchParams(location.search).get('p') || 'windows';
+      const mark = MARKS[key];
+      document.getElementById('mark').innerHTML = `<path d="${mark.path}"/>`;
+      document.getElementById('label').textContent = mark.label;
+    </script>
+  </body>
+</html>

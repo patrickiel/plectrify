@@ -5,12 +5,20 @@
   than exported once and forgotten: the tagline and the palette will move, and a
   card that cannot be rebuilt is a card that quietly goes stale.
 
-  Rebuild (Windows; adjust the Chrome path elsewhere):
+  It also renders README.md's masthead, Assets/Banner.png — the same artwork in
+  a shorter frame, so the page and the link unfurl cannot drift apart.
+
+  Rebuild both (Windows; adjust the Chrome path elsewhere):
 
     "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless \
       --disable-gpu --allow-file-access-from-files --hide-scrollbars \
       --force-device-scale-factor=1 --window-size=1280,640 \
       --screenshot=Assets/SocialPreview.png Assets/SocialPreview.html
+
+    "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless \
+      --disable-gpu --allow-file-access-from-files --hide-scrollbars \
+      --force-device-scale-factor=1 --window-size=1280,420 \
+      --screenshot=Assets/Banner.png "Assets/SocialPreview.html?h=420"
 
   Tokens are lifted from site/src/app.css under the same names, and the fonts
   are that site's own files — this card and the front page must look like the
@@ -172,6 +180,20 @@
     </style>
   </head>
   <body>
+    <script>
+      /* One source, two outputs. ?h=<px> shortens the frame for the README
+         banner (Assets/Banner.png); with no parameter this is the 1280×640
+         GitHub asks a social preview to be. The layout is centred flex either
+         way, so nothing else has to change. */
+      const h = new URLSearchParams(location.search).get('h');
+      if (h) {
+        document.documentElement.style.height = h + 'px';
+        document.addEventListener('DOMContentLoaded', () => {
+          document.body.style.height = h + 'px';
+        });
+      }
+    </script>
+
     <div class="wash"></div>
     <div class="rule"></div>
 

@@ -1,22 +1,23 @@
 <div align="center">
 
-<img src="Assets/PlectrifyIcon.png" alt="Plectrify" width="140">
+<!-- The masthead is one rendered image rather than a stack of centred lines:
+     icon, name and tagline are a single composition, set in the product's own
+     type, and it is the composition that is centred. Built by
+     Assets/SocialPreview.html at ?h=420 — the same source as the social card,
+     so the page and the link unfurl cannot drift apart. -->
 
-# Plectrify
+<img src="Assets/Banner.png" alt="Plectrify — your pedalboard, without the DAW." width="100%">
 
-**Your pedalboard, without the DAW.**
+<!-- GitHub renders a lone image as a bare <a><img>, not wrapped in a <p>, so it
+     carries no bottom margin and the buttons butt straight against the artwork.
+     These <br>s are the gap. vspace on the img would be the tidier answer but
+     the HTML sanitizer strips it, as it strips style. -->
+<br>
+<br>
 
-A free guitar rig for Windows and macOS. Plug in and play through your own
-VST3 amp sims and pedals, chained like a real pedalboard.
-
-[![Release](https://img.shields.io/github/v/release/patrickiel/plectrify?include_prereleases&label=release&color=00ffcc&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases)
-[![Downloads](https://img.shields.io/github/downloads/patrickiel/plectrify/total?label=downloads&color=00ffcc&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases)
-[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-9ba6b5?labelColor=171c28)](#install)
-[![Licence](https://img.shields.io/badge/licence-AGPL--3.0-9ba6b5?labelColor=171c28)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-join-7700ff?logo=discord&logoColor=white&labelColor=171c28)](https://discord.gg/dxQBanJr2X)
-
-[![Download for Windows](https://img.shields.io/badge/Download-Windows%20x64-00ffcc?style=for-the-badge&logo=windows&logoColor=171c28&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
-[![Download for macOS](https://img.shields.io/badge/Download-macOS%20Apple%20Silicon-00ffcc?style=for-the-badge&logo=apple&logoColor=171c28&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
+<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="250"></a>
+&nbsp;
+<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="250"></a>
 
 [Website](https://plectrify.com) ·
 [Docs](https://plectrify.com/docs) ·
@@ -38,17 +39,22 @@ VST3 amp sims and pedals, chained like a real pedalboard.
      screenshot from sitting in a white box for light-theme readers; with only
      one image, keep the plain <img> line and drop the two <source> lines.
 
-<div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="Assets/screenshot-rack-light.png">
-    <source media="(prefers-color-scheme: dark)" srcset="Assets/screenshot-rack.png">
-    <img src="Assets/screenshot-rack.png" alt="The Plectrify rack: a chain of plugin modules with mapped knobs" width="900">
-  </picture>
-</div>
+     Full width and flush left, like everything else on this page — a centred
+     hero would put the one centred element directly under a left-aligned
+     masthead.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="Assets/screenshot-rack-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="Assets/screenshot-rack.png">
+  <img src="Assets/screenshot-rack.png" alt="The Plectrify rack: a chain of plugin modules with mapped knobs" width="100%">
+</picture>
 
 ──────────────────────────────────────────────────────────────────────────── -->
 
 ---
+
+A free guitar rig for Windows and macOS. Plug in and play through your own
+VST3 amp sims and pedals, chained like a real pedalboard.
 
 Plectrify is a standalone app: no session to set up, no tracks to arm, no
 recording to manage. Build a chain of amps and effects, tune up, and play.
