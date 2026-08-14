@@ -520,6 +520,24 @@
   let prevSize: { w: number; h: number } | null = null;
   let resizeAnim: Animation | null = null;
 
+  /** Attached to the panel. The card also resizes for reasons the tween
+      effect never sees — the tone art arrives a frame after mount (`artSize`
+      is measured), a knob label wraps, a capture selector mounts. `prevSize`
+      has to follow those, or the next toggle the effect *does* see animates
+      from a size the card left long ago: the first rename on a TONE3000 card
+      snapped it back to its pre-art width and grew it from there. The
+      observer keeps `prevSize` current whenever no tween is in flight; the
+      effect below still reads it before the observer can see the toggle's
+      own reflow, so an intended tween keeps its true "from" size. */
+  function trackRestingSize(el: HTMLElement) {
+    const observer = new ResizeObserver(() => {
+      if (resizeAnim) return;
+      prevSize = { w: el.offsetWidth, h: el.offsetHeight };
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }
+
   $effect(() => {
     editing; // re-run whenever edit mode toggles…
     expanded; // …and whenever the hovered card folds or unfolds
@@ -580,6 +598,7 @@
 
 <div
   bind:this={panelEl}
+  {@attach trackRestingSize}
   class="module-panel flex w-fit shrink-0 flex-col overflow-hidden rounded-2xl border border-ink/20 bg-panel backdrop-blur-2xl"
   class:module-editing={editing}
   class:module-expanded={expanded}
