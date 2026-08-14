@@ -1,0 +1,26 @@
+# site/ keeps its own ignore file rather than adding entries to the root one:
+# it is an independent package with its own install and its own build, the same
+# way ui/ and packaging/ are, and its build output has names generic enough
+# (build/, .svelte-kit/) that scoping them here avoids matching anything in the
+# native tree by accident.
+
+# Dependencies
+/node_modules/
+/.pnpm-store/
+
+# SvelteKit's generated types, route manifest and dev/build intermediates.
+/.svelte-kit/
+
+# adapter-static's output — the folder Cloudflare Pages deploys. Generated on
+# every build, never committed.
+/build/
+
+# Vite's dependency-prebundle cache, if a stray one lands outside .svelte-kit.
+/.vite/
+
+# Wrangler's local state, written wherever it is invoked from.
+/.wrangler/
+
+# OS
+.DS_Store
+Thumbs.db

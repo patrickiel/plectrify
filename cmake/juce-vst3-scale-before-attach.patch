@@ -1,0 +1,79 @@
+Tell a hosted VST3 the display scale before attaching its view.
+
+JUCE 8.0.14 learns the platform scale factor only through
+NativeScaleFactorNotifier, whose callback hops through MessageManager::callAsync
+before it writes VST3PluginWindow::nativeScaleFactor. That hop cannot complete
+until the editor's constructor and its first componentVisibilityChanged() have
+returned, so view->attached() - which is what makes a plug-in build its UI -
+always runs while nativeScaleFactor is still the 1.0 placeholder, and the
+setContentScaleFactor() calls before it report an unscaled display. The real
+factor is pushed a message loop later.
+
+A plug-in that re-reads the host's scale whenever it changes recovers, and most
+current ones do. DPF, iPlug2 and other older frameworks read it once, while
+constructing the UI, so they never see anything but the 1.0 and draw at 1:1 for
+the life of the window - a little over half size on a 175% display, next to a
+host UI that is scaled correctly.
+
+The peer already knows the scale by the time we attach, so ask it directly
+instead of waiting to be told. Sizing is untouched: componentVisibilityChanged()
+already calls resizeToFit() straight after attaching, which re-reads the view's
+size under the corrected scale. macOS is excluded because nothing is reported to
+a plug-in there at all - see juce-vst3-no-mac-content-scale.patch.
+
+diff --git a/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp b/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp
+--- a/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp
++++ b/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp
+@@ -457,10 +457,52 @@ private:
+                       jmax (10, logicalSize.getHeight()));
+     }
+
++   #if ! JUCE_MAC
++    /*  PLECTRIFY_SCALE_BEFORE_ATTACH: take the display scale straight from the
++        peer, for the sake of plug-ins that only ever read it once.
++
++        nativeScaleFactor is otherwise written by NativeScaleFactorNotifier
++        alone, which reports through MessageManager::callAsync and so cannot
++        land until after the constructor and the first
++        componentVisibilityChanged() have run to completion. view->attached()
++        therefore always fires while nativeScaleFactor still holds its 1.0
++        placeholder, and the plug-in builds its editor believing the display is
++        unscaled; the true factor arrives a message loop later. A plug-in that
++        re-reads the host's scale on every change catches up - most modern ones
++        do - but DPF, iPlug2 and other older frameworks apply it only while
++        constructing their UI, so they stay at 1:1 for the life of the window
++        and draw an editor a little over half size on a 175% display.
++
++        The peer already knows the answer here, so ask it rather than wait to be
++        told. Sizing is left alone: componentVisibilityChanged() calls
++        resizeToFit() immediately after attaching, which re-reads the view's
++        size under the corrected scale.
++    */
++    void adoptPeerScaleFactor()
++    {
++        if (auto* peer = getTopLevelComponent()->getPeer())
++        {
++            const auto platformScale = (float) peer->getPlatformScaleFactor();
++
++            if (! approximatelyEqual (platformScale, nativeScaleFactor))
++            {
++                nativeScaleFactor = platformScale;
++                setContentScaleFactor();
++            }
++        }
++    }
++   #endif
++
+     void attachPluginWindow()
+     {
+         if (pluginHandle == HandleFormat{})
+         {
++           #if ! JUCE_MAC
++            // PLECTRIFY_SCALE_BEFORE_ATTACH: the plug-in has to know the display
++            // scale before it builds its UI - see adoptPeerScaleFactor().
++            adoptPeerScaleFactor();
++           #endif
++
+             #if JUCE_WINDOWS
+              pluginHandle = static_cast<HWND> (embeddedComponent.getHWND());
+             #endif

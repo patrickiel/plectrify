@@ -1,0 +1,34 @@
+{
+  // plectrify.com — a Worker that serves nothing but static assets.
+  //
+  // There is deliberately no `main`: an assets-only Worker has no script at
+  // all, so every request is answered by Cloudflare's asset server rather than
+  // by code we have to keep correct. The site is fully prerendered
+  // (adapter-static), so that is the whole runtime.
+  //
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "plectrify-site",
+  "compatibility_date": "2026-08-01",
+
+  // wrangler runs this before every `deploy`/`versions upload` (and in `dev`),
+  // so build/ can never be missing (a fresh CI clone) or stale (a local deploy
+  // after an edit) — wrangler uploads whatever is in build/ and would happily
+  // ship either.
+  "build": { "command": "pnpm build", "watch_dir": "src" },
+
+  "assets": {
+    // `html_handling` and `not_found_handling` are left at their defaults:
+    // auto-trailing-slash (so /docs/rigs finds docs/rigs.html) and a plain 404
+    // for anything unmatched. A fallback page is not wanted here for the same
+    // reason `fallback` is unset in svelte.config.js — a typo'd URL must not
+    // answer 200. Cache rules and the two security headers come from
+    // static/_headers, which the asset server reads verbatim.
+    "directory": "./build",
+  },
+
+  // The apex is served straight off this Worker; Cloudflare owns the zone, so
+  // wrangler creates the DNS record and the certificate on first deploy.
+  "routes": [{ "pattern": "plectrify.com", "custom_domain": true }],
+
+  "observability": { "enabled": true },
+}

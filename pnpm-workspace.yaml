@@ -1,0 +1,9 @@
+# tsx bundles esbuild, whose install script places the platform binary; the
+# same explicit allow ui/ and packaging/ already carry. Nothing else here — the
+# three packages (root tools, ui/, packaging/) stay independent installs, not a
+# workspace.
+packages:
+  - .
+
+allowBuilds:
+  esbuild: true

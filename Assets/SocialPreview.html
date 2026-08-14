@@ -1,0 +1,192 @@
+<!doctype html>
+<!--
+  Source for Assets/SocialPreview.png — the 1280×640 card GitHub, Discord, X and
+  every other unfurler shows in place of a link to the repo. Checked in rather
+  than exported once and forgotten: the tagline and the palette will move, and a
+  card that cannot be rebuilt is a card that quietly goes stale.
+
+  Rebuild (Windows; adjust the Chrome path elsewhere):
+
+    "C:\Program Files\Google\Chrome\Application\chrome.exe" --headless \
+      --disable-gpu --allow-file-access-from-files --hide-scrollbars \
+      --force-device-scale-factor=1 --window-size=1280,640 \
+      --screenshot=Assets/SocialPreview.png Assets/SocialPreview.html
+
+  Tokens are lifted from site/src/app.css under the same names, and the fonts
+  are that site's own files — this card and the front page must look like the
+  same product. Nothing here is responsive on purpose: the viewport is fixed at
+  the one size GitHub asks for.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Plectrify — social preview</title>
+    <style>
+      @font-face {
+        font-family: 'Chakra Petch';
+        font-weight: 600;
+        src: url('../site/static/fonts/chakra-petch-latin-600-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Inter Variable';
+        font-weight: 100 900;
+        src: url('../site/static/fonts/inter-latin-wght-normal.woff2')
+          format('woff2-variations');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono Variable';
+        font-weight: 100 800;
+        src: url('../site/static/fonts/jetbrains-mono-latin-wght-normal.woff2')
+          format('woff2-variations');
+      }
+
+      :root {
+        --space: #020305;
+        --ink: #ffffff;
+        --accent: #00ffcc;
+        --purple: #7700ff;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1280px;
+        height: 640px;
+        overflow: hidden;
+      }
+
+      body {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 76px;
+        padding: 0 96px;
+        background: var(--space);
+        font-family: 'Inter Variable', sans-serif;
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Two ambient washes, the same pair the site's hero sits on: a cool purple
+         behind the type and the accent's own glow behind the coin. Sized well
+         past the frame so no edge of either gradient is visible. */
+      .wash {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(760px 620px at 22% 46%, rgb(0 255 204 / 0.13), transparent 62%),
+          radial-gradient(900px 700px at 92% 8%, rgb(119 0 255 / 0.22), transparent 60%),
+          radial-gradient(700px 500px at 50% 118%, rgb(119 0 255 / 0.1), transparent 65%);
+      }
+
+      /* A hairline of accent along the top edge — the one piece of chrome, and
+         what stops the card reading as a plain dark rectangle when it is
+         thumbnailed down to a few hundred pixels. */
+      .rule {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--accent) 22%,
+          var(--accent) 58%,
+          var(--purple) 92%,
+          transparent
+        );
+        opacity: 0.85;
+      }
+
+      .coin {
+        position: relative;
+        flex: none;
+        width: 340px;
+        height: 340px;
+        filter: drop-shadow(0 0 60px rgb(0 255 204 / 0.28))
+          drop-shadow(0 24px 50px rgb(0 0 0 / 0.6));
+      }
+
+      .coin img {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .copy {
+        position: relative;
+        min-width: 0;
+      }
+
+      h1 {
+        font-family: 'Chakra Petch', sans-serif;
+        font-weight: 600;
+        font-size: 108px;
+        line-height: 1;
+        letter-spacing: -0.01em;
+        text-shadow:
+          0 0 24px rgb(0 255 204 / 0.35),
+          0 0 60px rgb(0 255 204 / 0.15);
+      }
+
+      p {
+        margin-top: 22px;
+        font-size: 38px;
+        line-height: 1.25;
+        font-weight: 400;
+        color: rgb(255 255 255 / 0.82);
+      }
+
+      /* The strip answers the two questions a card this size has room for:
+         what does it cost, and will it run on my machine. Mono and spaced so it
+         reads as a spec line rather than as a second sentence. */
+      .strip {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 40px;
+        font-family: 'JetBrains Mono Variable', monospace;
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        /* One line or it is not a spec line. There is no smaller size to fall
+           back to at this scale, so it must not be allowed to wrap. */
+        white-space: nowrap;
+      }
+
+      .strip span:nth-child(even) {
+        color: rgb(255 255 255 / 0.24);
+      }
+
+      .strip .quiet {
+        color: rgb(255 255 255 / 0.55);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wash"></div>
+    <div class="rule"></div>
+
+    <div class="coin"><img src="PlectrifyIcon.png" alt="" /></div>
+
+    <div class="copy">
+      <h1>Plectrify</h1>
+      <p>Your pedalboard, without the DAW.</p>
+      <div class="strip">
+        <span>VST3 guitar rig</span>
+        <span>/</span>
+        <span class="quiet">Windows &amp; macOS</span>
+        <span>/</span>
+        <span class="quiet">Free &amp; open source</span>
+      </div>
+    </div>
+  </body>
+</html>

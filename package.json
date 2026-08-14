@@ -1,0 +1,19 @@
+{
+  "name": "plectrify-tools",
+  "private": true,
+  "type": "module",
+  "description": "Root dev/release tooling, one language on both OSes: `pnpm app` dispatches to scripts/run.windows.ts / run.macos.ts and `pnpm release` to scripts/release.windows.ts / release.macos.ts, with `pnpm release:promote` the separate third step. One `pnpm install` here fetches tsx; ui/ and packaging/ stay their own packages.",
+  "scripts": {
+    "app": "tsx scripts/run.ts",
+    "release": "tsx scripts/release.ts",
+    "release:promote": "tsx scripts/release.windows.ts --promote",
+    "release:windows": "tsx scripts/release.windows.ts",
+    "release:macos": "tsx scripts/release.macos.ts",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  }
+}

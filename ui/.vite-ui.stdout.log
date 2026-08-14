@@ -1,0 +1,71 @@
+$ vite
+[2m11:32:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because lockfile has changed
+Port 5173 is in use, trying another one...
+Port 5174 is in use, trying another one...
+
+  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m1131[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5175[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m11:34:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperSessions.svelte, /src/app.css[22m
+[2m11:37:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:37:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:37:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\setlist\SetlistTool.svelte, /src/app.css[22m
+[2m11:37:58[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\setlist\SetlistTool.svelte, /src/app.css[22m
+[2m11:38:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\settings\SettingsPanel.svelte, /src/app.css[22m
+[2m11:39:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\settings\SettingsPanel.svelte, /src/app.css[22m
+[2m11:39:08[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\settings\SettingsPanel.svelte, /src/app.css[22m
+[2m11:39:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:39:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\setlist\SetlistTool.svelte, /src/app.css[22m
+[2m11:40:11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:40:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:40:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:40:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:40:58[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:41:06[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:41:12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:41:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:41:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:41:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:41:35[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:42:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+11:42:15 [vite-plugin-svelte] C:/Users/patri/AppData/Local/repos/patrickiel/RigFlow/ui/src/features/metronome/MetronomeTool.svelte:203:8 This element is implicitly closed by the following `</Card>`, which can cause an unexpected DOM structure. Add an explicit `</div>` to avoid surprises.
+https://svelte.dev/e/element_implicitly_closed
+[2m11:42:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:42:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:42:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:42:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperSessions.svelte, /src/app.css[22m
+[2m11:43:11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:43:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:43:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:43:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperSessions.svelte, /src/app.css[22m
+[2m11:43:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperSessions.svelte, /src/app.css[22m
+[2m11:43:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperTool.svelte, /src/app.css[22m
+[2m11:43:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:44:35[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\lib\components\Card.svelte, /src/app.css[22m
+[2m11:44:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\lib\components\Card.svelte, /src/app.css[22m
+[2m11:44:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperSessions.svelte, /src/app.css[22m
+[2m11:45:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\lib\components\SegmentedControl.svelte, /src/app.css[22m
+[2m11:45:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\lib\components\SegmentedControl.svelte, /src/app.css[22m
+[2m11:45:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperSessions.svelte, /src/app.css[22m
+[2m11:46:10[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperTool.svelte, /src/app.css[22m
+[2m11:46:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperTool.svelte, /src/app.css[22m
+[2m11:47:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:47:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:47:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:47:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:47:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperSessions.svelte, /src/app.css[22m
+[2m11:49:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\rack\ModulePicker.svelte, /src/app.css[22m
+[2m11:49:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\rack\ModulePicker.svelte, /src/app.css[22m
+[2m11:49:33[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\rack\ModulePicker.svelte, /src/app.css[22m
+[2m11:49:41[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\rack\ModulePicker.svelte, /src/app.css[22m
+[2m11:49:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:50:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperTool.svelte, /src/app.css[22m
+[2m11:50:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperTool.svelte, /src/app.css[22m
+[2m11:51:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:51:10[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\metronome\MetronomeTool.svelte, /src/app.css[22m
+[2m11:51:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\lib\components\SegmentedControl.svelte, /src/app.css[22m
+[2m11:52:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app.css[22m
+[2m11:52:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\lib\components\SegmentedControl.svelte, /src/app.css[22m
+[2m11:52:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/C:\Users\patri\AppData\Local\repos\patrickiel\RigFlow\ui\src\features\looper\LooperTool.svelte, /src/app.css[22m
+[ELIFECYCLE] Command failed with exit code 4294967295.

@@ -1,0 +1,16 @@
+# Wrangler ships two native/prebuilt dependencies whose install scripts must be
+# allowed to run: esbuild (bundler binary) and workerd (the Workers runtime,
+# used by `wrangler dev`). Without these the CLI refuses to start.
+packages:
+  - .
+
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+# pnpm's supply-chain delay would otherwise block a freshly published Wrangler.
+# These are the exact versions pinned in package.json, so this is an explicit
+# "we chose this build", not a blanket opt-out.
+minimumReleaseAgeExclude:
+  - miniflare@5.20260801.1-alpha
+  - wrangler@4.120.0

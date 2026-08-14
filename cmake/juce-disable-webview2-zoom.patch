@@ -1,0 +1,21 @@
+diff --git a/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp b/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_windows.cpp
+@@ -1022,7 +1022,17 @@ struct WebBrowserComponent::Impl::Platform  : public PlatformInterface
+            #if ! JUCE_DEBUG
+             settings->put_AreDevToolsEnabled (false);
+            #endif
+ 
++           #if defined (PLECTRIFY_DISABLE_WEBVIEW2_ZOOM) && PLECTRIFY_DISABLE_WEBVIEW2_ZOOM
++            settings->put_IsZoomControlEnabled (false);
++
++            ComSmartPtr<ICoreWebView2Settings5> settings5;
++            settings.QueryInterface (settings5);
++
++            if (settings5 != nullptr)
++                settings5->put_IsPinchZoomEnabled (false);
++           #endif
++
+             settings->put_IsStatusBarEnabled (! preferences.getWinWebView2BackendOptions().getIsStatusBarDisabled());
+             settings->put_IsBuiltInErrorPageEnabled (! preferences.getWinWebView2BackendOptions().getIsBuiltInErrorPageDisabled());
+ 

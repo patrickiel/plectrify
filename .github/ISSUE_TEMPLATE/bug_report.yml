@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in Plectrify is broken or behaves unexpectedly.
+title: '[Bug]: '
+labels: ['bug']
+
+# Field ids are also the query-parameter names Plectrify uses to prefill this form
+# (see ui/src/features/about/issueReport.ts). Renaming an id silently breaks the
+# prefill — the parameter is simply ignored, with no error anywhere.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        If you got here from **Setup → About & feedback → Report a bug**, the
+        Diagnostics box below is already filled in. Otherwise please paste it —
+        it is the difference between a report we can act on and one we cannot.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+      placeholder: |
+        The rack went silent after I bypassed the second module.
+        I expected the signal to pass through untouched.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        The smallest sequence that shows the problem. "I do not know how to
+        reproduce it" is a fine answer — say so and describe what you were doing.
+      placeholder: |
+        1. Load a rig with two modules
+        2. Bypass the second one
+        3. Play — no sound
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        In Plectrify: **Setup menu → About & feedback → Copy**, then paste here.
+        This is the single most useful thing in a bug report. It carries no rig,
+        scene or module names you typed, and no file paths.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: plugins
+    attributes:
+      label: Plugin involved
+      description: >-
+        If one specific plugin is involved, its name and version. Leave blank if
+        the problem is not about a particular plugin.
+      placeholder: Valhalla Supermassive 1.3.0
+    validations:
+      required: false

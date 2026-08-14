@@ -1,0 +1,39 @@
+{
+  "prettier.requireConfig": true,
+  "prettier.documentSelectors": [
+    "**/*.svelte"
+  ],
+  "[svelte]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.wordWrap": "bounded",
+    "editor.wordWrapColumn": 100,
+    "editor.wrappingIndent": "indent"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.formatOnSave": true
+  },
+  // Scoped to the patch directory rather than a bare "*.patch": .patch is the
+  // universal extension for a unified diff, and a blanket association would
+  // render every one of those as JSON in this workspace.
+  "files.associations": {
+    "**/Plectrify/patches/*.patch": "json"
+  }
+}

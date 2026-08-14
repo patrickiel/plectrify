@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Preserve the developer's normal per-platform Visual C++ settings. -->
+  <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+          Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+          Label="LocalAppDataPlatform" />
+
+  <!-- Auto may attach Visual Studio's JavaScript debugger to the WebView2
+       subprocess. Edge's internal debug breaks then suspend the whole app and
+       Windows replaces our chrome with a ghost 'Not Responding' window. -->
+  <PropertyGroup>
+    <LocalDebuggerDebuggerType>NativeOnly</LocalDebuggerDebuggerType>
+  </PropertyGroup>
+</Project>

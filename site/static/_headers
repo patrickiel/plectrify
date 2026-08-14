@@ -1,0 +1,16 @@
+# Cloudflare Pages reads this file verbatim. Two rules, both about caching:
+#
+# Vite fingerprints everything under _app/immutable/, so those files can never
+# change meaning under a given URL and are safe to cache forever.
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The fonts are copies of the app's, and their names carry no hash — so they are
+# cached for a week rather than forever, which is short enough to recover from a
+# swapped file and long enough that a repeat visitor never refetches them.
+/fonts/*
+  Cache-Control: public, max-age=604800
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

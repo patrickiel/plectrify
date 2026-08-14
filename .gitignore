@@ -1,0 +1,39 @@
+# Build output (build*/ also covers scratch configure trees)
+/build*/
+/artifacts/
+/.release-cache/
+/packaging/windows/output/
+
+# Third-party payloads fetched at configure time (WebView2 NuGet package)
+/third_party/
+
+# Root dev/release tooling (scripts/) — tsx and types only.
+/node_modules/
+
+# Svelte UI
+/ui/node_modules/
+# Wrangler and its runtime, installed only for publishing the plugin catalogue.
+/packaging/node_modules/
+# Wrangler's local state cache, written wherever it is invoked from.
+.wrangler/
+/ui/dist/
+/ui/.panel-build/
+/ui/.pnpm-store/
+/.pnpm-store/
+*.obj
+*.pdb
+*.exe
+*.ilk
+
+# IDE
+/.vs/
+/.idea/
+*.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Chromium/WebView2 writes this beside the working directory when its crash
+# handler cannot register; it is noise, not a log of ours.
+/debug.log

@@ -1,0 +1,67 @@
+Make a host-requested bypass authoritative in the graph.
+
+Stock JUCE hands bypass to the plugin whenever the plugin exports its own
+bypass parameter (VST3 kIsBypass): Node::setBypassed() sets that parameter and
+the render sequence keeps calling processBlock(), trusting the plugin to pass
+audio through itself. A plugin whose exported parameter is dead then never
+bypasses at all - Uhhyou's OrdinaryPhaser 0.1.7 exports one and ignores it,
+so the rack's bypass toggle audibly did nothing. Nor can the host fall back to
+processBlockBypassed(): the hosted-VST3 override routes that straight back
+into the same parameter (updateBypass in juce_VST3PluginFormatImpl.h).
+
+So when the *host* asked for bypass, enforce it in the graph: skip the
+plugin's processing entirely and pass the buffer through. The node's buffer
+already holds its input in place, so passing through is clearing whatever
+output channels the input does not cover - exactly what the AudioProcessor
+base implementation of processBlockBypassed does, minus its zero-latency
+assertion (the graph performs no latency compensation of its own). A plugin
+bypassing *itself* through its own parameter - from its own editor - is left
+alone, as before. Node::setBypassed still writes the plugin's parameter too,
+which keeps a working plugin's editor UI in step; it just no longer decides
+what the graph renders.
+
+diff --git a/modules/juce_audio_processors_headless/processors/juce_AudioProcessorGraph.cpp b/modules/juce_audio_processors_headless/processors/juce_AudioProcessorGraph.cpp
+--- a/modules/juce_audio_processors_headless/processors/juce_AudioProcessorGraph.cpp
++++ b/modules/juce_audio_processors_headless/processors/juce_AudioProcessorGraph.cpp
+@@ -887,10 +887,17 @@
+             if (processor.isSuspended())
+             {
+                 buffer.clear();
+             }
+             else
+             {
+-                const auto bypass = node->isBypassed() && processor.getBypassParameter() == nullptr;
++                /*  PLECTRIFY_HOST_OWNED_BYPASS: a bypass the host requested is the
++                    host's to enforce. Delegating it to the plugin's exported
++                    bypass parameter leaves a plugin whose parameter is dead
++                    audibly running forever. A plugin bypassing itself through
++                    its own parameter is untouched by this.
++                */
++                const auto bypass = node->userRequestedBypass()
++                                    || (node->isBypassed() && processor.getBypassParameter() == nullptr);
+                 processWithBuffer (c.globalIO, bypass, buffer, *midiBuffer);
+             }
+         }
+@@ -961,8 +968,21 @@
+         template <typename Value>
+         static void processImpl (bool bypass, AudioProcessor& p, AudioBuffer<Value>& audio, MidiBuffer& midi)
+         {
+             if (bypass)
+-                p.processBlockBypassed (audio, midi);
++            {
++                /*  PLECTRIFY_HOST_OWNED_BYPASS: never dispatch to the plugin's
++                    processBlockBypassed - the hosted-VST3 override routes it
++                    back into the same exported bypass parameter this patch
++                    exists to stop trusting. The buffer already holds the node's
++                    input in place, so passing through is clearing whatever
++                    output channels the input does not cover - what the
++                    AudioProcessor base implementation does, minus its
++                    zero-latency assertion (the graph does no latency
++                    compensation of its own).
++                */
++                for (int ch = p.getMainBusNumInputChannels(); ch < p.getTotalNumOutputChannels(); ++ch)
++                    audio.clear (ch, 0, audio.getNumSamples());
++            }
+             else
+                 p.processBlock (audio, midi);
+         }
