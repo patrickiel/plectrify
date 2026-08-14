@@ -523,6 +523,7 @@
   $effect(() => {
     editing; // re-run whenever edit mode toggles…
     expanded; // …and whenever the hovered card folds or unfolds
+    renamingName; // …and when the rename input's minimum width grows the card
     if (!panelEl) return;
     const el = panelEl;
     // A tween still in flight overrides width/height, so it has to be cancelled
@@ -684,11 +685,16 @@
           </span>
         {/if}
         {#if editing && renamingName}
+          <!-- `min-w-[22ch]` — the same cap the title's ghost asks for — is what
+           keeps renaming possible on a narrow card: a one-column (or knobless)
+           card squeezed the growable input to a few characters. The card is
+           w-fit, so the header widens it for the edit and the FLIP tween below
+           carries it there and back. -->
           <InlineRenameInput
             value={module.displayName ?? module.name}
             placeholder={module.name}
             ariaLabel="Rename module"
-            class="text-input w-0 min-w-0 grow truncate px-1.5 py-0.5 text-sm font-semibold tracking-[0.2px] text-ink"
+            class="text-input w-0 min-w-[22ch] grow truncate px-1.5 py-0.5 text-sm font-semibold tracking-[0.2px] text-ink"
             onCommit={commitName}
             onCancel={() => (renamingName = false)}
           />
