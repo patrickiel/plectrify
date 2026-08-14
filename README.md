@@ -8,6 +8,13 @@
 
 <img src="Assets/Banner.png" alt="Plectrify — your pedalboard, without the DAW." width="100%">
 
+<!-- GitHub renders a lone image as a bare <a><img>, not wrapped in a <p>, so it
+     carries no bottom margin and the buttons butt straight against the artwork.
+     These <br>s are the gap. vspace on the img would be the tidier answer but
+     the HTML sanitizer strips it, as it strips style. -->
+<br>
+<br>
+
 <a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="250"></a>
 &nbsp;
 <a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="250"></a>
