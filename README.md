@@ -9,14 +9,12 @@
 A free guitar rig for Windows and macOS. Plug in and play through your own
 VST3 amp sims and pedals, chained like a real pedalboard.
 
-[![Release](https://img.shields.io/github/v/release/patrickiel/plectrify?include_prereleases&label=release&color=00ffcc&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases)
-[![Downloads](https://img.shields.io/github/downloads/patrickiel/plectrify/total?label=downloads&color=00ffcc&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases)
-[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-9ba6b5?labelColor=171c28)](#install)
-[![Licence](https://img.shields.io/badge/licence-AGPL--3.0-9ba6b5?labelColor=171c28)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-join-7700ff?logo=discord&logoColor=white&labelColor=171c28)](https://discord.gg/dxQBanJr2X)
+[![Download for Windows](https://img.shields.io/badge/Download%20for%20Windows-00ffcc?style=for-the-badge&logo=windows&logoColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download%20for%20macOS-00ffcc?style=for-the-badge&logo=apple&logoColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows%20x64-00ffcc?style=for-the-badge&logo=windows&logoColor=171c28&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
-[![Download for macOS](https://img.shields.io/badge/Download-macOS%20Apple%20Silicon-00ffcc?style=for-the-badge&logo=apple&logoColor=171c28&labelColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
+[![Release](https://img.shields.io/github/v/release/patrickiel/plectrify?include_prereleases&label=release&color=39424f&labelColor=1b212c)](https://github.com/patrickiel/plectrify/releases)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-39424f?labelColor=1b212c)](#install)
+[![Licence](https://img.shields.io/badge/licence-AGPL--3.0-39424f?labelColor=1b212c)](LICENSE)
 
 [Website](https://plectrify.com) ·
 [Docs](https://plectrify.com/docs) ·
