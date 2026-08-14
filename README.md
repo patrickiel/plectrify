@@ -1,20 +1,22 @@
-<img src="Assets/PlectrifyIcon.png" alt="" width="116" align="left" hspace="20" vspace="4">
+<div align="center">
 
-# Plectrify
+<!-- The masthead is one rendered image rather than a stack of centred lines:
+     icon, name and tagline are a single composition, set in the product's own
+     type, and it is the composition that is centred. Built by
+     Assets/SocialPreview.html at ?h=420 — the same source as the social card,
+     so the page and the link unfurl cannot drift apart. -->
 
-**Your pedalboard, without the DAW.**
+<img src="Assets/Banner.png" alt="Plectrify — your pedalboard, without the DAW." width="100%">
 
-A free guitar rig for Windows and macOS. Plug in and play through your own
-VST3 amp sims and pedals, chained like a real pedalboard.
-
-<br clear="left">
-
-<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="260"></a>
-<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="260"></a>
+<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="250"></a>
+&nbsp;
+<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="250"></a>
 
 [Website](https://plectrify.com) ·
 [Docs](https://plectrify.com/docs) ·
 [Discord](https://discord.gg/dxQBanJr2X)
+
+</div>
 
 <!-- ───────────────────────────────────────────────────────────────────────────
      TODO: hero screenshot goes here.
@@ -43,6 +45,9 @@ VST3 amp sims and pedals, chained like a real pedalboard.
 ──────────────────────────────────────────────────────────────────────────── -->
 
 ---
+
+A free guitar rig for Windows and macOS. Plug in and play through your own
+VST3 amp sims and pedals, chained like a real pedalboard.
 
 Plectrify is a standalone app: no session to set up, no tracks to arm, no
 recording to manage. Build a chain of amps and effects, tune up, and play.
