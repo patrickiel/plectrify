@@ -1,6 +1,4 @@
-<div align="center">
-
-<img src="Assets/PlectrifyIcon.png" alt="Plectrify" width="140">
+<img src="Assets/PlectrifyIcon.png" alt="" width="116" align="left" hspace="20" vspace="4">
 
 # Plectrify
 
@@ -9,18 +7,14 @@
 A free guitar rig for Windows and macOS. Plug in and play through your own
 VST3 amp sims and pedals, chained like a real pedalboard.
 
-[![Download for Windows](https://img.shields.io/badge/Download%20for%20Windows-00ffcc?style=for-the-badge&logo=windows&logoColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
-[![Download for macOS](https://img.shields.io/badge/Download%20for%20macOS-00ffcc?style=for-the-badge&logo=apple&logoColor=171c28)](https://github.com/patrickiel/plectrify/releases/latest)
+<br clear="left">
 
-[![Release](https://img.shields.io/github/v/release/patrickiel/plectrify?include_prereleases&label=release&color=39424f&labelColor=1b212c)](https://github.com/patrickiel/plectrify/releases)
-[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-39424f?labelColor=1b212c)](#install)
-[![Licence](https://img.shields.io/badge/licence-AGPL--3.0-39424f?labelColor=1b212c)](LICENSE)
+<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="260"></a>
+<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="260"></a>
 
 [Website](https://plectrify.com) ·
 [Docs](https://plectrify.com/docs) ·
 [Discord](https://discord.gg/dxQBanJr2X)
-
-</div>
 
 <!-- ───────────────────────────────────────────────────────────────────────────
      TODO: hero screenshot goes here.
@@ -36,13 +30,15 @@ VST3 amp sims and pedals, chained like a real pedalboard.
      screenshot from sitting in a white box for light-theme readers; with only
      one image, keep the plain <img> line and drop the two <source> lines.
 
-<div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="Assets/screenshot-rack-light.png">
-    <source media="(prefers-color-scheme: dark)" srcset="Assets/screenshot-rack.png">
-    <img src="Assets/screenshot-rack.png" alt="The Plectrify rack: a chain of plugin modules with mapped knobs" width="900">
-  </picture>
-</div>
+     Full width and flush left, like everything else on this page — a centred
+     hero would put the one centred element directly under a left-aligned
+     masthead.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="Assets/screenshot-rack-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="Assets/screenshot-rack.png">
+  <img src="Assets/screenshot-rack.png" alt="The Plectrify rack: a chain of plugin modules with mapped knobs" width="100%">
+</picture>
 
 ──────────────────────────────────────────────────────────────────────────── -->
 
