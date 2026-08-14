@@ -5,6 +5,12 @@
    never reach out to Google Fonts, and a site whose type is a few pixels off
    the product's stops looking like the same product.
 
+   The files live in src/lib/fonts and are referenced relatively, not out of
+   static/: that puts them through Vite, which fingerprints them into
+   _app/immutable (cacheable forever) and lists them in the build manifest —
+   which is what lets hooks.server.ts emit a <link rel="preload"> for each at
+   prerender time instead of app.html hard-coding the tags by hand.
+
    font-display: swap, not the app's `block` — these come over the network
    rather than off local disk, and a blocking web font is the classic way to
    ship an invisible first paint. */
@@ -13,7 +19,7 @@
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+  src: url('./lib/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
 }
 
 @font-face {
@@ -21,7 +27,7 @@
   font-style: normal;
   font-weight: 100 800;
   font-display: swap;
-  src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
+  src: url('./lib/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
 }
 
 /* The third face is the site's alone, and it sets exactly one string: the
@@ -42,7 +48,7 @@
   font-style: normal;
   font-weight: 600;
   font-display: optional;
-  src: url('/fonts/chakra-petch-latin-600-normal.woff2') format('woff2');
+  src: url('./lib/fonts/chakra-petch-latin-600-normal.woff2') format('woff2');
 }
 
 /* The palette is the app's dark theme, token for token, and the names are kept

@@ -199,8 +199,10 @@ Two things about its content are load-bearing:
   the ASCII signal-flow diagrams; an indented block does not survive mdsvex.
 
 Design tokens are lifted from `ui/src/app.css` under the *same names*, and the
-two woff2 files in `site/static/fonts/` are copies of the app's. The site is
-dark only; the app has both themes.
+Inter and JetBrains Mono woff2 files in `site/src/lib/fonts/` are copies of the
+app's (in `src/lib`, not `static/`, so Vite fingerprints them and
+`hooks.server.ts` can preload them). The site is dark only; the app has both
+themes.
 
 ### Plugin catalogue (`packaging/`)
 

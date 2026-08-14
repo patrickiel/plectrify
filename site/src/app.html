@@ -9,22 +9,9 @@
     <link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
     <meta name="theme-color" content="#020305" />
 
-    <!-- Both faces are used above the fold — Inter for prose, JetBrains Mono for
-         the eyebrows and the rack diagram's labels — so both are preloaded. -->
-    <link
-      rel="preload"
-      href="%sveltekit.assets%/fonts/inter-latin-wght-normal.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
-    <link
-      rel="preload"
-      href="%sveltekit.assets%/fonts/jetbrains-mono-latin-wght-normal.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
+    <!-- Font preloads are not written here by hand: hooks.server.ts asks
+         SvelteKit to emit them for every font in the build manifest, with the
+         fingerprinted URLs only the build knows. They land in %sveltekit.head%. -->
 
     <!-- Stamps the visitor's desktop OS on <html> before first paint, so the
          download buttons can lead with the build that will actually run here
