@@ -708,12 +708,15 @@
            keeps renaming possible on a narrow card: a one-column (or knobless)
            card squeezed the growable input to a few characters. The card is
            w-fit, so the header widens it for the edit and the FLIP tween below
-           carries it there and back. -->
+           carries it there and back. `leading-normal` because the box must be
+           the title's box: the title inherits the page's 1.5 line-height while
+           an input's own default is smaller, and the mismatch nudged the whole
+           card shorter for the duration of the rename. -->
           <InlineRenameInput
             value={module.displayName ?? module.name}
             placeholder={module.name}
             ariaLabel="Rename module"
-            class="text-input w-0 min-w-[22ch] grow truncate px-1.5 py-0.5 text-sm font-semibold tracking-[0.2px] text-ink"
+            class="text-input w-0 min-w-[22ch] grow truncate px-1.5 py-0.5 text-sm leading-normal font-semibold tracking-[0.2px] text-ink"
             onCommit={commitName}
             onCancel={() => (renamingName = false)}
           />
