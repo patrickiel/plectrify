@@ -92,12 +92,13 @@
           radial-gradient(700px 500px at 50% 118%, rgb(119 0 255 / 0.1), transparent 65%);
       }
 
-      /* A hairline of accent along the top edge — the one piece of chrome, and
-         what stops the card reading as a plain dark rectangle when it is
-         thumbnailed down to a few hundred pixels. */
+      /* A hairline of accent along the top and bottom edges — the one piece of
+         chrome, and what stops the card reading as a plain dark rectangle when
+         it is thumbnailed down to a few hundred pixels. The pair also closes
+         the artwork off, which matters most in the README, where the banner
+         meets the page rather than a card's own border. */
       .rule {
         position: absolute;
-        top: 0;
         left: 0;
         right: 0;
         height: 3px;
@@ -110,6 +111,14 @@
           transparent
         );
         opacity: 0.85;
+      }
+
+      .rule--top {
+        top: 0;
+      }
+
+      .rule--bottom {
+        bottom: 0;
       }
 
       .coin {
@@ -195,7 +204,8 @@
     </script>
 
     <div class="wash"></div>
-    <div class="rule"></div>
+    <div class="rule rule--top"></div>
+    <div class="rule rule--bottom"></div>
 
     <div class="coin"><img src="PlectrifyIcon.png" alt="" /></div>
 
