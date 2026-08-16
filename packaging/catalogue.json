@@ -1,0 +1,1268 @@
+{
+  "_comment": [
+    "Plugin catalogue - the single authoring source for what Plectrify's Packages panel",
+    "offers. Used two ways:",
+    "  1. Debug builds read it straight from the source tree (PLECTRIFY_CATALOGUE_FILE),",
+    "     so the dev loop is: edit this file, restart. No upload, no network.",
+    "  2. `pnpm --dir packaging publish-catalogue` signs and publishes it, which is what",
+    "     release builds fetch - so a plugin update needs no Plectrify release.",
+    "Nothing is compiled into the binary.",
+    "",
+    "SHAPE. Three lists:",
+    "  packages - one definition per downloadable thing, plugin or not: where it comes",
+    "             from, its version, its licence, and the hash that authorises it.",
+    "  bundles  - named bundles that hold only package IDs plus a version of their own,",
+    "             so a bundle can gain or lose members without touching any definition.",
+    "             'starter' is the one the empty rack offers; more can be added here",
+    "             without any code change.",
+    "  links    - outbound pointers to things Plectrify does not host at all: captures,",
+    "             IR collections, and in time plugins we cannot redistribute.",
+    "",
+    "PER-PLATFORM ASSETS. Every payload lives in `assets`, keyed by platform slug, and",
+    "no platform is the default:",
+    "",
+    "  \"assets\": {",
+    "    \"macos-arm64\": { \"url\": ..., \"sha256\": ..., \"downloadBytes\": ... },",
+    "    \"windows-x64\": { \"url\": ..., \"sha256\": ..., \"downloadBytes\": ... }",
+    "  }",
+    "",
+    "Keys are written in alphabetical order for exactly that reason - the file should",
+    "not be readable as 'Windows, plus some others'. At least one is required: a",
+    "package offered nowhere is not a package. A platform with no entry is not offered",
+    "the package, and its row renders greyed with install disabled - visible rather",
+    "than hidden, so the catalogue never looks quietly thinner on one OS.",
+    "",
+    "This IS what schemaVersion 4 is. Until then Windows lived in flat",
+    "assetUrl/sha256/downloadBytes fields at the top of each entry and `assets` held",
+    "only the other platforms, so the asymmetry in the format kept re-appearing in the",
+    "tooling: two code paths per script, a validate rule refusing 'windows-x64' as a",
+    "'second source of truth', and a per-OS question ('does this have a mac build?')",
+    "that could only be asked one way round. One keyed map answers it for any platform",
+    "the same way. Unlike `category` gaining its array form, an older build cannot",
+    "read this and get a slightly worse answer - it would find no assetUrl at all - so",
+    "this is a genuine bump, and builds predating it reject the catalogue and keep",
+    "using their cached copy until they are updated.",
+    "",
+    "`include` stays on the PACKAGE, shared by every platform, and an asset may name",
+    "its own to override it. That is not the old asymmetry returning: extraction",
+    "patterns are usually layout-neutral ('**/*.vst3/**' works on both), and repeating",
+    "them per platform would invite the two copies to drift.",
+    "",
+    "`selfHosted` MOVED THE OTHER WAY - from the package onto each asset - because it",
+    "is a fact about one url and nothing else, and dragonfly-reverb is the entry that",
+    "proved it: mac re-hosted by us, Windows still fetched from the project. The",
+    "package-level flag could only describe that with a footnote, and the footnote",
+    "would have been what a reader trusted. This did NOT bump schemaVersion, because a",
+    "build too old to read it gets a slightly worse answer rather than none - it finds",
+    "no flag, and simply omits the 'Hosted by Plectrify' line from a package's details",
+    "while installing exactly the same bytes from exactly the same url. Nothing about",
+    "trust, verification or where a payload lands has ever read this field.",
+    "",
+    "ONE `version` COVERS EVERY PLATFORM'S PAYLOAD, so each platform's asset must come",
+    "from the same upstream release. An older mac build under a newer version number",
+    "would misstate what mac users are getting - which is why dragonfly-reverb's mac",
+    "asset is a re-host of the 3.2.10 dmg rather than the ready-to-unzip mac zip that",
+    "release 3.2.7 shipped. The awkward format is a packaging problem, solvable by",
+    "`host-plugin`; the wrong version is a lie, and nothing solves that.",
+    "",
+    "DEPENDENCIES. A package may name ONE other in `dependsOn` - a single id, not a",
+    "list - and it is installed first. The edge always points from the thing that",
+    "needs something to the thing it needs: a patch names the plugin it was built",
+    "for, never the other way round, because only that direction is true. The patch",
+    "is meaningless without the plugin; the plugin is complete without the patch. It",
+    "also keeps the two independent, so adding or revising a patch never touches the",
+    "plugin's pin, hash or provenance. The id must name a package in this file, may",
+    "not be the package's own, and the chain it starts may not loop; the app and",
+    "`validate` both enforce that.",
+    "",
+    "KIND vs CATEGORY - the two fields every package carries, and they are not the same",
+    "question. Confusing them is a security bug, so keep them apart:",
+    "  kind     - 'plugin' or 'content'. This is a TRUST decision, not a display one: a",
+    "             'plugin' is unzipped into the VST3 load path and will be executed",
+    "             inside Plectrify's process; 'content' unpacks into a plain data folder",
+    "             (installDir) and is never loaded as code. A content package must",
+    "             declare installDir; a plugin must not. Nothing in the UI reads this.",
+    "  category - where the panel files the package, printed verbatim and grouped by in",
+    "             first-appearance order. Purely cosmetic, so renaming one can never",
+    "             move a payload between data and code. Name these for what a guitarist",
+    "             is looking for ('Amps', 'Cabs & IRs', 'Effects'), never for how the",
+    "             package is packaged - 'Plugins' and 'Content' are the kinds, and are",
+    "             deliberately not category names. Adding a section is a new category",
+    "             here, never a UI change.",
+    "",
+    "             A category may be one heading (\"Effects\") or a PATH of them",
+    "             (['Effects', 'Reverb']), outermost first, which renders the last",
+    "             segment as a subsection of the ones before it. Use a path only where",
+    "             a section has grown enough to need dividing - Effects has; Amps has",
+    "             not - and leave the entries that span every subsection on the parent",
+    "             itself, which is why the three multi-effect racks below sit under a",
+    "             bare 'Effects'. Nesting is display and nothing more: it is the same",
+    "             cosmetic field, refused the same 'Plugins'/'Content' names at every",
+    "             depth, and still unable to move a payload anywhere.",
+    "",
+    "             Both forms are accepted everywhere, so nothing had to be rewritten",
+    "             when paths arrived, and schemaVersion did not move: a build too old to",
+    "             read a path files those rows under 'More downloads' and installs them",
+    "             correctly, where a bump would leave it with no catalogue at all.",
+    "  tags     - the panel's FILTER CHIPS: what the thing is, as against the one place",
+    "             it is filed. Cosmetic exactly as category is, and refused the same",
+    "             'Plugins'/'Content' names for the same reason, but it answers a",
+    "             different question and a package has several answers to it: a",
+    "             multi-effect rack is a distortion AND a delay AND a reverb, and it",
+    "             still sits in one section. Always an array, however few - there is no",
+    "             bare-string shorthand here, because nothing predates the field.",
+    "",
+    "             These were the top-level headings until that showed its limit: with",
+    "             every package on offer filed under 'Effects', the chip row read",
+    "             'Effects 22' beside a fallback chip and narrowed nothing anyone wanted",
+    "             narrowed. Keep the VOCABULARY SMALL and reuse it - a tag used once is a",
+    "             chip that filters 22 rows down to 1, and twelve of those are a wall of",
+    "             chips instead of a way through the list. Before inventing one, check",
+    "             whether an existing tag says it.",
+    "",
+    "             Omitting it is a legitimate answer, not an oversight: the entry then",
+    "             appears under no chip. HISE is the one that does (see its note).",
+    "",
+    "Both fields appear on links too, and both mean the same there. Tags especially:",
+    "a chip asks what someone is after, and the honest answer to 'amps' or 'captures'",
+    "is mostly things Plectrify does not host - so choosing a chip narrows the link",
+    "cards rather than hiding them, and a chip's count includes them.",
+    "Anything with no category falls into one last 'More downloads' group.",
+    "",
+    "A bundle's `version` is what tells us which edition of it a user installed, so bump",
+    "it whenever its packageIds change. The packages' own versions are independent: a",
+    "plugin update does not change the bundle, and a bundle change does not re-download",
+    "packages that are already current.",
+    "",
+    "ASCII ONLY. This file is read by C++, TypeScript and shell tooling on three",
+    "platforms; keeping it to ASCII removes an entire class of encoding bug (an",
+    "earlier PowerShell round-trip silently mojibaked every em dash in here).",
+    "",
+    "INVARIANT: every kind:'plugin' payload must yield a .vst3 by UNZIPPING ALONE -",
+    "every `assets` entry, on every platform. Never point at an installer",
+    "executable; Plectrify will not run one. Neural Amp Modeler ships only an installer,",
+    "which is why its (MIT-licensed) VST3 must be extracted once and hosted by us",
+    "before it can be listed. The bar bites hardest on macOS, where a .dmg or .pkg is",
+    "the usual release format: `host-plugin` extracts those as plain data on a",
+    "Mac and re-hosts the bundles, which is how dragonfly-reverb reached macOS and",
+    "what airwindows-consolidated is still waiting on.",
+    "",
+    "LICENSING, and note that `selfHosted` sits on the ASSET rather than the package -",
+    "it is a fact about ONE url, so a package can be a mirror on one platform and a",
+    "re-host on the other, which dragonfly-reverb is. An asset without it means the",
+    "user's machine fetches from the project's own release page, so the conveyance is",
+    "vendor->user and GPL section 6 rests with the vendor. The moment one is flipped to",
+    "selfHosted:true, Plectrify becomes the conveyor of THAT binary and section 6 attaches",
+    "to us - one platform is enough. Then the entry must name the corresponding source",
+    "in `sourceUrl` (validate refuses it otherwise), and the SOURCE_OFFER.txt in both",
+    "installers must say where a hosted plugin's source is found. Section 6(d) allows",
+    "that source to sit on the project's own server, which is where dragonfly-reverb's",
+    "points, BUT THE OBLIGATION DOES NOT MOVE WITH IT: we must keep it available for as",
+    "long as we offer the binary. So if an upstream source archive ever disappears,",
+    "mirror it into our bucket beside the plugin archive and re-point sourceUrl - never",
+    "just drop the field. And do not 'fix' a rotted vendor URL by re-hosting a binary",
+    "whose source you have not checked is still published: re-pin to a newer release,",
+    "or drop the plugin.",
+    "",
+    "The flag is CHECKED AGAINST THE URL IT SITS ON, in both directions: validate",
+    "refuses a selfHosted asset that is not served from our bucket, and one that is",
+    "without the flag. Neither mistake is cosmetic - the first claims a responsibility",
+    "we are not carrying, the second hides one we are. That check is only possible",
+    "because the flag is per asset; a package-level one could always be explained away",
+    "by 'the other platform'."
+  ],
+  "schemaVersion": 4,
+  "revision": 14,
+  "_noticesComment": [
+    "Licence disclosure travels WITH the catalogue rather than shipping in the",
+    "installer. If the offered plugins change, the notices change with them - no new",
+    "installer just to correct a licence line, and no stale file on disk contradicting",
+    "what is actually on offer. The panel renders this text plus each plugin's own",
+    "licenseId / licenseUrl / projectUrl."
+  ],
+  "notices": {
+    "summary": "These are third-party plugins, each under its own open-source licence. Plectrify's installer contains none of them, and nothing is downloaded until you ask for it.",
+    "fetched": "Downloads come straight from each project's own release page over HTTPS and are checked against a pinned checksum before anything is written. Because the transfer is from the project to you, that project remains the distributor of its own binaries and source.",
+    "hosted": "Where a project publishes nothing your system can install directly, Plectrify hosts the download instead - either a copy of the project's own build, re-zipped so it installs without running an installer, or, where the project publishes no build at all, one Plectrify compiled from its source. Either is done only where the plugin's licence permits it. What was hosted and where it came from is recorded alongside each download, the corresponding source stays published on the project's own release page that the plugin's Project link leads to, and the project's own licence notices travel inside the plugin.",
+    "models": "No amp capture models are included. TONE3000's terms do not permit bundling their catalogue, so any model you use is one you fetched yourself.",
+    "uninstall": "Plugins install into your own user profile. Removing one deletes only the files Plectrify installed, and uninstalling Plectrify leaves them in place - they are yours, and other hosts can use them."
+  },
+  "links": [
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Amps",
+        "Cabs & IRs"
+      ],
+      "label": "Ignite Amps",
+      "url": "https://www.igniteamps.com/",
+      "note": "Emissary and TPA-1 amp heads, plus the NadIR cab loader"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Reverb",
+        "Delay",
+        "Modulation"
+      ],
+      "label": "Valhalla free plugins",
+      "url": "https://valhalladsp.com/demos-downloads/",
+      "note": "Supermassive reverb/delay, Space Modulator flanger, Freq Echo shifter"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Amps",
+        "Dynamics"
+      ],
+      "label": "UAD Explore FREE",
+      "url": "https://www.uaudio.com/products/uad-explore-free",
+      "note": "1176, LA-2A, a 610 preamp and a tube amp - needs a UA account"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "EQ",
+        "Dynamics"
+      ],
+      "label": "TDR Nova and Kotelnikov",
+      "url": "https://www.tokyodawn.net/tdr-nova/",
+      "note": "Dynamic EQ, and a compressor for the mix bus"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Dynamics",
+        "Distortion",
+        "Reverb"
+      ],
+      "label": "Klanghelm freeware",
+      "url": "https://klanghelm.com/contents/plugins.html",
+      "note": "DC1A and MJUC jr. compressors, IVGI saturation, TENS jr. spring reverb"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Distortion",
+        "Amps",
+        "Delay",
+        "Modulation"
+      ],
+      "label": "Nembrini Audio free plugins",
+      "url": "https://www.nembriniaudio.com/collections/free/free",
+      "note": "Klon, Big Muff, TS808 and Rat pedals, an amp, delay, chorus and a gate"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Amps",
+        "Distortion",
+        "Modulation",
+        "EQ"
+      ],
+      "label": "Audiority free plugins",
+      "url": "https://www.audiority.com/product-category/plugins/free/",
+      "note": "L12X solid state amp, Dr Drive overdrive, Dr Phase and an EQ boost"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Amps",
+        "Cabs & IRs"
+      ],
+      "label": "Voxengo Boogex",
+      "url": "https://www.voxengo.com/product/boogex/",
+      "note": "Amp and cab sim with its own IR loader"
+    },
+    {
+      "category": "Pro freeware",
+      "tags": [
+        "Dynamics",
+        "EQ",
+        "Reverb",
+        "Delay",
+        "Modulation"
+      ],
+      "label": "MeldaProduction MFreeFXBundle",
+      "url": "https://www.meldaproduction.com/MFreeFXBundle",
+      "note": "Three dozen free effects - compressor, EQs, reverb, delay, chorus, phaser and more"
+    },
+    {
+      "category": "Open source",
+      "tags": [
+        "Multi-effect",
+        "Amps"
+      ],
+      "label": "Stompbox",
+      "url": "https://github.com/mikeoliphant/Stompbox",
+      "note": "A whole pedalboard in one plugin"
+    },
+    {
+      "category": "Open source",
+      "tags": [
+        "Multi-effect",
+        "Distortion"
+      ],
+      "label": "BYOD",
+      "url": "https://github.com/Chowdhury-DSP/BYOD",
+      "note": "Build your own distortion pedal from a kit of parts"
+    },
+    {
+      "category": "Open source",
+      "tags": [
+        "Distortion",
+        "Modulation"
+      ],
+      "label": "ChowTapeModel",
+      "url": "https://github.com/jatinchowdhury18/AnalogTapeModel",
+      "note": "Tape saturation, wow and flutter"
+    },
+    {
+      "category": "Open source",
+      "tags": [
+        "Amps"
+      ],
+      "label": "Proteus",
+      "url": "https://github.com/GuitarML/Proteus",
+      "note": "Plays neural captures of amps and pedals"
+    },
+    {
+      "category": "Open source",
+      "tags": [
+        "EQ"
+      ],
+      "label": "ZL Equalizer",
+      "url": "https://github.com/ZL-Audio/ZLEqualizer",
+      "note": "Dynamic parametric EQ"
+    },
+    {
+      "category": "Open source",
+      "tags": [
+        "Dynamics"
+      ],
+      "label": "ZL Compressor",
+      "url": "https://github.com/ZL-Audio/ZLCompressor",
+      "note": "Compressor with a sidechain EQ"
+    },
+    {
+      "category": "Open source",
+      "label": "HISE",
+      "url": "https://github.com/christophhart/HISE",
+      "note": "A framework for building plugins - a developer tool, not a pedal",
+      "_tagsNote": "DELIBERATELY UNTAGGED, and the one entry here that is. Every chip names something a guitarist is after, and this is a build tool - it answers 'reverb' and 'amps' and the rest with a no. Leaving the field off is how the format says that; it is not an oversight to be tidied up later."
+    }
+  ],
+  "bundles": [
+    {
+      "id": "starter",
+      "name": "Starter bundle",
+      "description": "The usual pedals in one go: drive, chorus, delay, and reverb.",
+      "version": "11",
+      "_selectionNote": "A hand-picked pedalboard, in signal-chain order: PeakEater is drive, Lupex Chorus is modulation, Lupex Delay and QDelay are the two delay flavours (dark analog repeats vs a clean dual delay), Dragonfly is the ambience reverb. ON macOS ONLY QDELAY AND DRAGONFLY ARE OFFERED - PeakEater and both Lupex pedals are Windows-only - and that is accepted: a bundle is one list of ids with no per-platform form, and the panel skips unavailable ids rather than queueing installs that cannot succeed. A bundle is one list of ids with no per-platform form, and it should stay that way: two lists would drift, and a bundle that quietly means something different per OS is worse than one that is visibly incomplete - the panel skips unavailable ids rather than queueing installs that cannot succeed.",
+      "_capturesNote": "Neural Amp Modeler is no longer here, and not because it stopped mattering: it ships inside Plectrify now (packaging/bundled-plugins.json). Every TONE3000 tone is a capture that loads into it, so a catalogue of captures with nothing to play them in is not a product - and a plugin the app assumes is present has no business being one the user might not have installed. Nothing in the catalogue is responsible for making the app audible any more; this bundle is effects and nothing else.",
+      "packageIds": [
+        "peakeater",
+        "lupex-chorus",
+        "lupex-delay",
+        "qdelay",
+        "dragonfly-reverb"
+      ]
+    }
+  ],
+  "_packagesComment": [
+    "Ordered by category, then by what a player reaches for first inside it. The panel",
+    "renders them in this order within each section, so this list IS the running order",
+    "on screen - there is no sort rule in the app to disagree with it.",
+    "",
+    "That holds per level now that categories may be paths: a section appears where its",
+    "first entry does, and the entries filed on a parent directly are drawn above its",
+    "subsections whatever order they were written in. So keep this list in the order it",
+    "should read - Effects runs racks, drive, filter, modulation, delay, reverb, which is",
+    "roughly a signal chain - rather than relying on the grouping to sort it out."
+  ],
+  "packages": [
+    {
+      "id": "airwindows-consolidated",
+      "kind": "plugin",
+      "category": "Effects",
+      "tags": [
+        "Multi-effect",
+        "Distortion",
+        "Modulation"
+      ],
+      "name": "Airwindows Consolidated",
+      "purpose": "Utility, saturation and modulation collection",
+      "version": "2026-08-02-f3fc037",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/baconpaul/airwin2rack/main/LICENSE",
+      "projectUrl": "https://github.com/baconpaul/airwin2rack",
+      "sourceUrl": "https://github.com/baconpaul/airwin2rack/tree/f3fc037",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/hosted/airwindows-consolidated/airwindows-consolidated-2026-08-02-f3fc037-macos-arm64.zip",
+          "sha256": "7f26b16182cc67bfa62369bf44f0691fbb05b037ba4c59e1b905a2d5b90522dd",
+          "downloadBytes": 12287036,
+          "selfHosted": true
+        },
+        "windows-x64": {
+          "url": "https://github.com/baconpaul/airwin2rack/releases/download/DAWPlugin/AirwindowsConsolidated-2026-08-02-f3fc037-Windows.zip",
+          "sha256": "670ec3abb43838c0a51934205d21ffc45992d364e46bc227b15c372177f0ae5b",
+          "downloadBytes": 13317479
+        }
+      },
+      "_macNote": "THE MAC ASSET IS A RE-HOST OF UPSTREAM'S OWN dmg, not a build of ours. This release ships mac only as airwindows-consolidated-macOS-2026-08-02-f3fc037.dmg, which cannot back an asset url - the app will not mount a disk image on a user's behalf - so `host-plugin` mounted it here as plain data, expanded the airwindows-consolidated_VST3.pkg inside it, and re-zipped the one bundle unmodified (see PROVENANCE-macos-arm64.txt beside the archive, which records the dmg's own sha256). Nothing from the payload was executed, and the bundle's Developer ID signature (Paul Walker, 547U7G7MZC) still verifies after extraction. The binary is universal, x86_64 and arm64; only the arm64 slice matters here and it is checked with lipo before archiving, which is why the asset is keyed macos-arm64 rather than by what else is in it. The dmg also carries AU and CLAP builds, which Plectrify does not host: it is a VST3 host, and shipping formats it cannot load would be payload nobody asked for.",
+      "_licenceNote": "Source is MIT, but the shipped binaries carry GPL-3.0 (pre-3.8 VST3 SDK linkage) - LICENSE.gpl3 in the Windows zip, License.txt in the mac pkg, checked separately rather than assumed from the Windows one. The panel shows the BINARY's licence, which is what this field records. Re-check BOTH on every version bump.",
+      "_sourceNote": "sourceUrl NAMES THE COMMIT, NOT THE RELEASE TARBALL, and that is deliberate. Serving the mac binary ourselves makes Plectrify its conveyor, so GPL section 6 requires the corresponding source to stay published for as long as we serve the object code. This release does ship airwin2rack-source-f3fc037.tar.gz, which is the fuller snapshot - but it hangs off the ROLLING DAWPlugin tag and is replaced the moment upstream rebuilds, which would leave us conveying a GPL binary behind a dead source pointer in the window before anyone noticed. The commit f3fc037 is what the dmg's own filename names, it is reachable on main, and it cannot be replaced in place. Re-point it at the new commit whenever the binary is re-hosted, in the same edit as the hash.",
+      "_rotNote": "This project publishes to a ROLLING tag ('DAWPlugin') whose asset filename carries a build date and commit, so both the URL and the hash change whenever it is rebuilt - unlike the other entries, which point at immutable version tags. Expect this pin to rot; re-verify it on every publish. BOTH platforms rot together and must be re-pinned together: they are cut from the one tag, so a mac re-host without a matching Windows re-pin would leave this entry's single `version` describing only one of the two binaries. `check-updates` cannot see the mac pin move (a self-hosted url never appears in an upstream release), so it falls back to matching this `version` against the newest release's asset filenames - which is exactly why the version string is that filename's date-and-commit and not something prettier."
+    },
+    {
+      "id": "surge-xt-effects",
+      "kind": "plugin",
+      "category": "Effects",
+      "tags": [
+        "Multi-effect",
+        "Distortion",
+        "Modulation",
+        "Delay",
+        "Reverb"
+      ],
+      "name": "Surge XT Effects",
+      "purpose": "Effects rack - reverbs, delays, rotary speaker, distortion, chorus",
+      "version": "1.3.4",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/surge-synthesizer/surge/main/LICENSE",
+      "projectUrl": "https://github.com/surge-synthesizer/surge",
+      "include": [
+        "**/Surge XT Effects.vst3/**"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/surge-synthesizer/releases-xt/releases/download/1.3.4/surge-xt-macos-1.3.4-pluginsonly.zip",
+          "sha256": "37d8d809693adc86587b7bc75a2384fc4e905f259aa9b9a21777749d36fbf8aa",
+          "downloadBytes": 186958216
+        },
+        "windows-x64": {
+          "url": "https://github.com/surge-synthesizer/releases-xt/releases/download/1.3.4/surge-xt-win64-1.3.4-pluginsonly.zip",
+          "sha256": "564e162c560af07ad4ed47fe1bfcd827cf97a575de30d06c48249aad2e7c35e6",
+          "downloadBytes": 49093875
+        }
+      },
+      "_macNote": "BY FAR THE LARGEST DOWNLOAD IN THE CATALOGUE at 187 MB, against 49 MB on Windows, and that is upstream's packaging rather than a mistake: the mac pluginsonly zip carries VST3, AU, CLAP and a standalone .app for BOTH Surge XT and Surge XT Effects, all universal binaries. The include pattern is layout-neutral enough to inherit - on macOS the bundle sits at the archive root as 'Surge XT Effects.vst3/', and '**/' matches zero segments - so the same one line still selects the effects rack alone and drops the synth, the AU, the CLAP and the two .app files. The extracted bundle is about 40 MB. The _dataPathNote below applies here too and is likewise untested: the mac bundle's Resources hold only an icon, so it has no factory data folder either.",
+      "_includeNote": "THE ONLY ENTRY WHOSE include NAMES ONE PLUGIN RATHER THAN MATCHING *.vst3, and it must stay that way. This archive holds two VST3 bundles: 'Surge XT Effects.vst3' and 'Surge XT.vst3', the synthesiser. A guitar rig has no use for the synth - it is an instrument, it makes sound with no input - so the pattern selects the effects rack alone. Widening this to the usual '**/*.vst3/**' would silently install both. The CLAP builds, the two standalone .exe files and surge-xt-cli.exe in the same zip are dropped by the same pattern.",
+      "_sourceNote": "The binary comes from surge-synthesizer/releases-xt while projectUrl points at surge-synthesizer/surge - the project splits code and releases across two repositories, and the code one publishes only a rolling 'Nightly' tag whose assets carry a date and commit in the filename. Pin the versioned releases-xt tag, never Nightly: its URL and hash both change on every build.",
+      "_dataPathNote": "UNVERIFIED IN A REAL INSTALL - test this one through the Packages panel before publishing. Surge normally gets a factory data folder from its own setup.exe; the pluginsonly zip pinned here contains no such folder, only the plugin bundles. On Windows SurgeStorage walks up from the loaded binary looking for a 'SurgeXTData' directory and then falls back to the shared library path, so an install that places only the .vst3 leaves it with neither. The effects rack needs none of the wavetables or patches that folder holds, and configuration.xml is compiled into the binary, so it is expected to run - but expected is not tested. If it turns out to need the folder, note that the walk-up passes through %PROGRAMDATA%/Plectrify, which a kind:'content' package with installDir 'SurgeXTData' would land in; that would be a second entry, not a change to this one."
+    },
+    {
+      "id": "uhhyou-comb-distortion",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Drive & distortion"
+      ],
+      "tags": [
+        "Distortion"
+      ],
+      "name": "CombDistortion",
+      "purpose": "Distortion using a self-modulating comb filter",
+      "version": "0.1.7",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
+      "projectUrl": "https://github.com/ryukau/VSTPlugins",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/CombDistortion_0.1.7_macOS.zip",
+          "sha256": "27ceaadebfe54d155af2e527b78b4d2f17eae8be3515c1927876c11c927a3833",
+          "downloadBytes": 1069972
+        },
+        "windows-x64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/CombDistortion_0.1.7.zip",
+          "sha256": "7db35a3351425d2584d0d390509f80665c348644dc4f4ef07282f02fe7086115",
+          "downloadBytes": 2373629
+        }
+      },
+      "_macNote": "THIS NOTE COVERS ALL SEVEN `uhhyou-` ENTRIES. Every one of them pins the project's separate <Plugin>_<version>_macOS.zip for macos-arm64 rather than the plain zip windows-x64 uses. The plain zip does contain a mac binary - the bundle carries Contents/MacOS beside Contents/x86_64-win and x86_64-linux, and the mac binary in it is byte-identical to the one in the macOS zip - so either would work. The macOS zip is pinned because it is half the size, because its _CodeSignature seals exactly the mac file set rather than a tree with two other platforms added to it, and because it is what the project publishes for mac users. All seven mac binaries are universal (x86_64 + arm64) and signed, so they load into the arm64-only Plectrify process. Both zips also carry a `presets` folder of .vstpreset files, which the include patterns drop: Plectrify maps knobs itself and does not read VST3 presets.",
+      "_projectNote": "THIS NOTE AND THE ONE BELOW COVER ALL SEVEN `uhhyou-` ENTRIES, not just this one - they used to be seven adjacent rows and are now spread across the Effects subsections by what each does, so read them as being about the id prefix rather than about the neighbours. They are all Uhhyou Plugins (ryukau/VSTPlugins), listed one by one rather than as the project's 108 MB everything-bundle: that bundle is 39 plugins of which two thirds are synths and drum machines, and a guitar rig has no use for ClangCymbal. Each per-plugin zip is ~2.5 MB and unpacks to a plain .vst3 bundle carrying Windows, macOS and Linux binaries plus the plugin's own manual and licence text. The repository is maintenance-only upstream - new Uhhyou plugins now go to a separate JUCE repository - so expect these versions to move rarely.",
+      "_versionNote": "VERSIONS ARE PER PLUGIN, THE RELEASE TAG IS NOT. Every `uhhyou-` zip lives under the single release tag 'UhhyouPlugins0.70.0' while carrying its own version in the filename (CombDistortion_0.1.7.zip). So `version` here is the plugin's, and it will never equal the tag. A consequence for check-updates, which compares by asset URL: when the project cuts its next collection release, EVERY `uhhyou-` entry reports as behind even where the plugin itself did not change, because the tag in the URL moved. Confirm against the individual version in the new asset's filename before touching a hash. Old release URLs stay live, so a pin that is 'behind' in that sense is not broken."
+    },
+    {
+      "id": "peakeater",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Drive & distortion"
+      ],
+      "tags": [
+        "Distortion"
+      ],
+      "name": "PeakEater",
+      "purpose": "Wave shaper - six clipping curves with oversampling and dry/wet",
+      "version": "0.8.2",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/vvvar/PeakEater/master/LICENSE.md",
+      "projectUrl": "https://github.com/vvvar/PeakEater",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://github.com/vvvar/PeakEater/releases/download/v0.8.2/peakeater-v0.8.2-Windows-x86_64.zip",
+          "sha256": "6bae14feb7ea19beed6faf4a6984168521d2deb1351db9da5c208d274254e075",
+          "downloadBytes": 3727973
+        }
+      },
+      "_macNote": "A MAC BUILD EXISTS BUT CANNOT BE PINNED AS IT SHIPS - this release publishes macOS only as peakeater-v0.8.2-macOS-universal.dmg, and the app will not mount a disk image on a user's behalf. So this is the airwindows-consolidated/dragonfly-reverb shape, not the lupex one: the binary is there and `host-plugin` on a Mac would expand the dmg as plain data and re-host the bundle, which needs a Mac to run and has not been done. Until it is, the row renders greyed on macOS. Note that re-hosting flips selfHosted:true on that asset and GPL section 6 then attaches to us, so a sourceUrl must land in the same edit.",
+      "_includeNote": "The archive is a peakeater_artefacts/Release/ tree holding CLAP and LV2 builds beside the VST3 - roughly two thirds of it. The include patterns match only .vst3 paths, so both are dropped at extraction; that, not a truncated download, is why the installed plugin is about a third of what came down. The bundle itself is nested at Release/VST3/peakeater.vst3/, which '**/' handles, so no per-platform include is needed.",
+      "_licenceNote": "LICENSE.md is the bare GPLv3 text with no 'or any later version' offer from the project itself, so GPL-3.0-only - the same reading as dragonfly-reverb, reev-r and open-spatial-delay. selfHosted is false, so the project conveys its own binary and section 6 rests with it.",
+      "_rotNote": "UPSTREAM IS DORMANT: v0.8.2 was cut in August 2023 and nothing has been pushed since. That is not a reason to drop the entry - the pin is an immutable release tag and the plugin works - but expect check-updates to report it current forever, and do not read a long-unchanged version as a stale pin here."
+    },
+    {
+      "id": "fire",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Drive & distortion"
+      ],
+      "tags": [
+        "Distortion"
+      ],
+      "name": "Fire",
+      "purpose": "Multiband distortion - 20 drive algorithms, per-band solo and mix",
+      "version": "1.5.0",
+      "licenseId": "AGPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/jerryuhoo/Fire/master/LICENSE.md",
+      "projectUrl": "https://github.com/jerryuhoo/Fire",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/jerryuhoo/Fire/releases/download/v1.5.0/Fire-1.5.0-macOS.zip",
+          "sha256": "e4c63f6954ad89a4137d50de71dd9dd00486ad8afeca2f0ebaeb3b7c837e24b3",
+          "downloadBytes": 17985506
+        },
+        "windows-x64": {
+          "url": "https://github.com/jerryuhoo/Fire/releases/download/v1.5.0/Fire-1.5.0-Windows.zip",
+          "sha256": "f47b578ff24684343966f36c3615357fbcca7c99e3c76116ea7dd4a494d46814",
+          "downloadBytes": 6992022
+        }
+      },
+      "_macNote": "BOTH PLATFORMS SHIP PLAIN ZIPS, which is why this entry needed no re-hosting on either. The mac zip lays out AU, CLAP and VST3 side by side and the include patterns select the VST3 alone; the bundle's binary is universal (x86_64 + arm64, checked in the Mach-O fat header), so it loads into the arm64-only Plectrify process, and the archive carries the project's _CodeSignature. That signature will not survive extraction through juce::ZipFile, which is the same position every other zip-shipped mac plugin here is in and why the build carries the disable-library-validation entitlement.",
+      "_includeNote": "The Windows zip puts Fire.lib and a CLAP build beside the bundle, both dropped by the patterns. Note that upstream ships desktop.ini and Plugin.ico INSIDE Fire.vst3, so those two do install - they are part of the bundle as published, not stray files, and the folder icon is what the .ico is for.",
+      "_licenceNote": "AGPL-3.0-only, the second AGPL entry here after filt-r, and recorded because the panel prints it. Nothing follows from it for us: selfHosted is false on both assets, so each project conveys its own binary, and AGPL's network clause has no bearing on a plugin loaded locally. Plectrify is itself AGPL-3.0-only.",
+      "_verifyNote": "UNVERIFIED IN A REAL INSTALL - install it through the Packages panel before publishing. Its editor is large and resizable, which is the interesting case for a hosted editor window."
+    },
+    {
+      "id": "filt-r",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Filters & dynamics"
+      ],
+      "tags": [
+        "Filter"
+      ],
+      "name": "FILT-R",
+      "purpose": "Envelope-drawn filter - auto-wah and sweeps, 34 filter types",
+      "version": "1.3.0",
+      "licenseId": "AGPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/tiagolr/filtr/master/LICENSE",
+      "projectUrl": "https://github.com/tiagolr/filtr",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/tiagolr/filtr/releases/download/v1.3.0/filtr-macos-v1.3.0.zip",
+          "sha256": "4a3c2f6128dd6c9b883857ac1bf37d8265dd3e44c9fe77a03f8c61d2834f43f1",
+          "downloadBytes": 13395910
+        },
+        "windows-x64": {
+          "url": "https://github.com/tiagolr/filtr/releases/download/v1.3.0/filtr-win-v1.3.0.zip",
+          "sha256": "7d77c3369ebc6ca8cc85baef08b1d9d8164cf79da2a2f3f4ca48fb54a9d87b98",
+          "downloadBytes": 6599776
+        }
+      },
+      "_licenceNote": "AGPL-3.0, and the only AGPL entry here - the rest of this author's plugins are GPL-3.0. It is recorded rather than smoothed over because the panel prints it. Nothing follows from it for us: selfHosted is false, so the project conveys its own binary, and the network clause AGPL adds over GPL has no bearing on a plugin loaded locally in a desktop host. Plectrify is itself AGPL-3.0-only.",
+      "_includeNote": "This and the two GATE-12/TIME-12 zips below ship an LV2 build beside the VST3 - GATE-12.lv2 and friends, roughly half the archive. The include patterns match only .vst3 paths, so the LV2 is filtered out at extraction and never lands on disk; that, not a truncated download, is why the installed size is about half the download's. Do not widen the patterns to 'fix' it: Plectrify hosts VST3 only, and an LV2 .dll in the load path is dead weight the scanner would have to reject. The same patterns do the same job on macOS, where all six of this author's entries (FILT-R, GATE-12, TIME-12, QDelay, Sirial, REEV-R) ship a <name>-macos zip laying out AU, LV2 and VST3 side by side - hence a mac download roughly twice the Windows one for the same installed plugin. None of the six needed a per-platform include: '**/*.vst3/**' is layout-neutral, which is why `include` stays on the package rather than being repeated under each asset."
+    },
+    {
+      "id": "gate-12",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Filters & dynamics"
+      ],
+      "tags": [
+        "Filter",
+        "Modulation"
+      ],
+      "name": "GATE-12",
+      "purpose": "Envelope-drawn gate - tremolo, stutter and volume shaping",
+      "version": "1.3.3",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/tiagolr/gate12/master/LICENSE",
+      "projectUrl": "https://github.com/tiagolr/gate12",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/tiagolr/gate12/releases/download/v1.3.3/gate12-macos-v1.3.3.zip",
+          "sha256": "2c11517bd9b59a83fa813fe9f933c4233deff5c7571b4e299c8b6fd91b2e7189",
+          "downloadBytes": 12505885
+        },
+        "windows-x64": {
+          "url": "https://github.com/tiagolr/gate12/releases/download/v1.3.3/gate12-win-v1.3.3.zip",
+          "sha256": "93b1056a40a341452804260a165ce9ce0feaad65eedbcf192319910671f54cf5",
+          "downloadBytes": 6383770
+        }
+      }
+    },
+    {
+      "id": "time-12",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Filters & dynamics"
+      ],
+      "tags": [
+        "Delay",
+        "Modulation"
+      ],
+      "name": "TIME-12",
+      "purpose": "Envelope-drawn delay modulator - tape stop, glitch and reverse",
+      "version": "1.2.3",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/tiagolr/time12/master/LICENSE",
+      "projectUrl": "https://github.com/tiagolr/time12",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/tiagolr/time12/releases/download/v1.2.3/time12-macos-v1.2.3.zip",
+          "sha256": "9066d0f46fe0cbce102296180d157a176708654b9d6488f6d616e9e3d5cf45e4",
+          "downloadBytes": 12313409
+        },
+        "windows-x64": {
+          "url": "https://github.com/tiagolr/time12/releases/download/v1.2.3/time12-win-v1.2.3.zip",
+          "sha256": "b5699e49850826a8279e315d51cc8cf92636fc98d5d649bcfadd7ae026982989",
+          "downloadBytes": 5539406
+        }
+      },
+      "_syncNote": "GATE-12, TIME-12 and FILT-R all draw an envelope against the host's timeline, and their most obvious modes - pattern sync, beat position - want a tempo and a transport that Plectrify, being a live rig rather than a DAW, does not provide. Each one also has a free-running LFO rate and an audio-trigger mode that fires the envelope from transients in the signal, which is the mode that makes sense here: the guitar itself is the clock. Worth knowing before concluding one of them is broken."
+    },
+    {
+      "id": "lupex-chorus",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Modulation"
+      ],
+      "tags": [
+        "Modulation"
+      ],
+      "name": "Lupex Chorus",
+      "purpose": "Analog BBD chorus - true stereo, quadrature LFO, shelf tone controls",
+      "version": "0.1.0",
+      "licenseId": "MIT",
+      "licenseUrl": "https://github.com/maurocosentino/lupex-chorus-bbd#license",
+      "projectUrl": "https://github.com/maurocosentino/lupex-chorus-bbd",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://github.com/maurocosentino/lupex-chorus-bbd/releases/download/v0.1.0/ChorusBBD-Windows-VST3.zip",
+          "sha256": "47d60a4c5dac109984001fb63a81f6b575fdc542796cf4bcca1e417522e0d28d",
+          "downloadBytes": 4670255
+        }
+      },
+      "_macNote": "NO macOS BUILD EXISTS TO PIN. Both Lupex releases ship Windows and Linux only, and unlike airwindows-consolidated or dragonfly-reverb there is no mac artifact in an awkward format to re-host - there is simply nothing. Building it ourselves is not the answer either: that is what `builtFromSource` means, and it commits us to producing and standing behind a binary, which is a step to take for an amp sim nobody else builds (see neural-amp-modeler) and not for a chorus. If the author ever publishes a mac zip, this becomes an ordinary assets['macos-arm64'] entry from the same release as the windows-x64 one.",
+      "_licenceNote": "Same author, same arrangement as lupex-delay above - MIT claimed in the README with no LICENSE file, on a JUCE build. Read that entry's note before changing either.",
+      "_versionNote": "v0.1.0 is the project's first and so far only release, cut the same day as Lupex Delay v1.1.0. A 0.x version is the author's own numbering, not a beta channel; there is no other tag to prefer."
+    },
+    {
+      "id": "uhhyou-ordinary-phaser",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Modulation"
+      ],
+      "tags": [
+        "Modulation"
+      ],
+      "name": "OrdinaryPhaser",
+      "purpose": "Phaser with a delay in the feedback path",
+      "version": "0.1.7",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
+      "projectUrl": "https://github.com/ryukau/VSTPlugins",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/OrdinaryPhaser_0.1.7_macOS.zip",
+          "sha256": "18425ea86d54722eb02c08868408d35745bf99e20cb699525f69918d15e7c337",
+          "downloadBytes": 1153200
+        },
+        "windows-x64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/OrdinaryPhaser_0.1.7.zip",
+          "sha256": "07d35855f1a34d859d161b724d2ca1641b704143d3e892cc20e119344a4c9b0e",
+          "downloadBytes": 2557806
+        }
+      }
+    },
+    {
+      "id": "uhhyou-parallel-detune",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Modulation"
+      ],
+      "tags": [
+        "Modulation",
+        "Pitch"
+      ],
+      "name": "ParallelDetune",
+      "purpose": "Detune and chorus - 8 pitch shifters in parallel",
+      "version": "0.1.7",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
+      "projectUrl": "https://github.com/ryukau/VSTPlugins",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/ParallelDetune_0.1.7_macOS.zip",
+          "sha256": "1eb08a207959575dd7af1006c877bad7496f77fff5c782370391e6b0908227da",
+          "downloadBytes": 1204476
+        },
+        "windows-x64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/ParallelDetune_0.1.7.zip",
+          "sha256": "ed1ee666c3af255fa52a1d29b2e17b1e8332f4b2aaa6389086f82a8ac02f5211",
+          "downloadBytes": 2640060
+        }
+      }
+    },
+    {
+      "id": "lupex-delay",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay"
+      ],
+      "name": "Lupex Delay",
+      "purpose": "Analog BBD delay - dark repeats, wow and flutter, ping-pong",
+      "version": "1.1.0",
+      "licenseId": "MIT",
+      "licenseUrl": "https://github.com/maurocosentino/lupex-analog-delay#license",
+      "projectUrl": "https://github.com/maurocosentino/lupex-analog-delay",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://github.com/maurocosentino/lupex-analog-delay/releases/download/v1.1.0/Lupex-Windows-VST3.zip",
+          "sha256": "d3a02e93782e6ccd49132a4a4328123ecd07109051418ce55cf71c3e435e9f11",
+          "downloadBytes": 4268667
+        }
+      },
+      "_macNote": "NO macOS BUILD EXISTS TO PIN - Windows and Linux only, on both this and lupex-chorus. See that entry's note; the reasoning is the same for both and applies to whichever of them gets a mac release first.",
+      "_licenceNote": "THE LICENCE URL POINTS AT A README HEADING, NOT A LICENCE FILE, and that is the whole of what this project publishes: both Lupex repositories say '## License / MIT' in README.md and carry no LICENSE or COPYING file, which is why GitHub reports no licence for either. It is the author's own statement of terms, so it is recorded as MIT rather than treated as unlicensed - the opposite of the Gateway case on neural-amp-modeler, where a copyright was asserted with no licence beside it at all. Two caveats to keep in view. MIT asks that its notice travel with copies, and there is no notice here to travel. And these are JUCE builds - the submodule is juce-framework/JUCE - so a binary distributed under MIT rather than AGPLv3 implies a commercial JUCE licence. Both are the author's compliance questions and not ours only because selfHosted is false: the download goes from the project to the user and Plectrify conveys nothing. Do not flip either Lupex entry to selfHosted:true without resolving them first.",
+      "_versionNote": "The asset filename carries no version - every tag ships 'Lupex-Windows-VST3.zip' - so only the tag in the URL path distinguishes releases. That is still immutable per tag, and check-updates compares by asset URL, so a new tag reads as a new URL correctly. It does mean a downloaded file tells you nothing about which release it is; take the version from the tag."
+    },
+    {
+      "id": "qdelay",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay"
+      ],
+      "name": "QDelay",
+      "purpose": "Dual delay - ping-pong, tap, reverse, diffusion and feedback EQ",
+      "version": "1.1.2",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/tiagolr/qdelay/master/LICENSE",
+      "projectUrl": "https://github.com/tiagolr/qdelay",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.1.2/qdelay-macos-v1.1.2.zip",
+          "sha256": "44a6e68f62c60f14b6ae3da64e93387af51682aadcd421b51e53078fb6642fcf",
+          "downloadBytes": 8795936
+        },
+        "windows-x64": {
+          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.1.2/qdelay-win-v1.1.2.zip",
+          "sha256": "629bd9c82daf1f0b6653f47e0a9df7ae8b33f2db847e2bb6c02d7784aec8f9ae",
+          "downloadBytes": 3341979
+        }
+      }
+    },
+    {
+      "id": "sirial",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay"
+      ],
+      "name": "Sirial",
+      "purpose": "Rhythmic delay - 16 serial taps, ping-pong and reverse",
+      "version": "1.1.1",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/tiagolr/sirial/master/LICENSE",
+      "projectUrl": "https://github.com/tiagolr/sirial",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/tiagolr/sirial/releases/download/v1.1.1/sirial-macos-v1.1.1.zip",
+          "sha256": "8b824a76797d7d4310f673818c7794cf958215e435b35b4396db6beaa0a871fa",
+          "downloadBytes": 7853482
+        },
+        "windows-x64": {
+          "url": "https://github.com/tiagolr/sirial/releases/download/v1.1.1/sirial-win-v1.1.1.zip",
+          "sha256": "6b3f2b96511269ad1f5c3176d999ba3bd30f236fa98ac3dae537df12e3097997",
+          "downloadBytes": 2766466
+        }
+      }
+    },
+    {
+      "id": "uhhyou-seven-delay",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay",
+        "Modulation"
+      ],
+      "name": "SevenDelay",
+      "purpose": "Stereo delay with modulated fractional delay time",
+      "version": "0.1.32",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
+      "projectUrl": "https://github.com/ryukau/VSTPlugins",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/SevenDelay_0.1.32_macOS.zip",
+          "sha256": "8553e639eca0b99431de5ffd2e76865993024169790f69f120ab35c8d8e13d22",
+          "downloadBytes": 1108477
+        },
+        "windows-x64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/SevenDelay_0.1.32.zip",
+          "sha256": "527ad28572d70eecaefee94a0f4a5c48c5af7876ddd5fc8c07e2363a589f8c67",
+          "downloadBytes": 2469035
+        }
+      }
+    },
+    {
+      "id": "uhhyou-pitch-shift-delay",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay",
+        "Pitch"
+      ],
+      "name": "PitchShiftDelay",
+      "purpose": "Pitch-shifting delay - octaves, detune and shimmer",
+      "version": "0.2.13",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
+      "projectUrl": "https://github.com/ryukau/VSTPlugins",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/PitchShiftDelay_0.2.13_macOS.zip",
+          "sha256": "0c400c2fdf5dcb60ceeba788b4826acc9b1c3336ab9bf9ecd7e4f58407ae6e50",
+          "downloadBytes": 1164840
+        },
+        "windows-x64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/PitchShiftDelay_0.2.13.zip",
+          "sha256": "d0728b266c955bcb8dae1104352623018a175ea72a4474a7f16cd8c46b8050d9",
+          "downloadBytes": 2592634
+        }
+      }
+    },
+    {
+      "id": "open-spatial-delay",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay"
+      ],
+      "name": "OpenSpatialDelay",
+      "purpose": "Delay whose 12 echoes sit in 3D space - binaural on headphones",
+      "version": "0.9",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/Spatial-Media-Lab/OpenSpatialDelay/v0.9/LICENSE",
+      "projectUrl": "https://github.com/Spatial-Media-Lab/OpenSpatialDelay",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/Spatial-Media-Lab/OpenSpatialDelay/releases/download/v0.9/OpenSpatialDelay-v0.9-macOS.zip",
+          "sha256": "18326efd339c8b2c1dc9b437035d7c07d499d08104460bdb4a0e5046dbf2a704",
+          "downloadBytes": 75352059
+        },
+        "windows-x64": {
+          "url": "https://github.com/Spatial-Media-Lab/OpenSpatialDelay/releases/download/v0.9/OpenSpatialDelay-v0.9-Windows.zip",
+          "sha256": "f43f5f670fc29bb5fd60b0c0cdadb3065a8d83791d8f7c3faf01932782a1d7ab",
+          "downloadBytes": 3830541
+        }
+      },
+      "_versionNote": "THE TAG SAYS v0.9 AND THE PLUGIN SAYS v1.0, and both are right. The Windows asset under this tag was replaced in place on 2026-04-07 with a 1.0 build: the bundle inside is named 'OpenSpatialDelay v1.0.vst3' and its moduleinfo.json reports 1.0.0. `version` records the release we pin, because that is what the URL names and what check-updates compares, so expect the plugin's own header to read v1.0 and do not 'correct' one to match the other. THE MAC ASSET WAS NOT SWAPPED: OpenSpatialDelay-v0.9-macOS.zip still holds 'OpenSpatialDelay v0.9.vst3' reporting 0.9.0. So this is the one entry where the two platforms genuinely deliver different builds under one `version` - not by our choice but because upstream replaced one file and not the other. It is recorded rather than smoothed over; the fix, if the difference ever matters, is a release that ships both again, not a second version field. The mac bundle is arm64-only (the Windows one is x64-only), which is fine - each asset only ever has to run on the platform that selects it.",
+      "_rotNote": "DO NOT 'UPDATE' THIS TO v1.0.0. That release exists and is newer, but it publishes no Windows binary at all - its own notes say 'Plugin binaries are distributed via the mailing list, not GitHub' and send users to andrewrahman.com/get-osd, an email-gated form page. There is no direct, stable URL there to pin a hash against, so it cannot back an asset on either platform (same objection as the Gateway note on neural-amp-modeler). v0.9 is the newest release carrying binaries at all, and its Windows asset is the 1.0 build anyway. Separately: because that asset was already swapped in place once, the hash can rot without the URL moving - the same failure mode as airwindows-consolidated's rolling tag. Re-verify on every publish.",
+      "_layoutNote": "This is a spatial plugin - up to 12 taps rendered through binaural HRTF, 15 surround formats and 6 ambisonic orders - so it looks like a poor fit for a rack that is 2-in/2-out throughout. It works because its VST3 isBusesLayoutSupported accepts whatever the host proposes, so Plectrify hands it stereo and it renders to stereo. Set the output format to Binaural for headphones or Stereo for speakers; the surround and ambisonic formats have nowhere to go here. The five measured HRTFs are compiled into the binary, so nothing else needs installing.",
+      "_licenceNote": "GPL-3.0-only rather than -or-later: the project's LICENSE opens 'This software is licensed under the GNU General Public License v3.0' with no 'or any later version' grant of its own - the two later-version lines in that file are the GPL's own 'How to Apply These Terms' appendix, not this project's offer. Same reading as dragonfly-reverb and reev-r."
+    },
+    {
+      "id": "reev-r",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Reverb"
+      ],
+      "tags": [
+        "Reverb",
+        "Cabs & IRs"
+      ],
+      "name": "REEV-R",
+      "purpose": "Convolution reverb - plays IR files, including cabinet IRs",
+      "version": "1.4.0",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/tiagolr/reevr/master/LICENSE",
+      "projectUrl": "https://github.com/tiagolr/reevr",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/tiagolr/reevr/releases/download/v1.4.0/reevr-macos-v1.4.0.zip",
+          "sha256": "92e069e942ac0f286169b32d0fd175483a10e07da6470a3582c93cc8a741c9e3",
+          "downloadBytes": 19300930
+        },
+        "windows-x64": {
+          "url": "https://github.com/tiagolr/reevr/releases/download/v1.4.0/reevr-win-v1.4.0.zip",
+          "sha256": "d22f2c2421f4d3b52040bad8878ec37c96f1c69413f231f689769833dfffb864",
+          "downloadBytes": 7730204
+        }
+      },
+      "_categoryNote": "This is a REVERB, not a cabinet loader - upstream calls it 'a cross-platform convolution reverb with modulation', and its own IR suggestions are reverb spaces (Bricasti M7, Open Air). It sits under Effects > Reverb for that reason. It happens to be a general convolution engine pointed at a user IR folder, so it will play cabinet IRs the user supplies too - a side effect, not its job. Do not move it back to 'Cabs & IRs' - the catalogue offers no dedicated cab loader and, since the cab-irs pack was dropped, no IR pack either, and papering over that with a mislabelled reverb hides the gap instead of filling it."
+    },
+    {
+      "id": "dragonfly-reverb",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Reverb"
+      ],
+      "tags": [
+        "Reverb"
+      ],
+      "name": "Dragonfly Reverb",
+      "purpose": "Hall, room, plate and early-reflection reverbs",
+      "version": "3.2.10",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/michaelwillis/dragonfly-reverb/master/LICENSE",
+      "projectUrl": "https://github.com/michaelwillis/dragonfly-reverb",
+      "sourceUrl": "https://github.com/michaelwillis/dragonfly-reverb/releases/download/3.2.10/dragonfly-reverb-3.2.10-src.tar.xz",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/hosted/dragonfly-reverb/dragonfly-reverb-3.2.10-macos-arm64.zip",
+          "sha256": "1004351210a32013018e38d41f63e0fe77085163ba73349923d3f93906d0491b",
+          "downloadBytes": 4814083,
+          "selfHosted": true
+        },
+        "windows-x64": {
+          "url": "https://github.com/michaelwillis/dragonfly-reverb/releases/download/3.2.10/dragonfly-reverb-3.2.10-win64.zip",
+          "sha256": "ca5f35f9dcd9a33f06490d3c92f04061a1a798cb81257d5ca5851bdda0824c66",
+          "downloadBytes": 22447365
+        }
+      },
+      "_macNote": "THE MAC ASSET IS A RE-HOST OF UPSTREAM'S OWN 3.2.10 UNIVERSAL DMG, not a build of ours and not another release. Release 3.2.10 ships mac only as .dmg images (universal and intel), which cannot back an asset url - the app will not mount a disk image on a user's behalf - so `host-plugin` mounted it here as plain data, expanded the dragonfly-reverb-AudioPlugins.pkg inside it, and re-zipped the four VST3 bundles unmodified (see PROVENANCE-macos-arm64.txt beside the archive, which records the dmg's own sha256). Nothing from the payload was executed. Note what was NOT done: release 3.2.7 ships dragonfly-reverb-mac-universal-3.2.7.zip, which would unzip perfectly well, and pinning it would have been wrong - one `version` covers every platform's payload, so this entry would say 3.2.10 while handing Macs a 3.2.7 binary, and every update check, install marker and support question downstream would inherit that lie. The universal dmg carries x86_64 and arm64; only the arm64 slice matters here and it is checked with lipo before archiving, which is why the asset is keyed macos-arm64 rather than by what else is in the binary.",
+      "_hostingNote": "THE FIRST ENTRY SERVED FROM BOTH PLACES AT ONCE, which is what `selfHosted` sitting on the ASSET is for: mac comes from our bucket, Windows straight from the project's release page, and each asset says which. WHAT FOLLOWS FROM THE MAC HALF: Plectrify is the distributor of that binary, so GPL-3.0 section 6 attaches to us and the corresponding source must stay available for as long as we offer it - one self-hosted platform is enough for `validate` to demand a sourceUrl, which is the rule that makes a half-mirrored entry safe. sourceUrl names upstream's own 3.2.10 src.tar.xz, which section 6d permits (a different server, with clear directions next to the object code), but the obligation does not move with the file: if that asset ever disappears, mirror it into our bucket beside the archive and re-point sourceUrl. Do not simply drop the field. Four bundles, one package: Hall, Room, Plate and Early Reflections install together, exactly as they do from the Windows zip."
+    },
+    {
+      "id": "cloud-reverb",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Reverb"
+      ],
+      "tags": [
+        "Reverb"
+      ],
+      "name": "CloudReverb",
+      "purpose": "Algorithmic reverb - huge diffuse spaces, the CloudSeed algorithm",
+      "version": "0.5",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/xunil-cloud/CloudReverb/master/LICENSE",
+      "projectUrl": "https://github.com/xunil-cloud/CloudReverb",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/xunil-cloud/CloudReverb/releases/download/v0.5/CloudReverb-v0.5-macOS.zip",
+          "sha256": "88b60035570f680e29ccc2465711dd1ea9886d80c6c1bcca5f8bf09b2cd49b9c",
+          "downloadBytes": 15082485
+        },
+        "windows-x64": {
+          "url": "https://github.com/xunil-cloud/CloudReverb/releases/download/v0.5/CloudReverb-v0.5-Windows-x86_64.zip",
+          "sha256": "2674dab0c2dd58bb98cc9acdb612cc411b5baa7d896db20127b21fc6a22868a2",
+          "downloadBytes": 8238611
+        }
+      },
+      "_portNote": "THIS IS THE PORT, NOT THE ORIGINAL, and that is deliberate - do not 'correct' it to ValdemarOrn/CloudSeed. The original CloudSeed is unusable here on two counts at once: it ships a VST2 .dll (Plectrify builds with VST3 hosting only) and it is a C#/.NET plugin whose bare CloudSeed.dll sits beside a folder of sibling assemblies - AudioLib, Newtonsoft.Json, SharpSoundDevice - which the installer would leave behind, the same two failures that keep Stompbox in the links list. Its last release was 2018 and the repo's own head is tagged 'Legacy'. CloudReverb is Valdemar Erlingsson's algorithm rewritten in JUCE by xunil-cloud, still maintained, and it ships a real VST3 bundle. The rewrite is GPL-3.0 even though the original is MIT, which is the licence recorded here: what a user downloads is the port."
+    },
+    {
+      "id": "uhhyou-lattice-reverb",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Reverb"
+      ],
+      "tags": [
+        "Reverb"
+      ],
+      "name": "LatticeReverb",
+      "purpose": "Reverb built on a lattice allpass structure",
+      "version": "0.1.26",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
+      "projectUrl": "https://github.com/ryukau/VSTPlugins",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/LatticeReverb_0.1.26_macOS.zip",
+          "sha256": "6b3b00dc67dd789649cf03428ab29cccca25def49160960df871d62caf998586",
+          "downloadBytes": 1166130
+        },
+        "windows-x64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/LatticeReverb_0.1.26.zip",
+          "sha256": "a2eab356520edc96cf19741cbe21a87a6bda79f8ddff348ed34125d0fbd8539d",
+          "downloadBytes": 2638577
+        }
+      }
+    },
+    {
+      "id": "uhhyou-fdn64-reverb",
+      "kind": "plugin",
+      "category": [
+        "Effects",
+        "Reverb"
+      ],
+      "tags": [
+        "Reverb"
+      ],
+      "name": "FDN64Reverb",
+      "purpose": "Feedback-delay-network reverb, 64 delays",
+      "version": "0.1.19",
+      "licenseId": "GPL-3.0-only",
+      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
+      "projectUrl": "https://github.com/ryukau/VSTPlugins",
+      "include": [
+        "**/*.vst3/**",
+        "*.vst3"
+      ],
+      "assets": {
+        "macos-arm64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/FDN64Reverb_0.1.19_macOS.zip",
+          "sha256": "0cf44262e9154f5219343aa13d8782574e8957051618566450c2065a73e3d6e9",
+          "downloadBytes": 1203407
+        },
+        "windows-x64": {
+          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/FDN64Reverb_0.1.19.zip",
+          "sha256": "698a356185bdce90ddf085408be90346a7718535de957244c2a7daf50ad083e5",
+          "downloadBytes": 2667651
+        }
+      }
+    }
+  ],
+  "_linksComment": [
+    "Where users get the content the plugins need. Plectrify bundles no amp captures:",
+    "TONE3000's terms forbid bundling or mirroring their catalogue, and the one large",
+    "GPL-labelled .nam collection relicenses other people's captures wholesale and names",
+    "them after live trademarks. So the honest answer is to point users at the source,",
+    "which is what every other NAM player does.",
+    "",
+    "These live in the catalogue rather than in the app so a dead or moved link is a",
+    "publish, not a release.",
+    "",
+    "'PRO FREEWARE' IS THE ONE HEADING HERE THAT IS NOT OPEN SOURCE, and it is a separate",
+    "section rather than more rows under 'More plugins' precisely so that difference is",
+    "visible on screen instead of buried in a note. Everything else this file names is a",
+    "project whose licence has been read and recorded; these are closed-source binaries",
+    "from commercial makers, given away, whose terms are an EULA we have not audited and",
+    "cannot summarise in a `note`. Grouping them with the open-source links would quietly",
+    "extend the trust the rest of the file has earned to things it was never established",
+    "for.",
+    "",
+    "WHAT MAKES THIS SAFE IS THAT A LINK CONVEYS NOTHING. No hash authorises anything, no",
+    "byte is served by us, nothing is installed by Plectrify, and no licence obligation can",
+    "attach - which is exactly why these can be listed while a closed-source PACKAGE could",
+    "never be. That asymmetry is the rule, not an accident of this batch: a proprietary",
+    "plugin must not become a package however convenient its zip, because the whole basis",
+    "on which `validate` lets an entry pin a hash is a licence that says we may.",
+    "",
+    "So the bar for adding a row here is editorial, not legal: is it genuinely free (not a",
+    "trial, not a rental, not lapsing), is it professional-grade, and does a guitarist want",
+    "it? Each note states the terms plainly, including where an account is required - UAD",
+    "Explore FREE needs a UA account and their UA Connect installer, which is a real cost",
+    "to the user and belongs in the row rather than in a surprise after the click. Re-check",
+    "these on occasion: freeware is withdrawn far more often than an open-source release",
+    "tag disappears, and unlike a package there is no hash whose failure would tell us.",
+    "",
+    "STOMPBOX is a link and not a package, and the reason is technical rather than",
+    "legal - do not 'promote' it to the packages list without reading this. Licensing is",
+    "fine: GPL-3.0, the project publishes its own Windows StompboxVST3Plugin.zip, and it",
+    "unzips without an installer, so it would qualify as selfHosted:false like the other",
+    "GPL entries. Two things stop it. (1) It is not a self-contained bundle. The archive",
+    "is a StompboxPlugin/ folder holding a bare StompboxPluginBridge.vst3 beside ~25",
+    "sibling DLLs (AudioPlugSharp, MonoGame, SharpDX, Ijwhost, stompbox-capi) and a",
+    "Content/ folder of textures. CatalogueInstaller moves only *.vst3 into the load",
+    "path, so an install would deliver the bridge DLL alone and every dependency would",
+    "be left behind - a plugin that fails to load, reported as a successful install.",
+    "(2) It is a .NET plugin: its runtimeconfig asks for Microsoft.WindowsDesktop.App 8,",
+    "which the user must install separately and which no amount of unzipping provides.",
+    "The catalogue has no way to express a prerequisite like that, and a missing runtime",
+    "again surfaces as a silent scan failure. Both would have to be solved - a folder",
+    "install mode for kind:'plugin', and some form of prerequisite check - before this",
+    "could be offered as a package rather than pointed at.",
+    "",
+    "BYOD is a link for the opposite reason to Stompbox: the mechanics could be solved,",
+    "and the licensing cannot. It is GPL-3.0, so re-hosting a copy would ordinarily be",
+    "permitted - but the official builds are configured -DBYOD_BUILD_ADD_ON_MODULES=ON",
+    "and compile in Chowdhury-DSP/BYOD-add-ons, a repository their CI checks out with a",
+    "token and which 404s to everyone else. So no published tree is the corresponding",
+    "source of the binary we would be hosting, and a sourceUrl pointing at the public",
+    "repo would be a claim about a different program. Truthful source is the whole basis",
+    "on which validate lets a GPL entry set selfHosted; an entry that satisfies the",
+    "check while failing the obligation is worse than no entry. Upstream may ship this",
+    "themselves - their CLA is what makes it theirs to do - and that changes nothing",
+    "about what we may mirror.",
+    "",
+    "The mechanics are worth recording anyway, so nobody starts at the wrong end. v1.3.0",
+    "publishes an Inno Setup .exe, a .dmg wrapping a signed .pkg, and a .deb; nothing",
+    "unzips to a bundle, which is the same invariant that rules out HISE below.",
+    "host-plugin exists for exactly that shape but could not run this one today - it",
+    "unpacks the payload as a zip before looking for the installer, and its cleanup",
+    "expects unins000.exe under the --DIR it passed, where BYOD's script sends it to",
+    "UninstallFilesDir instead, so the uninstall would not be found and nothing would",
+    "upload. Building the public source with build-plugin is legally clean and answers",
+    "the wrong question: it yields a BYOD without the add-on modules, which is not the",
+    "plugin anyone has used, and upstream's own mac build sets no CMAKE_OSX_ARCHITECTURES",
+    "at all, so arm64 is not part of the path they release from.",
+    "",
+    "CHOWTAPEMODEL AND PROTEUS are links for one shared reason and are worth promoting",
+    "together if anyone ever does the work. Both are GPL-3.0 with published source, both",
+    "are squarely useful here - tape saturation with wow and flutter, and a capture player",
+    "for amps and pedals - and both publish an Inno Setup .exe for Windows and a .dmg for",
+    "macOS, so neither unzips to a bundle and the kind:'plugin' invariant rules them out",
+    "as they ship. Unlike ZL Equalizer below, this is precisely the shape host-plugin was",
+    "written for: the Windows half drives an Inno installer and cleans up after itself,",
+    "and the mac half expands a dmg as plain data. What stops it being done in passing is",
+    "that re-hosting flips selfHosted:true, which makes Plectrify the conveyor of a GPL",
+    "binary, and that both platforms must be re-hosted from the same upstream release",
+    "before either can be published, since one `version` covers every platform's payload.",
+    "The rest of jatinchowdhury18's plugins (ChowPhaser, ChowMatrix, ChowMultiTool) ship",
+    "the same way, so whoever solves one has solved them all.",
+    "",
+    "THE ZL AUDIO PLUGINS - ZL Equalizer and ZL Compressor - are links because of how they",
+    "are packaged, not because of their licence, and the objection is the publisher's",
+    "release format rather than anything about either plugin. Both are AGPL-3.0 with",
+    "published source, which would permit re-hosting, and both fill real gaps here: the",
+    "catalogue offers no dedicated EQ and no compressor at all. But every Windows artefact",
+    "they publish is a .msi and every mac one a .dmg, so nothing unzips to a bundle on",
+    "either platform and the kind:'plugin' invariant rules them out. Nor can",
+    "host-plugin rescue the Windows half today: hostPlugin.windows.ts looks for a .exe",
+    "inside the unpacked asset and drives it with Inno Setup's own switches (/VERYSILENT,",
+    "then unins000.exe), and an .msi is neither - it would need msiexec /qn plus an",
+    "uninstall by product code, which is a second installer backend, not a flag. The mac",
+    "dmg is the shape host-plugin already handles, but half a release is not a release",
+    "(one `version` covers every platform), so promoting either means teaching the Windows",
+    "half about MSI first - and that one piece of work would unlock both, plus whatever",
+    "else this publisher releases. Until then, pointing at the project is the honest",
+    "answer.",
+    "",
+    "INSTRUMENTS ARE NOT LISTED AT ALL, as packages or as links, and that is a standing",
+    "rule rather than a judgement about any one of them. A synthesiser generates sound",
+    "from note events and does nothing with the audio arriving at its input, and Plectrify",
+    "routes no notes to a module - MIDI here binds knobs, not pitches. So an install would",
+    "succeed, the scan would find it, a card would appear in the rack, and the plugin",
+    "would be silent: a worse outcome than not offering it, and not one a link's note can",
+    "talk a user out of. It is the same objection that makes surge-xt-effects pin an",
+    "include pattern naming one bundle, so the Surge synthesiser is left in the archive",
+    "rather than installed beside the effects rack. Note that an instrument can pass every",
+    "mechanical gate in this file - a clean licence, a plain zip unpacking straight to a",
+    ".vst3 on both platforms - and still be wrong to list, so check what a plugin DOES",
+    "before pinning it. Nothing changes here until Plectrify routes notes, which is a rig",
+    "feature and not a catalogue one.",
+    "",
+    "HISE is a link for a simpler reason, and one no amount of installer work would",
+    "change: it is not a plugin. It is the GPL-3.0 framework you build instruments and",
+    "plugins WITH - an IDE and export toolchain - so there is no effect here to put in a",
+    "rack, and its only Windows artefact is an installer .exe, which the invariant above",
+    "rules out on its own. It sits under its own heading rather than 'More plugins' so",
+    "the panel does not promise a pedal and hand over a development environment."
+  ]
+}

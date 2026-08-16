@@ -1,0 +1,119 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "GitHub",
+      "type": "shell",
+      "icon": {
+        "id": "github",
+        "color": "terminal.ansiMagenta"
+      },
+      "command": "open 'https://github.com/patrickiel/plectrify'",
+      "windows": {
+        "command": "Start-Process 'https://github.com/patrickiel/plectrify'",
+        "options": {
+          "shell": {
+            "executable": "powershell.exe",
+            "args": [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command"
+            ]
+          }
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared",
+        "close": true
+      }
+    },
+    {
+      "label": "Site",
+      "type": "shell",
+      "icon": {
+        "id": "globe",
+        "color": "terminal.ansiBlue"
+      },
+      "command": "open 'https://plectrify.com/'",
+      "windows": {
+        "command": "Start-Process 'https://plectrify.com/'",
+        "options": {
+          "shell": {
+            "executable": "powershell.exe",
+            "args": [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command"
+            ]
+          }
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared",
+        "close": true
+      }
+    },
+    {
+      "label": "Worker",
+      "detail": "The production deployments for the plectrify.com Cloudflare Worker.",
+      "type": "shell",
+      "icon": {
+        "id": "server",
+        "color": "terminal.ansiYellow"
+      },
+      "command": "open 'https://dash.cloudflare.com/499f243b00cae2dac2063e45be6ed0e7/workers/services/view/plectrify-site/production/deployments'",
+      "windows": {
+        "command": "Start-Process 'https://dash.cloudflare.com/499f243b00cae2dac2063e45be6ed0e7/workers/services/view/plectrify-site/production/deployments'",
+        "options": {
+          "shell": {
+            "executable": "powershell.exe",
+            "args": [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command"
+            ]
+          }
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared",
+        "close": true
+      }
+    },
+    {
+      "label": "R2",
+      "detail": "The plectrify bucket: hosted plugin archives, their PROVENANCE.txt, and the signed catalogue, under plugins/v1/.",
+      "type": "shell",
+      "icon": {
+        "id": "cloud",
+        "color": "terminal.ansiYellow"
+      },
+      "command": "open 'https://dash.cloudflare.com/499f243b00cae2dac2063e45be6ed0e7/r2/default/buckets/plectrify'",
+      "windows": {
+        "command": "Start-Process 'https://dash.cloudflare.com/499f243b00cae2dac2063e45be6ed0e7/r2/default/buckets/plectrify'",
+        "options": {
+          "shell": {
+            "executable": "powershell.exe",
+            "args": [
+              "-NoProfile",
+              "-NonInteractive",
+              "-Command"
+            ]
+          }
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared",
+        "close": true
+      }
+    }
+  ]
+}

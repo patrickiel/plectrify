@@ -1,0 +1,19 @@
+.reordering {
+  user-select: none;
+}
+
+.reordering > .item {
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.item {
+  position: relative;
+}
+
+.dragging {
+  z-index: 1;
+  border-radius: var(--ctl-r-sm);
+  background: var(--fill-hover);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--color-void) 45%, transparent);
+  transition: none;
+}

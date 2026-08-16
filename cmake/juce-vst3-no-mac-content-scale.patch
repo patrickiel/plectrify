@@ -1,0 +1,69 @@
+Do not report a content scale factor to a hosted VST3 on macOS.
+
+IPlugViewContentScaleSupport is a Windows/Linux interface: on macOS a plug-in
+view's coordinates are already logical points, and the plug-in reads the backing
+scale from its own NSWindow. JUCE 8.0.14 calls setContentScaleFactor() there
+anyway - with 1.0, since the macOS peer reports no platform scale - and only
+suppresses the resulting failure warning. That is harmless for a plug-in which
+rejects the call, but a plug-in that *accepts* it throws away the retina scale
+it had correctly taken from the screen: every iPlug2 build before the OS_WIN
+guard (Neural Amp Modeler among them) then renders its UI at 1x into the
+top-left quarter of its 2x layer, leaving the rest of the window undrawn.
+
+So on macOS, behave as a host with no scale interface at all: adopt the view's
+own size and report nothing. Windows and Linux keep JUCE's behaviour verbatim.
+
+diff --git a/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp b/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp
+--- a/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp
++++ b/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp
+@@ -498,32 +498,47 @@
+ 
+     void updatePluginScale()
+     {
++       #if JUCE_MAC
++        // PLECTRIFY_NO_MAC_CONTENT_SCALE: nothing to report here, so this
++        // is the no-scale-interface path - see setContentScaleFactor().
++        resizeToFit();
++       #else
+         if (scaleInterface != nullptr)
+             setContentScaleFactor();
+         else
+             resizeToFit();
++       #endif
+     }
+ 
+     void setContentScaleFactor()
+     {
++       #if ! JUCE_MAC
+         if (scaleInterface != nullptr)
+         {
+             [[maybe_unused]] const auto result = scaleInterface->setContentScaleFactor ((IPlugViewContentScaleSupport::ScaleFactor) getEffectiveScale());
+-
+-           #if ! JUCE_MAC
+             [[maybe_unused]] const auto warning = warnOnFailure (result);
+-           #endif
+         }
++       #else
++        // PLECTRIFY_NO_MAC_CONTENT_SCALE: IPlugViewContentScaleSupport is a
++        // Windows/Linux interface. A macOS view is measured in logical
++        // points already and the plug-in takes the backing scale from its
++        // own NSWindow, so there is no scale for a host to report - and a
++        // plug-in that accepts one regardless (every iPlug2 build before
++        // the OS_WIN guard) replaces its real 2x screen scale with our
++        // 1.0 and then draws at half size into a quarter of its layer.
++       #endif
+     }
+ 
+     void setScaleFactor (float s) override
+     {
+         userScaleFactor = s;
+         setContentScaleFactor();
+         resizeToFit();
+     }
+ 
++    // Unused on macOS, where nothing is reported to the plug-in.
++    [[maybe_unused]]
+     float getEffectiveScale() const
+     {
+         return nativeScaleFactor * userScaleFactor;
+     }

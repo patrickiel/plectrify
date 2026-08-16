@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.ico" sizes="any" />
+    <link rel="icon" href="%sveltekit.assets%/favicon-32.png" type="image/png" />
+    <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+    <link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
+    <meta name="theme-color" content="#020305" />
+
+    <!-- Font preloads are not written here by hand: hooks.server.ts asks
+         SvelteKit to emit them for every font in the build manifest, with the
+         fingerprinted URLs only the build knows. They land in the head
+         placeholder below. (Never name that placeholder in a comment:
+         SvelteKit substitutes its first occurrence, wherever it is.) -->
+
+    <!-- Stamps the visitor's desktop OS on <html> before first paint, so the
+         download buttons can lead with the build that will actually run here
+         (see DownloadButtons.svelte). It has to be an inline head script rather
+         than component code: every page is prerendered, so the server cannot
+         know the OS, and doing it after hydration would visibly re-rank the
+         buttons a beat after the page appears.
+
+         Only a confident desktop answer is stamped. A phone, a tablet or a
+         Linux box leaves the attribute unset, and the buttons stay evenly
+         weighted, the honest state when we cannot tell, since a reader on a
+         phone is choosing for a machine that is somewhere else. -->
+    <script>
+      (function () {
+        try {
+          var ua = navigator.userAgent;
+          var uaPlatform = navigator.userAgentData && navigator.userAgentData.platform;
+          var touch = navigator.maxTouchPoints || 0;
+          var os = '';
+
+          if (uaPlatform === 'Windows' || /Windows NT/.test(ua)) {
+            os = 'windows';
+          } else if (uaPlatform === 'macOS' || /Mac OS X/.test(ua)) {
+            // An iPhone says "Mobile", and an iPad in desktop mode is a Mac in
+            // every respect but its touch points. Neither can run a .dmg.
+            if (!/Mobile/.test(ua) && touch <= 1) os = 'macos';
+          }
+
+          if (os) document.documentElement.dataset.os = os;
+        } catch (e) {
+          /* Leave it unset: both buttons then read equally. */
+        }
+      })();
+    </script>
+
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

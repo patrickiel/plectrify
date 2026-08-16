@@ -1,0 +1,281 @@
+@import 'tailwindcss';
+
+/* Self-hosted variable fonts, the same two files the app ships (copied from
+   ui/public/fonts). Self-hosting is not just a preference here: the app must
+   never reach out to Google Fonts, and a site whose type is a few pixels off
+   the product's stops looking like the same product.
+
+   The files live in src/lib/fonts and are referenced relatively, not out of
+   static/: that puts them through Vite, which fingerprints them into
+   _app/immutable (cacheable forever) and lists them in the build manifest,
+   which is what lets hooks.server.ts emit a <link rel="preload"> for each at
+   prerender time instead of app.html hard-coding the tags by hand.
+
+   font-display: swap, not the app's `block`, because these come over the network
+   rather than off local disk, and a blocking web font is the classic way to
+   ship an invisible first paint. */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./lib/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('./lib/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+/* The third face is the site's alone, and it sets exactly one string: the
+   wordmark beside the coin, in the header and the footer. Inter is the right
+   choice for paragraphs precisely because it is anonymous, which is the wrong
+   quality for a logo: set in it, "Plectrify" reads as a UI label rather than
+   as a name. Chakra Petch's squared, bevelled letterforms carry the same
+   pedal-hardware attitude as the knob cards and the mono control labels, so
+   the name looks like it was stamped on the same gear. One static 600 cut:
+   the only weight the wordmark uses, and a 10 KB file.
+
+   font-display: optional, not swap, because no layout depends on this and nothing
+   is read from it, so on a slow connection it is better for the wordmark to
+   stay in Inter for that page view than to reflow the top-left corner of the
+   site after first paint. */
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-weight: 600;
+  font-display: optional;
+  src: url('./lib/fonts/chakra-petch-latin-600-normal.woff2') format('woff2');
+}
+
+/* The palette is the app's dark theme, token for token, and the names are kept
+   identical on purpose: a component lifted from ui/ in either direction should
+   need no renaming. Semantic, never named for the colour it happens to be:
+   --color-ink is "whatever text and raised veils are made of".
+
+   Unlike the app this site is dark only. It is a document, not a window the
+   user lives in for hours, and the product's signature look *is* the dark rack
+   glowing against near-black. A light variant would be a second design to keep
+   honest for no reader who asked for one. */
+@theme {
+  /* Surfaces, furthest back to nearest. */
+  --color-space: #020305; /* page */
+  --color-chrome: rgb(23 28 40 / 0.92); /* sticky header, footer */
+  --color-chrome-solid: #171c28;
+  --color-panel: rgba(15, 18, 25, 0.85); /* cards */
+  --color-panel-solid: rgb(15 18 25);
+  --color-menu: #0a0d14; /* popovers, code blocks */
+  --color-well: #000000; /* recessed faces */
+
+  /* Neutrals. */
+  --color-ink: #ffffff;
+  --color-void: #000000;
+  --color-muted: #9ba6b5;
+
+  /* Hues. */
+  --color-accent: #00ffcc;
+  --color-accent-ink: #000000; /* text sitting *on* an accent fill */
+  --color-danger: #ff2a55;
+  --color-hot: #ffb000;
+  --color-purple: #7700ff; /* ambient background gradient */
+
+  /* Glows, derived so re-pointing --color-accent re-derives them for free. */
+  --shadow-glow-accent:
+    0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --shadow-glow-accent-sm: 0 4px 15px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --shadow-glow-accent-lg: 0 0 35px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --shadow-panel: 0 25px 50px color-mix(in srgb, var(--color-void) 60%, transparent);
+
+  --text-shadow-glow-accent:
+    0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --text-shadow-glow-accent-sm: 0 0 5px color-mix(in srgb, var(--color-accent) 40%, transparent);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  /* Wordmark only: never body copy, never a heading. */
+  --font-wordmark: 'Chakra Petch', var(--font-sans);
+}
+
+/* Edges, fills and the text ladder: the app's control tokens, minus the ones
+   that only mean something to a live control (focus offsets, learn rings). */
+:root {
+  --edge-hair: color-mix(in srgb, var(--color-ink) 8%, transparent);
+  --edge-soft: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  --edge: color-mix(in srgb, var(--color-ink) 16%, transparent);
+  --edge-hover: color-mix(in srgb, var(--color-ink) 30%, transparent);
+
+  --fill-rest: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  --fill-hover: color-mix(in srgb, var(--color-ink) 8%, transparent);
+
+  --ink-body: color-mix(in srgb, var(--color-ink) 80%, transparent);
+  --ink-quiet: color-mix(in srgb, var(--color-ink) 58%, transparent);
+  --ink-off: color-mix(in srgb, var(--color-ink) 28%, transparent);
+
+  --ctl-r-xs: 0.25rem;
+  --ctl-r-sm: 0.35rem;
+  --ctl-r-md: 0.45rem;
+  --ctl-r-lg: 0.6rem;
+
+  --ctl-dur: 120ms;
+  --ctl-transition:
+    color var(--ctl-dur) ease, border-color var(--ctl-dur) ease,
+    background-color var(--ctl-dur) ease, opacity var(--ctl-dur) ease;
+}
+
+/* Tailwind-facing aliases. `inline` keeps them live var() references. */
+@theme inline {
+  --color-control-edge-hair: var(--edge-hair);
+  --color-control-edge-soft: var(--edge-soft);
+  --color-control-edge: var(--edge);
+  --color-control-edge-hover: var(--edge-hover);
+  --color-control-rest: var(--fill-rest);
+  --color-control-hover: var(--fill-hover);
+  --color-control-body: var(--ink-body);
+  --color-control-quiet: var(--ink-quiet);
+  --color-control-off: var(--ink-off);
+
+  --radius-control-xs: var(--ctl-r-xs);
+  --radius-control-sm: var(--ctl-r-sm);
+  --radius-control-md: var(--ctl-r-md);
+  --radius-control-lg: var(--ctl-r-lg);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    /* The sticky header's height, so an anchored heading doesn't land under it. */
+    scroll-padding-top: 5.5rem;
+  }
+
+  /* The app pins html/body to 100% and hides overflow, since it is a window. This is
+     a document, so it scrolls, and text is selectable everywhere. */
+  body {
+    background-color: var(--color-space);
+    background-image:
+      radial-gradient(
+        at 0% 0%,
+        color-mix(in srgb, var(--color-accent) 5%, transparent) 0px,
+        transparent 50%
+      ),
+      radial-gradient(
+        at 100% 100%,
+        color-mix(in srgb, var(--color-purple) 5%, transparent) 0px,
+        transparent 50%
+      );
+    background-attachment: fixed;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-ink) 20%, transparent);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* One reduced-motion rule for the whole site, same as the app's. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* The eyebrow above a section heading: small mono caps in accent, the same
+     idiom the app uses for control labels. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+  }
+
+  /* A content card: the app's module-card surface, one step out of the page.
+
+     The top edge is lit a step brighter than the other three. At these values a
+     card and the page behind it are barely a shade apart, so a hairline of one
+     value all the way round reads as an outline drawn on the page rather than
+     as a panel sitting above it. The lit edge is what a physical panel catches
+     from the light above it, and it is the cheapest thing that makes the card
+     an object. Done with the border rather than an inset shadow on purpose: a
+     `shadow-*` utility on the same element would replace an inset shadow and
+     silently take the effect with it. */
+  .surface {
+    background: var(--color-panel);
+    border: 1px solid var(--edge-hair);
+    border-top-color: color-mix(in srgb, var(--color-ink) 15%, transparent);
+    border-radius: var(--ctl-r-lg);
+    backdrop-filter: blur(12px);
+  }
+
+  /* A .surface that answers the pointer: the edge picks up, the fill lifts one
+     step, and the module card's accent hairline fades in along the top: the
+     same signal the app gives the card under the cursor, so a feature card and
+     a rack module respond alike. */
+  .surface-hover {
+    position: relative;
+    transition: var(--ctl-transition);
+  }
+
+  /* Inset from the corners rather than bled to the edge, so the hairline never
+     overhangs the radius. */
+  .surface-hover::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    right: 0.9rem;
+    left: 0.9rem;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+    opacity: 0;
+    transition: opacity var(--ctl-dur) ease;
+  }
+
+  .surface-hover:hover {
+    border-color: var(--edge);
+    border-top-color: color-mix(in srgb, var(--color-ink) 24%, transparent);
+    background: color-mix(in srgb, var(--color-ink) 3%, var(--color-panel));
+  }
+
+  .surface-hover:hover::after {
+    opacity: 0.7;
+  }
+}

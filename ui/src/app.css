@@ -1,0 +1,451 @@
+@import 'tailwindcss';
+
+/* Self-hosted variable fonts (ui/public/fonts), preloaded from index.html so
+   the first paint already has them — the packaged app must never reach out to
+   Google Fonts. font-display: block is deliberate: the files come off local
+   disk, so blocking removes the fallback-font flash without perceptible delay. */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: block;
+  src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+/* The dark theme's values. Every token is *semantic* — name it for the job it
+   does, never for the colour it happens to be — because the light theme below
+   re-points the same names at very different colours. In particular --color-ink
+   is "whatever text, icons and raised veils are made of" and --color-void is
+   "whatever shadows and recesses are made of"; they are white and black only by
+   coincidence of this theme. */
+@theme {
+  /* Surfaces, from furthest back to nearest. */
+  --color-space: #020305; /* page */
+  --color-chrome: rgb(
+    23 28 40 / 0.92
+  ); /* toolbar / status bar / tool rail — a
+     clear step above the page so the frame reads as a raised surface, not as
+     the rack continuing under a hairline */
+  --color-chrome-solid: #171c28; /* chrome, where translucency would leak */
+  --color-panel: rgba(15, 18, 25, 0.85); /* module card */
+  --color-panel-solid: rgb(15 18 25); /* card, where translucency would leak */
+  --color-menu: #0a0d14; /* popover / tooltip surface */
+  --color-knob: #0a0c10; /* knob face */
+  --color-well: #000000; /* recessed control face (switch, meter body) */
+  --color-field: rgb(0 0 0 / 0.4); /* text input / select well */
+  --color-scrim: rgb(2 3 5 / 0.8); /* modal backdrop */
+
+  /* Neutrals. */
+  --color-ink: #ffffff; /* text, icons, hairlines, raised veils */
+  --color-void: #000000; /* shadows and insets */
+  --color-lit: #ffffff; /* genuinely white in *both* themes (see §light) */
+  --color-muted: #9ba6b5; /* secondary text */
+
+  /* Hues. */
+  --color-accent: #00ffcc;
+  --color-accent-ink: #000000; /* text sitting *on* an accent fill */
+  --color-danger: #ff2a55; /* clipping, destructive confirm */
+  --color-warn: oklch(70.4% 0.191 22.216); /* destructive hover (Tailwind red-400) */
+  --color-hot: #ffb000; /* meter: hot but not yet clipping */
+  --color-purple: #7700ff; /* ambient background gradient */
+
+  /* Ink-veil strength multiplier, for both hairlines and low-alpha secondary
+     text. Dark lays light veils over near-black, which sits on the steep part
+     of the L* curve — a 25% veil there moves L* by +28. The same alpha of ink
+     over a light page moves it by only −17, so light scales these up. Applied
+     where a line or a label actually gets lost, not blanket-applied: most fills
+     read correctly at the same alpha in both themes. */
+  --ink-k: 1;
+
+  /* Shared glows, all derived from the palette above. Tailwind emits these as
+     live var() references (guarded by @supports), so re-pointing --color-accent
+     at :root level re-derives them for free. */
+  --shadow-glow-accent:
+    0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --shadow-glow-accent-sm: 0 4px 15px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --shadow-glow-accent-lg: 0 0 35px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --shadow-glow-accent-bar: 0 0 12px color-mix(in srgb, var(--color-accent) 65%, transparent);
+  --shadow-panel: 0 25px 50px color-mix(in srgb, var(--color-void) 60%, transparent);
+  --shadow-dialog: 0 30px 90px color-mix(in srgb, var(--color-void) 75%, transparent);
+
+  --text-shadow-glow-accent:
+    0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --text-shadow-glow-accent-sm: 0 0 5px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  --text-shadow-glow-ink: 0 0 15px color-mix(in srgb, var(--color-ink) 30%, transparent);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+/* Widths of the right-hand tool rail and its slide-out panel. Shared by the
+   sidebar itself, by the toolbar/status-bar hairlines — which stop where the
+   rail begins so the three read as one continuous chrome frame around the
+   rack — and by the rack's stats overlay, which keeps clear of both. */
+:root {
+  --tool-rail-w: 3rem;
+  --tool-panel-w: 15.5rem;
+}
+
+/* ── Control design tokens ────────────────────────────────────────────────
+   The scale every shared control primitive is built from. The source values
+   stay on :root because scoped CSS and runtime styles consume them directly;
+   the @theme inline aliases below expose the same live values to Tailwind.
+   They derive from --ink-k, which the light theme re-points below, so light
+   gets its stronger veils for free. */
+:root {
+  /* Edges. Scaled by the ink veil — a hairline is exactly what --ink-k exists
+     for. The .tb-* toolbar family stays one step louder (24%/42%) on purpose:
+     the toolbar is chrome, the sidebar is content. */
+  --edge-hair: color-mix(in srgb, var(--color-ink) calc(8% * var(--ink-k)), transparent);
+  --edge-soft: color-mix(in srgb, var(--color-ink) calc(10% * var(--ink-k)), transparent);
+  --edge: color-mix(in srgb, var(--color-ink) calc(16% * var(--ink-k)), transparent);
+  --edge-hover: color-mix(in srgb, var(--color-ink) calc(30% * var(--ink-k)), transparent);
+  --edge-toolbar: color-mix(in srgb, var(--color-ink) calc(24% * var(--ink-k)), transparent);
+  --edge-toolbar-hover: color-mix(in srgb, var(--color-ink) calc(42% * var(--ink-k)), transparent);
+
+  /* Fills. Not veil-scaled: a fill reads correctly at the same alpha in both
+     themes, which is why --ink-k is applied to lines and labels only. */
+  --fill-rest: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  --fill-hover: color-mix(in srgb, var(--color-ink) 8%, transparent);
+  --fill-on: color-mix(in srgb, var(--color-ink) 9%, transparent);
+
+  /* Text ladder, below --color-ink and above --color-muted. */
+  --ink-body: color-mix(in srgb, var(--color-ink) 80%, transparent);
+  --ink-quiet: color-mix(in srgb, var(--color-ink) 58%, transparent);
+  --ink-off: color-mix(in srgb, var(--color-ink) 28%, transparent);
+
+  /* Radii. Four steps, replacing eight ad-hoc values between .25 and .6rem.
+     Not --radius-*: that is Tailwind's namespace, and Popover's `rounded-md`
+     would silently move with it. */
+  --ctl-r-xs: 0.25rem; /* chips, beat pads */
+  --ctl-r-sm: 0.35rem; /* inputs, list rows, dense actions */
+  --ctl-r-md: 0.45rem; /* pill buttons, rail buttons */
+  --ctl-r-lg: 0.6rem; /* cards, tiles */
+
+  --ctl-dur: 120ms;
+  --ctl-transition:
+    color var(--ctl-dur) ease, border-color var(--ctl-dur) ease,
+    background-color var(--ctl-dur) ease, opacity var(--ctl-dur) ease;
+
+  /* Focus. One ring, three offsets chosen by what the control sits in:
+       in    — flush with a container edge, or fills a row
+               (rail buttons, list rows, panel close, tabs, menu items)
+       tight — packed grid where 2px would collide with a neighbour across a
+               .3rem gap (the song transport, the looper's verb grid)
+       out   — free-standing bordered control with margin around it
+               (toolbar buttons, the MIDI learn switch, Refresh)
+     Primitives default to the right one; --ctl-focus-offset overrides it. */
+  --focus-ring: 2px solid var(--color-accent);
+  --focus-in: -2px;
+  --focus-tight: 1px;
+  --focus-out: 2px;
+
+  /* Disabled, two treatments chosen by what the control *is*: a text-led
+     button dims its label to --ink-off and keeps its border, so it doesn't
+     vanish out of its row; anything composite (rows, icons, toolbar buttons)
+     fades whole. */
+  --disabled-opacity: 0.4;
+
+  /* Chrome controls — the skin a control wears when it sits *on* the chrome
+     frame (top toolbar, tool sidebar) rather than inside a content panel: a
+     well one step deeper than the surface under it, a quiet edge, and its own
+     text ladder. The Perform/Edit toggle is the reference; the rig and scene
+     switchers, the toolbar's save/discard buttons and the tool panels' cards
+     all wear it, so the frame reads as one family. Primitives opt in with
+     `surface="chrome"`.
+
+     The active tint is deliberately substantial enough to read as a selected
+     segment without turning into a solid accent button. */
+  --chrome-control-bg: color-mix(in srgb, var(--color-space) 78%, var(--color-chrome-solid));
+  --chrome-control-border: color-mix(
+    in srgb,
+    var(--color-ink) calc(11% * var(--ink-k)),
+    var(--chrome-control-bg)
+  );
+  --chrome-control-hover-bg: color-mix(in srgb, var(--color-ink) 5%, var(--chrome-control-bg));
+  /* A neutral selected segment has no colour to carry it, so it leans on
+     lightness alone — it has to clear the well by more than a hover does. */
+  --chrome-control-selected-bg: color-mix(in srgb, var(--color-ink) 22%, var(--chrome-control-bg));
+  --chrome-control-selected-border: color-mix(
+    in srgb,
+    var(--color-ink) 30%,
+    var(--chrome-control-bg)
+  );
+  --chrome-control-active-bg: color-mix(in srgb, var(--color-accent) 19%, var(--chrome-control-bg));
+  --chrome-control-active-border: color-mix(
+    in srgb,
+    var(--color-accent) 24%,
+    var(--chrome-control-bg)
+  );
+  --chrome-control-text: color-mix(in srgb, var(--color-muted) 82%, var(--color-ink));
+  --chrome-control-tag-text: color-mix(in srgb, var(--color-muted) 72%, var(--chrome-control-bg));
+  --chrome-control-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 2.5%, transparent),
+    0 1px 2px color-mix(in srgb, var(--color-void) 34%, transparent);
+  /* A disabled chrome control recedes instead of dimming its label alone: the
+     well and its edge thin out toward whatever surface the button sits on, so
+     the row still reads as a row of controls but none of them ask to be
+     pressed. Both are alpha blends toward transparent, so the same pair works
+     in either theme without a second definition. */
+  --chrome-control-disabled-bg: color-mix(in srgb, var(--chrome-control-bg) 38%, transparent);
+  --chrome-control-disabled-border: color-mix(
+    in srgb,
+    var(--chrome-control-border) 45%,
+    transparent
+  );
+
+  /* Mono control type. */
+  --ctl-text-xs: 0.62rem; /* chips, counts, captions */
+  --ctl-text-sm: 0.68rem; /* tab labels, hints */
+  --ctl-text-md: 0.7rem; /* pill label */
+  --ctl-text: 0.72rem; /* transport label, editor input */
+  --ctl-text-lg: 0.9rem; /* the maximized-panel step */
+}
+
+/* Tailwind-facing aliases for the runtime control tokens above. `inline` is
+   important: the generated utilities reference the live :root variables, so
+   a component keeps following the active light/dark theme. */
+@theme inline {
+  --color-control-edge-hair: var(--edge-hair);
+  --color-control-edge-soft: var(--edge-soft);
+  --color-control-edge: var(--edge);
+  --color-control-edge-hover: var(--edge-hover);
+  --color-control-edge-toolbar: var(--edge-toolbar);
+  --color-control-edge-toolbar-hover: var(--edge-toolbar-hover);
+  --color-control-rest: var(--fill-rest);
+  --color-control-hover: var(--fill-hover);
+  --color-control-on: var(--fill-on);
+  --color-control-body: var(--ink-body);
+  --color-control-quiet: var(--ink-quiet);
+  --color-control-off: var(--ink-off);
+
+  --radius-control-xs: var(--ctl-r-xs);
+  --radius-control-sm: var(--ctl-r-sm);
+  --radius-control-md: var(--ctl-r-md);
+  --radius-control-lg: var(--ctl-r-lg);
+
+  --animate-learn-pulse: learn-pulse 1.2s ease-in-out infinite;
+  /* Twice, then done: this answers "which one of these did I just click", and
+     a light that keeps blinking after the eye has landed on it stops being an
+     answer and becomes an alarm. */
+  --animate-reveal-pulse: reveal-pulse 0.6s ease-in-out 2;
+}
+
+@keyframes learn-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+}
+
+/* A ring rather than a fill: patch tiles carry the patch's own colour and
+   plugin chips are plain, so the one treatment that reads the same on both is
+   drawn outside them. */
+@keyframes reveal-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--color-accent) 70%, transparent),
+      0 0 12px 3px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+}
+
+/* Light theme. Not an inversion: dark lifts surfaces *out of* the void with
+   white veils and coloured glows, light floats white cards *above* a cool grey
+   page and separates them with real elevation shadows. The page/card lightness
+   step does the work the veils do in dark, which is why the veil alphas mostly
+   carry over unchanged.
+
+   Unlayered on purpose — :root[data-theme='light'] (0,2,0) outranks the
+   :root,:host (0,1,0) that @theme compiles to, so this wins wherever it sets a
+   value and inherits the dark default everywhere it doesn't. */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* The page carries the whole separation in this theme. It was #eceff4, a few
+     percent off the white chrome sitting on it — and chrome that is also
+     translucent then melts into it wherever the two meet, worst along the
+     drawer's long edge. A real step darker and cooler is what makes the frame
+     read as one bright shell around a recessed workspace. */
+  --color-space: #d6dbe4;
+  /* Light inverts the lift: frosted white chrome floating above the grey page,
+     same idiom as the cards. Near-opaque rather than 88%, so the drawer keeps
+     its own colour over whatever it overlaps instead of washing out. */
+  --color-chrome: rgb(250 251 253 / 0.97);
+  --color-chrome-solid: #fafbfd;
+  /* Cards stay the whitest thing on screen — a step above the chrome, two above
+     the page — so a module reads as nearest the eye. The one exception is the
+     drawer, which re-points these for its tiles (see ModuleDrawer.svelte):
+     white-on-white there had every tile melting into the chrome. */
+  --color-panel: rgb(255 255 255 / 0.94);
+  --color-panel-solid: #ffffff;
+  --color-menu: #ffffff;
+  --color-knob: #e2e7ee;
+  --color-well: #dfe4ec;
+  --color-field: #ffffff;
+  /* Deliberately still dark: a light scrim over light content would leave the
+     dialog with nothing to stand out against. */
+  --color-scrim: rgb(9 16 30 / 0.45);
+
+  --color-ink: #0d1626; /* 15.7:1 on the page, 18.1:1 on a card */
+  /* Carries its own alpha so that every `color-mix(… var(--color-void) N%,
+     transparent)` in the codebase scales down to a light-appropriate shadow
+     without a single call site changing. Dark's alpha is 1, so dark is
+     untouched. Kept low: the dark theme leans on heavy shadow because it has
+     no lightness headroom below its surfaces, whereas here the same weight
+     reads as grime. */
+  --color-void: rgb(9 16 30 / 0.5);
+  --color-muted: #4a5566; /* 6.5:1 — same ink:muted ratio as dark */
+
+  /* Same teal family as #00ffcc (hue 171° vs 168°), dropped in lightness
+     because the original is 1.1:1 on a light page. 6.0:1 on a card. */
+  --color-accent: #00705f;
+  --color-accent-ink: #ffffff; /* black on #00705f is only 3.5:1 */
+  --color-danger: #c31435;
+  --color-warn: #b3261e;
+  --color-hot: #b06a00; /* 4.3:1 — a meter fill, so the 3:1 bar applies */
+  --color-purple: #6d4bff;
+
+  /* 1.25 was enough while chrome and page were near the same lightness — the
+     surfaces did some of the separating. Now that both are bright but distinct,
+     the hairline *between* two bright surfaces is where the edge would still be
+     lost, so the veils go up a step. */
+  /* A chrome control is a well one step deeper than the surface it sits on, and
+     the dark theme reaches for the page to get that step. Light cannot: the two
+     are now far apart, so the same recipe sinks the rig and scene switchers to
+     nearly the page's own colour and the toolbar reads as a row of grey slabs.
+     Here the step is a light veil of ink into the chrome itself — measured from
+     what is actually behind the control, which is what the dark recipe is doing
+     too when its page and chrome sit close together. */
+  --chrome-control-bg: color-mix(in srgb, var(--color-ink) 5%, var(--color-chrome-solid));
+
+  --ink-k: 1.5;
+
+  /* Glow → elevation. A 24px coloured halo on a white page reads as dirt, not
+     as light, so the accent shadows become tight drop shadows and the text
+     halos go away entirely (there is no light-mode idiom for a coloured glow on
+     11px mono type — it only ever blurs it).
+     Keep in sync with the .module-tinted light block in ModuleCard.svelte,
+     which has to restate these against the module's own accent. */
+  --shadow-glow-accent:
+    0 1px 3px color-mix(in srgb, var(--color-accent) 45%, transparent),
+    0 3px 10px color-mix(in srgb, var(--color-accent) 22%, transparent);
+  --shadow-glow-accent-sm: 0 2px 8px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  --shadow-glow-accent-lg: 0 8px 28px color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --shadow-glow-accent-bar: 0 1px 4px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  --text-shadow-glow-accent: none;
+  --text-shadow-glow-accent-sm: none;
+  --text-shadow-glow-ink: none;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #app {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* This is an app window, not a document: chrome — labels, readouts, button
+     text — is never selectable, so a drag that starts on a knob or slips off a
+     button can't leave a trail of blue highlight behind it. Only genuine text
+     entry opts back in below. */
+  :root {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input,
+  textarea,
+  [contenteditable='true'] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  body {
+    background-color: var(--color-space);
+    background-image:
+      radial-gradient(
+        at 0% 0%,
+        color-mix(in srgb, var(--color-accent) 5%, transparent) 0px,
+        transparent 50%
+      ),
+      radial-gradient(
+        at 100% 100%,
+        color-mix(in srgb, var(--color-purple) 5%, transparent) 0px,
+        transparent 50%
+      );
+    color: var(--color-ink);
+  }
+
+  /* Softer than dark's 5%/5%: a dark tint over a light page carries much
+     further, and the page is the one surface where the ambient wash must read
+     as light in the room rather than as a stain. */
+  :root[data-theme='light'] body {
+    background-image:
+      radial-gradient(
+        at 0% 0%,
+        color-mix(in srgb, var(--color-accent) 4%, transparent) 0px,
+        transparent 50%
+      ),
+      radial-gradient(
+        at 100% 100%,
+        color-mix(in srgb, var(--color-purple) 3%, transparent) 0px,
+        transparent 50%
+      );
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-ink) 20%, transparent);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  }
+
+  /* One reduced-motion rule for the whole app, replacing the per-component
+     @media blocks that each remembered to silence only their own animation.
+     JS-driven transitions are unaffected and already opt out themselves via
+     `prefersReducedMotion.current` (Popover, SwitcherGroup). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

@@ -1,0 +1,26 @@
+name: Idea or feature request
+description: Suggest something Plectrify should do.
+title: '[Idea]: '
+labels: ['enhancement']
+
+# No diagnostics field here on purpose: an idea does not need a plugin chain, and
+# demanding one would train people to paste it without reading — which is exactly
+# how the bug form's required field stops being taken seriously.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like Plectrify to do?
+      placeholder: Let a knob control the same parameter on several modules at once.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: What are you trying to achieve?
+      description: >-
+        The problem behind the request. Knowing what you are actually trying to
+        do often turns up a better answer than the feature as described.
+    validations:
+      required: true

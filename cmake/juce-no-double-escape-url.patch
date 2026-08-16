@@ -1,0 +1,36 @@
+Do not re-escape a URL that is already escaped, on macOS.
+
+JUCE 8.0.14's WebKit/WKWebView backend percent-encodes every string handed to
+goToURL() before building the request, with URLQueryAllowedCharacterSet. That
+set does not contain '%', so an escape already in the string is escaped again:
+"%3A" becomes "%253A", and the server that decodes it once is handed the literal
+text "https%3A%2F%2F..." rather than the URL it stands for.
+
+Any correctly-built query string is affected. Plectrify hit it on the TONE3000
+OAuth flow, where redirect_uri is a URL inside a query parameter and so must be
+escaped: TONE3000 answered "redirect_uri must be a valid URL", quoting our
+escapes back. It equally mangles any escaped parameter in a page the user
+navigates to inside that window.
+
+The encoding is there to rescue a string that is not a valid URL (a raw space,
+say), so keep it for exactly that case: try the string as given first, and only
+escape when NSURL rejects it. A valid URL then reaches WebKit untouched.
+
+diff --git a/modules/juce_gui_extra/native/juce_WebBrowserComponent_mac.mm b/modules/juce_gui_extra/native/juce_WebBrowserComponent_mac.mm
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_mac.mm
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_mac.mm
+@@ -61,7 +61,13 @@
+ {
+     NSString* urlString = juceStringToNS (url);
+ 
+-     urlString = [urlString stringByAddingPercentEncodingWithAllowedCharacters: [NSCharacterSet URLQueryAllowedCharacterSet]];
++     // PLECTRIFY_NO_DOUBLE_ESCAPE_URL: only escape a string that is not already
++     // a valid URL. URLQueryAllowedCharacterSet excludes '%', so escaping
++     // unconditionally turns every existing escape into a literal one - a
++     // redirect_uri of "https%3A%2F%2Fhost%2Fpath" is delivered to the server as
++     // that text rather than as the URL it encodes.
++     if ([NSURL URLWithString: urlString] == nil)
++         urlString = [urlString stringByAddingPercentEncodingWithAllowedCharacters: [NSCharacterSet URLQueryAllowedCharacterSet]];
+ 
+      if (NSURL* nsURL = [NSURL URLWithString: urlString])
+      {

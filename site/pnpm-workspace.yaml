@@ -1,0 +1,19 @@
+# This file's job is to make site/ its own pnpm root. pnpm walks up from the
+# invocation directory looking for a pnpm-workspace.yaml and installs whatever
+# it finds first — without this, `pnpm install` here resolves the repo root's
+# and does nothing at all, leaving no node_modules and a confusing "Already up
+# to date". Declaring one here keeps `pnpm --dir site install` a plain,
+# self-contained install, which is the same independence ui/ and packaging/ are
+# meant to have.
+#
+# allowBuilds mirrors the root's: Vite bundles esbuild, whose install script
+# places the platform binary. Without the allow there is no binary and no build.
+# wrangler bundles workerd the same way — it is what `wrangler dev` runs the
+# site on locally; deploying does not need it, but a half-installed wrangler is
+# a worse thing to leave behind than a binary nobody runs.
+packages:
+  - .
+
+allowBuilds:
+  esbuild: true
+  workerd: true

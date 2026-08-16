@@ -1,0 +1,40 @@
+{
+  "name": "plectrify-ui",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "preview": "vite preview",
+    "app": "pnpm --dir .. app",
+    "app:ui": "pnpm --dir .. app --ui-only",
+    "app:clean": "pnpm --dir .. app --clean",
+    "app:dist": "pnpm --dir .. app --dist",
+    "release": "pnpm --dir .. release",
+    "release:promote": "pnpm --dir .. release:promote",
+    "release:build": "pnpm --dir .. release:windows"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tailwindcss/vite": "^4.1.11",
+    "prettier": "3.9.6",
+    "prettier-plugin-svelte": "4.1.1",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "svelte": "^5.36.0",
+    "svelte-check": "^4.2.2",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "phosphor-svelte": "^3.1.0",
+    "tailwind-merge": "^3.6.0"
+  }
+}

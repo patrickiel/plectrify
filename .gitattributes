@@ -1,0 +1,19 @@
+# Keep the canonical GNU licence byte-for-byte identical on Windows checkouts.
+LICENSE text eol=lf
+
+# The catalogue is signed over its exact bytes on disk, so a CRLF checkout would
+# leave the committed .sig not matching the .json it was computed over — and the
+# repo is meant to match what is live. Pin both halves of the pair.
+packaging/catalogue.json     text eol=lf
+packaging/catalogue.json.sig text eol=lf
+
+# `host` archives these files byte-for-byte and the catalogue pins the hash of
+# the result, so the same commit must produce the same archive everywhere. With
+# core.autocrlf on, a Windows checkout of a text file differs from a mac one by
+# a byte per line, which is enough to make a pack look "changed" purely for
+# having been rebuilt on the other OS — and a patch pack now genuinely is built
+# on both. Pin the text; the captures and impulses are binary already.
+packaging/content/**/*.json text eol=lf
+packaging/content/**/*.txt  text eol=lf
+packaging/content/**/*.nam  binary
+packaging/content/**/*.wav  binary

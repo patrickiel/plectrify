@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#020305" />
+    <meta name="application-name" content="Plectrify" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link
+      rel="preload"
+      href="/fonts/inter-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/jetbrains-mono-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <title>Plectrify</title>
+    <script>
+      // The theme has to be on <html> before the first frame. The engine's
+      // persisted settings arrive asynchronously — a file read over the JUCE
+      // bridge — so a light-theme user would otherwise stare at the dark canvas
+      // for several frames and then watch it flip. App.svelte mirrors the
+      // resolved theme into this key on every change; this is its only reader.
+      // Key and colours match src/lib/theme.ts and the palette in src/app.css.
+      (() => {
+        let theme = 'dark';
+        try {
+          if (localStorage.getItem('plectrify.theme') === 'light') theme = 'light';
+        } catch {
+          // Storage unavailable — the dark default is the safe first paint.
+        }
+        const root = document.documentElement;
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+        // Stands in for the page background until app.css lands, and keeps
+        // showing through while WebView2's compositor catches up with a resize.
+        // On <html> rather than <body> so it survives before <body> is parsed.
+        root.style.backgroundColor = theme === 'light' ? '#eceff4' : '#020305';
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

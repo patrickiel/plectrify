@@ -1,0 +1,14 @@
+# Cloudflare Pages reads this file verbatim.
+#
+# Vite fingerprints everything under _app/immutable/, so those files can never
+# change meaning under a given URL and are safe to cache forever. The fonts are
+# in here too — they moved from static/fonts into src/lib/fonts precisely so
+# Vite would hash them, which is what lets hooks.server.ts preload them and
+# what lets this rule cache them forever instead of the week the unhashed
+# names used to be limited to.
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

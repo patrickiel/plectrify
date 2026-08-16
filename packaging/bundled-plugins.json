@@ -1,0 +1,28 @@
+{
+  "_note": "PLUGINS PLECTRIFY SHIPS, as opposed to ones it offers. Everything in catalogue.json is fetched at the user's request and installed into a folder they own; everything here is inside the installer, lands beside the executable, is never listed by the Packages panel, and goes away when Plectrify is uninstalled. A plugin belongs here only when the app is not honestly usable without it. Today that is exactly one: every TONE3000 tone is a Neural Amp Modeler capture, and browsing a catalogue of captures with nothing to play them in is not a feature. The pins moved out of catalogue.json when it stopped being a package. Both release scripts read this file, download the archive, check the SHA-256 and stage the .vst3 - so the binary is the same one the catalogue used to hand out, built by us from the MIT source (see PROVENANCE next to each archive) and covered by THIRD_PARTY_NOTICES.md. Updating means rebuilding with `pnpm --dir packaging build-plugin`, uploading, and pasting the new version/url/sha256 here.",
+  "plugins": [
+    {
+      "id": "neural-amp-modeler",
+      "name": "Neural Amp Modeler",
+      "version": "0.7.15",
+      "licenseId": "MIT",
+      "licenseUrl": "https://raw.githubusercontent.com/sdatkinson/NeuralAmpModelerPlugin/v0.7.15/LICENSE",
+      "projectUrl": "https://github.com/sdatkinson/NeuralAmpModelerPlugin",
+      "sourceUrl": "https://github.com/sdatkinson/NeuralAmpModelerPlugin/tree/v0.7.15",
+      "builtFromSource": true,
+      "bundleName": "NeuralAmpModeler.vst3",
+      "assets": {
+        "macos-arm64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/hosted/neural-amp-modeler/neural-amp-modeler-0.7.15-macos-arm64.zip",
+          "sha256": "db22693f2d138e3fc3c4dafc35404c5c2218354e8f08908ca0818e8f71bbbc87",
+          "downloadBytes": 1874644
+        },
+        "windows-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/hosted/neural-amp-modeler/neural-amp-modeler-0.7.15-win-x64.zip",
+          "sha256": "c9889ed97379e071f1a82c200aee6670b3093de082557836fa1c0cb2a710c77f",
+          "downloadBytes": 2263175
+        }
+      }
+    }
+  ]
+}

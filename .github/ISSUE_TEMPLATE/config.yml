@@ -1,0 +1,3 @@
+# No blank issues: the bug form's required Diagnostics field is the whole point,
+# and a blank issue is exactly the escape hatch that would defeat it.
+blank_issues_enabled: false

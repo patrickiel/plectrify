@@ -1,0 +1,32 @@
+{
+  "name": "plectrify-site",
+  "private": true,
+  "type": "module",
+  "description": "The plectrify.com marketing and documentation site. A fully static SvelteKit build (adapter-static) served by an assets-only Cloudflare Worker — no server, no database, no authentication. Its design tokens are lifted from ui/src/app.css so the site and the app read as one product.",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "cf-preview": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.8",
+    "@sveltejs/kit": "^2.20.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tailwindcss/vite": "^4.1.11",
+    "mdsvex": "^0.12.3",
+    "prettier": "3.9.6",
+    "prettier-plugin-svelte": "4.1.1",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "svelte": "^5.36.0",
+    "svelte-check": "^4.2.2",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "wrangler": "^4.120.1"
+  }
+}
