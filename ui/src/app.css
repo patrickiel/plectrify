@@ -239,6 +239,13 @@
      a light that keeps blinking after the eye has landed on it stops being an
      answer and becomes an alarm. */
   --animate-reveal-pulse: reveal-pulse 0.6s ease-in-out 2;
+  /* The same pulse turned inward, for a row that fills its container edge to
+     edge. A Card clips (overflow-hidden, so its rounded corners hold), so an
+     outward ring on a full-bleed row keeps its top and bottom — those spill
+     into the neighbouring rows, still inside the card — and loses its left and
+     right sides to the clip. Drawn inside, nothing is cut off and the row needs
+     no inset of its own, which would shift it sideways as the pulse starts. */
+  --animate-reveal-pulse-inset: reveal-pulse-inset 0.6s ease-in-out 2;
 }
 
 @keyframes learn-pulse {
@@ -265,6 +272,22 @@
     box-shadow:
       0 0 0 2px color-mix(in srgb, var(--color-accent) 70%, transparent),
       0 0 12px 3px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+}
+
+/* The inward twin. Same colours and timing, so the two read as one treatment;
+   only the direction differs, and which one an element wants is decided by
+   whether its container clips its edges. */
+@keyframes reveal-pulse-inset {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+
+  50% {
+    box-shadow:
+      inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 70%, transparent),
+      inset 0 0 12px 3px color-mix(in srgb, var(--color-accent) 35%, transparent);
   }
 }
 

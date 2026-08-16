@@ -86,6 +86,18 @@ function isPatchOfPackage(patch: Patch, packageId: string): boolean {
   return patch.id === packageId || patch.id.startsWith(`${packageId}_`);
 }
 
+/** The id of the package a pack patch came from, or undefined for a patch the
+    user saved themselves. What the **Pack** badge points at: the badge says a
+    patch arrived with a package, and this is the package it names. Only ever
+    asked of a `readOnly` patch — a user's own patch id may coincide with a
+    package's, and their patch is still theirs. */
+export function packageIdForPatch(
+  patch: Patch,
+  packages: readonly CataloguePackage[],
+): string | undefined {
+  return patch.readOnly ? packageForPatch(patch, packages)?.id : undefined;
+}
+
 /** The package a pack patch came from. */
 function packageForPatch(
   patch: Patch,

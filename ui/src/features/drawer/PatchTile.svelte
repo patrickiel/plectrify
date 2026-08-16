@@ -51,6 +51,11 @@
     /** Open this tone's page on TONE3000 — the T3K mark's one action. Absent
         (a patch with no tone, or no url recorded) leaves the mark inert. */
     onOpenTone?: () => void;
+    /** Show the package this patch was installed with — the **Pack** badge's
+        one action. Absent (a patch the user saved, or a pack whose package is
+        not in the catalogue this build fetched) leaves the badge a plain
+        label, which is what it always was. */
+    onShowPackage?: () => void;
     /** A Shift-drag left this tile: the drawer's own reorder gesture,
         never a rack drag — the drawer owns the in-flight state and the drop.
         Absent, the modifier changes nothing. */
@@ -72,6 +77,7 @@
     captureMissing = false,
     onRepair,
     onOpenTone,
+    onShowPackage,
     onReorderStart,
     onReorderEnd,
   }: Props = $props();
@@ -316,10 +322,31 @@
              answers "why can't I edit this?", a question only asked once the
              pointer is on the tile — holding width for it all the time is
              what it costs, not what it earns. -->
-        <span
-          class="absolute inset-y-0.5 right-1 flex items-center rounded bg-[color-mix(in_srgb,var(--color-panel-solid)_88%,transparent)] px-1 text-[length:var(--drawer-font-label,.7rem)] text-muted opacity-0 backdrop-blur-[2px] transition-opacity group-hover:opacity-100"
-          {@attach tooltip('Installed with a package')}>Pack</span
-        >
+        {#if onShowPackage}
+          <!-- The badge is also the way back to what installed this. It
+               already says "a package put me here"; the only question it
+               raises is which one, and the Packages panel is the one place
+               that answers. -->
+          <button
+            type="button"
+            class="absolute inset-y-0.5 right-1 flex cursor-pointer items-center rounded bg-[color-mix(in_srgb,var(--color-panel-solid)_88%,transparent)] px-1 text-[length:var(--drawer-font-label,.7rem)] text-muted opacity-0 backdrop-blur-[2px] transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:text-accent focus-visible:opacity-100"
+            onclick={(e) => {
+              // The tile is a drag source and, in the plugin list, a click
+              // target of its own; neither should fire because the badge was
+              // pressed.
+              e.stopPropagation();
+              onShowPackage?.();
+            }}
+            ondragstart={(e) => e.preventDefault()}
+            aria-label="Show the package {patch.name} was installed with"
+            {@attach tooltip('Installed with a package — show it')}>Pack</button
+          >
+        {:else}
+          <span
+            class="absolute inset-y-0.5 right-1 flex items-center rounded bg-[color-mix(in_srgb,var(--color-panel-solid)_88%,transparent)] px-1 text-[length:var(--drawer-font-label,.7rem)] text-muted opacity-0 backdrop-blur-[2px] transition-opacity group-hover:opacity-100"
+            {@attach tooltip('Installed with a package')}>Pack</span
+          >
+        {/if}
       {:else}
         <!-- Floating over the title's right end rather than beside it, so the
              tile stays exactly as wide as its content — invisible buttons in

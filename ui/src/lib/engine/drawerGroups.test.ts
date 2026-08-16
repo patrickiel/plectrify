@@ -8,6 +8,7 @@ import {
   groupPluginsByMaker,
   orderPatchEntries,
   packageDrawerItems,
+  packageIdForPatch,
   patchCategory,
   pluginPackageIds,
   splitCategoryPath,
@@ -100,6 +101,44 @@ describe('packageDrawerItems', () => {
       [plugin({ id: 'p1', packageId: 'surge-xt' })],
     );
     expect(items).toEqual({ patchIds: [], pluginIds: [] });
+  });
+});
+
+describe('packageIdForPatch', () => {
+  const packs = [
+    pkg({ id: 'amalgam-jtm45' }),
+    pkg({ id: 'dragonfly-reverb-patches' }),
+    pkg({ id: 'dragonfly-reverb', kind: 'plugin' }),
+  ];
+
+  it('names the package a pack patch was installed with', () => {
+    expect(packageIdForPatch(patch({ id: 'amalgam-jtm45', readOnly: true }), packs)).toBe(
+      'amalgam-jtm45',
+    );
+  });
+
+  it('joins a multi-patch pack by its folder prefix', () => {
+    const p = patch({ id: 'dragonfly-reverb-patches_hall', readOnly: true });
+    expect(packageIdForPatch(p, packs)).toBe('dragonfly-reverb-patches');
+  });
+
+  it('does not let a shorter package id claim a longer one’s patch', () => {
+    // 'dragonfly-reverb' is a prefix of the pack's id but not of a patch
+    // folder: the join is on '<id>_', so only the patches package matches.
+    const p = patch({ id: 'dragonfly-reverb-patches_hall', readOnly: true });
+    expect(packageIdForPatch(p, packs)).not.toBe('dragonfly-reverb');
+  });
+
+  it('claims nothing for a patch the user saved themselves', () => {
+    // Same id as a package, deliberately: a patch of the user's own is theirs
+    // however its file happens to be named, so the badge is not offered.
+    expect(packageIdForPatch(patch({ id: 'amalgam-jtm45' }), packs)).toBeUndefined();
+  });
+
+  it('is undefined for a pack whose package the catalogue no longer lists', () => {
+    expect(
+      packageIdForPatch(patch({ id: 'withdrawn-pack', readOnly: true }), packs),
+    ).toBeUndefined();
   });
 });
 
