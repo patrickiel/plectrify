@@ -8,13 +8,15 @@ description: Install Plectrify, choose an audio device, scan your plugins and ge
 Grab the build for your machine from the [download section](/#download).
 
 - **Windows**: run the installer. It bundles the WebView2 runtime and the Visual C++
-  redistributable, so there is nothing else to set up.
+  redistributable, so there is nothing else to set up. It also offers **Plectrify as a VST3
+  plug-in** (checked by default), installed to `C:\Program Files\Common Files\VST3` — the same
+  rig, running on a track inside your DAW, sharing your rigs and patches with the standalone.
 - **macOS** (Apple Silicon, 13.3 or newer): open the disk image and drag the app to
   Applications. The build is not notarized, so macOS refuses the first launch and may call the
   app damaged. It is not: see [Opening it on macOS](/docs/opening-on-macos), which is a
   two-minute detour you do once.
 
-Plectrify ships **no plugins**. It is a host: you bring the amp sims and effects, and it runs
+Plectrify is a host, not a plugin collection: you bring the amp sims and effects, and it runs
 them. If you have none yet, the built-in [Packages panel](/docs/packages) can install a starter
 set for you.
 

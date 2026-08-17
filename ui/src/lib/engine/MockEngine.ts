@@ -696,6 +696,14 @@ const MOCK_PLUGIN_VERSIONS: Record<string, string> = {
   'Mock Utility': '0.9-beta',
 };
 
+/** `?host=plugin` renders the mock as the VST3 build: the DAW-owned surfaces
+    (setup wizard, audio settings, window chrome, Auto Standby) hide exactly as
+    they do inside a real host, so the gated layout is exercisable in the
+    browser. Anything else — including absence — is the standalone. */
+function mockHostMode(): 'standalone' | 'plugin' {
+  return new URLSearchParams(location.search).get('host') === 'plugin' ? 'plugin' : 'standalone';
+}
+
 // No exe to ask, and nothing here may pass for a release build: the About
 // dialog reports this verbatim, so standalone UI work is never mistaken for the
 // shipped app in a bug report. Every group is still populated — the diagnostics
@@ -708,6 +716,11 @@ const MOCK_APP_INFO: AppInfo = {
   // exercise the same wording branches (Finder, WebKit, no ASIO line) the
   // native mac build takes.
   platform: /mac/i.test(navigator.platform) ? 'macos' : 'windows',
+  host: mockHostMode(),
+  capabilities:
+    mockHostMode() === 'plugin'
+      ? { audioDevices: false, midiDevices: false, windowChrome: false, autoStandby: false }
+      : { audioDevices: true, midiDevices: true, windowChrome: true, autoStandby: true },
   juceVersion: '—',
   buildInfo: {
     commit: '',

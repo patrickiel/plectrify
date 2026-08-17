@@ -4,11 +4,16 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-Plectrify is a standalone **guitar-rig VST3 host** for Windows and macOS
-(Apple Silicon): a JUCE (C++17) application that runs a user-ordered chain of
-VST3 plugins (amp sims, effects) live from a guitar input. The entire UI is a
-Svelte web app rendered inside an embedded `juce::WebBrowserComponent`
-(WebView2 on Windows, WKWebView on macOS); the C++ side owns all audio.
+Plectrify is a **guitar-rig VST3 host** for Windows and macOS (Apple
+Silicon): a JUCE (C++17) engine that runs a user-ordered chain of VST3
+plugins (amp sims, effects) live from a guitar input. It ships in two
+shapes from one engine: the standalone application, and a VST3 plugin that
+runs the same rig inside a DAW (`Source/plugin/`; core support — release
+packaging for the plugin is still to come). The entire UI is a Svelte web
+app rendered inside an embedded `juce::WebBrowserComponent` (WebView2 on
+Windows, WKWebView on macOS); the C++ side owns all audio. Both builds read
+the same per-user data root, so rigs, patches, installed packages and the
+TONE3000 account are shared by construction.
 
 A **module** in the rack is just a hosted plugin — it carries no built-in
 semantics. The user gives it identity by mapping knobs onto the plugin's
@@ -53,8 +58,12 @@ scripts/              # root dev/release tooling — every entry point `pnpm` ru
   release.macos.ts    # macOS release pipeline (signed/notarized DMG)
   shared.ts           # helpers: OS-neutral (shared.ts) and per-OS (windows.ts, macos.ts)
 Source/               # C++ — vertical slices, each folder is on the include path
-  app/                # Main.cpp (entry), MainComponent (shell, audio stack, web bridge)
+  app/                # Main.cpp (app entry), MainComponent (standalone shell),
+                      #   PlectrifyEngine (everything shared with the VST3 build),
+                      #   HostServices.h (the engine's abstract host), EngineWebView
   audio/              # RackProcessor (AudioProcessorGraph wrapper), InputRouterProcessor
+  plugin/             # the VST3 build: PluginProcessor (AudioProcessor + HostServices),
+                      #   PluginEditor (the shared web view in a DAW's window)
   plugins/            # PluginManager (VST3 scan / cache / async instantiation)
   rackui/             # PluginEditorWindow (hosts a plugin's own editor)
   tone3000/             # TONE3000 account, its own browser window, downloads, NAM state codec
@@ -89,6 +98,19 @@ pnpm app --dist --no-ui    # skip the Svelte build (C++ only)
 pnpm app --dist --no-run   # build + test only, don't launch
 pnpm app --clean           # rebuild the native target from scratch
 pnpm app --dist --config Release   # Release build (stages ui/ where the OS serves it)
+pnpm app --plugin    # build the Debug VST3 and install it for this user's DAWs
+                     #   (%LOCALAPPDATA%\Programs\Common\VST3 on Windows,
+                     #   ~/Library/Audio/Plug-Ins/VST3 on macOS). Starts Vite
+                     #   like the default loop; launch the DAW with
+                     #   PLECTRIFY_DEV_URL=http://localhost:5173 in its
+                     #   environment for live HMR. A Debug .vst3 needs no
+                     #   staging — UI, catalogue and bundled plugins resolve
+                     #   from the source tree. Note the copy step fails while a
+                     #   DAW holds the bundle open: close the DAW first —
+                     #   nothing can release a loaded .vst3 the way stopApp()
+                     #   releases the exe. --plugin refuses --dist/--ui-only:
+                     #   a Release .vst3 is staged and sealed by the release
+                     #   pipeline, not the dev loop.
 ```
 
 Platform notes: Windows builds into `build/` (VS generator, multi-config) and
@@ -656,6 +678,89 @@ records the substitution it made.
 
 ## Architecture
 
+### One engine, two hosts
+
+Everything shared between the standalone app and the VST3 plugin lives in
+`PlectrifyEngine` (`Source/app/PlectrifyEngine.{h,cpp}`): the rack graph, the
+plugin library and catalogue, the TONE3000 slice, rig capture/apply, Auto
+Standby's policy hookup, the sandboxed file I/O and both directions of the UI
+bridge. It is deliberately **not** a `juce::Component` — a plugin editor is
+created and destroyed freely while audio keeps running, so the engine outlives
+any view. The host constructs its web view from
+`engine->registerEventListeners(makeEngineWebViewOptions(...))` and attaches
+it; every C++→JS push funnels through `PlectrifyEngine::emit()`, which quietly
+drops events while no view is attached — a state the page's request/re-push
+contract already recovers from.
+
+Host-shaped questions go through **`plectrify::HostServices`**
+(`Source/app/HostServices.h`), the engine's only route to anything the two
+builds answer differently: sample rate/block size, CPU/xruns/device latency,
+MIDI device names, the audio-settings and window events, whether Auto Standby
+may engage, whether the host persists engine state, and the latency report
+upward. `MainComponent` is the standalone implementation (it keeps the
+`AudioDeviceManager`, `AudioProcessorPlayer`, `InputProbe`, `MidiInputManager`
+and window handlers); `PlectrifyAudioProcessor` (`Source/plugin/`) is the
+DAW-hosted one. `HostCapabilities` rides `appInfo` to the page (with
+`host: 'standalone' | 'plugin'`), which gates the standalone-only surfaces —
+setup wizard, device settings, window chrome, the Auto Standby card — behind
+`appInfo.capabilities ?? STANDALONE_CAPABILITIES`, defaulting standalone-true
+so the app can never flash a degraded layout before the push lands. The `host`
+discriminator alone also rides the web view's initialisation data
+(`registerEventListeners` bakes it into `window.__JUCE__` before the page's
+first script runs), because the page's session-restore decision is one-shot
+and a push can be dropped while the editor is hidden — which is how a DAW may
+open one, and how pluginval found a page that guessed standalone and applied
+the standalone's autosaved working rack over the DAW's session. Layout may
+safely default; where the session lives may not.
+
+**The plugin build** (`juce_add_plugin(PlectrifyPlugin FORMATS VST3)` — the
+same `PLECTRIFY_ENGINE_SOURCES` and one `plectrify_configure_target()`
+function, so the two targets cannot drift on definitions; `JUCE_ASIO` stays
+app-only) takes over the `AudioProcessorPlayer`'s job in
+`prepareToPlay`/`processBlock`, honouring the graph's suspension under its
+callback lock exactly as the player did. Buses are mono-or-stereo in, stereo
+out; the router always taps channel 0 (the DAW routes; the graph's render-time
+clamp covers mono). The engine publishes graph latency on a diff every tick →
+`setLatencySamples`, so the DAW's delay compensation tracks the chain — the
+standalone's no-op keeps its behaviour unchanged. Host MIDI is collected
+lock-free in `processBlock` and flushed to the page's `midiEvents` stream on
+the engine tick with `MidiInputManager`'s exact coalescing rule, so MIDI learn
+works unmodified. The plugin's WebView2 profile is `WebView2-Plugin`, never
+the app's — two processes must not share a profile lock. `moduleResourceDir()`
+in `AppPaths.h` is what lets `provideUiResource` and the bundled-plugin
+directory resolve inside either the exe's folder or a `.vst3` bundle's
+`Contents/Resources`.
+
+**Host-saved state.** `getStateInformation` persists one JSON document
+(`PlectrifyEngine::currentHostState()`): the rack in `applyRigEntries`' shape,
+the split topology, the page's session blob, the fixed-node settings the
+standalone keeps in `audio_settings.xml`, and the editor size. VST3 hosts may
+ask off the message thread, so the engine keeps a capture cache refreshed on
+its tick (rate-limited to ~2 s — a capture serializes every plugin's state)
+and captures fresh when asked on the message thread. `setStateInformation`
+applies through the ordinary rig-apply path under the load mute and its
+watchdog; the load generation makes the latest state win over one still
+applying. The page's session metadata rides the same document instead of
+`working-rack.json`: the plugin build's page uses the `writeSession` /
+`readSession` bridge events (engine memory), because a global file would be
+fought over by two instances and dies with no one to read it when the DAW
+project moves machines. On restore the plugin's page **adopts** the session's
+metadata without re-applying the rack — the engine's rack is already live, and
+rebuilding it on every editor open would cut audio. Auto Standby is never
+driven in the plugin (offline render and freeze are the host's business); the
+feedback guard, tuner, looper and metronome all remain.
+
+Both release pipelines ship the plugin self-contained (`ui/` + the bundled NAM
+in `Contents/Resources`): the Windows installer behind a default-on task into
+`{commoncf64}\VST3`, the mac DMG as a sealed `Plectrify.vst3` beside the app
+with a symlink to the machine-wide `/Library/Audio/Plug-Ins/VST3` (a per-user
+`~/Library` symlink is impossible — a symlink target is a literal path, never
+tilde-expanded — and dropping the bundle on the machine-wide one costs a
+Finder auth prompt, not an elevated installer). The Steinberg VST3 SDK notice
+electing GPLv3 is in `THIRD_PARTY_NOTICES.md`, ASIO-notice pattern. Still to
+come: out-of-process scanning — Rescan inside a DAW still loads plugins
+in-process, where a crashing plugin takes the host down.
+
 ### UI ↔ engine contract
 
 `ui/src/lib/engine/EngineBridge.ts` is the single contract between UI and
@@ -673,11 +778,13 @@ engine-specific behaviour behind the bridge.
 
 No method calls cross the boundary — everything is named events:
 
-- **JS → C++**: `backend.emitEvent(id, payload)`; handled by
-  `withEventListener(...)` registrations and `handle*` methods in
-  `Source/app/MainComponent.cpp` (e.g. `insertModule`, `replaceModule`,
-  `setParam`, `watchParams`, `openEditor`, `scanPlugins`, `openAudioSettings`,
-  `installPackages`).
+- **JS → C++**: `backend.emitEvent(id, payload)`; handled by the
+  `withEventListener(...)` registrations in
+  `PlectrifyEngine::registerEventListeners` and its `handle*` methods (e.g.
+  `insertModule`, `replaceModule`, `setParam`, `watchParams`, `openEditor`,
+  `scanPlugins`, `installPackages`); host-owned events (`openAudioSettings`,
+  `setAudioDevice`, `startWindowResize`…) are delegated to `HostServices`,
+  where the plugin build inherits harmless no-ops.
 - **C++ → JS**: `emitEventIfBrowserIsVisible(...)`. `rackChanged` pushes the
   full rack state after structural changes; `paramValues` streams live knob
   values (a 15 Hz `juce::Timer` in `MainComponent` polls parameters so UI knobs
@@ -704,7 +811,9 @@ No method calls cross the boundary — everything is named events:
 
 When adding a UI↔engine capability: add the method to `EngineBridge`,
 implement it in **both** `MockEngine` and `JuceEngine`, pick a matching event
-name, and wire the handler in `MainComponent`.
+name, and wire the handler in `PlectrifyEngine` (or through `HostServices`,
+if only one host can answer it — then the other inherits the no-op and the
+page hides the surface behind `HostCapabilities`).
 
 ### Audio (C++)
 
@@ -797,11 +906,12 @@ name, and wire the handler in `MainComponent`.
   scanning runs on a background thread with a crash blacklist
   (dead-man's-pedal file). `KnownPluginList` is internally locked, so the
   message thread can read it while a scan runs.
-- `MainComponent` (`Source/app/`) — owns the device manager,
-  `AudioProcessorPlayer`, rack, and the web view; launches native dialogs
-  (plugin picker, audio settings, per-plugin editor windows). Navigation is
-  deferred until a window peer exists (WebView2 requirement) — see
-  `parentHierarchyChanged()`.
+- `MainComponent` (`Source/app/`) — the standalone shell and the engine's
+  `HostServices`: owns the device manager, `AudioProcessorPlayer`, the web
+  view and the MIDI inputs, and the `PlectrifyEngine` that owns everything
+  else (the rack, per-plugin editor windows, the audio-settings dialog is the
+  shell's). Navigation is deferred until a window peer exists (WebView2
+  requirement) — see `parentHierarchyChanged()`.
 
 **A first launch chooses its own audio device.** With no `audio_settings.xml`,
 JUCE's default is the OS's default, which on Windows is shared-mode WASAPI on
@@ -908,7 +1018,10 @@ OSes.
 - `rigs/` + `rigs/index.json` — saved full-chain rigs. TS owns the format,
   naming and listing; C++ only captures/applies plugin state (`captureRig` /
   `applyRig`) and provides sandboxed file I/O.
-- `working-rack.json` — autosaved snapshot of the working rack (session restore).
+- `working-rack.json` — autosaved snapshot of the working rack (session
+  restore). Standalone only: the VST3 build's working session rides the DAW
+  project through the host-saved state (`writeSession`/`readSession`) instead
+  of a global file two instances would fight over.
 - `patches/<patchId>.patch` — one whole patch: its name, the plugin it was
   built for, the knob mapping, the module card's look (title override and
   accent colour — half of what gives a module its identity, so it travels with

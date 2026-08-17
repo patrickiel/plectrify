@@ -281,6 +281,28 @@ function backend(): JuceBackend | undefined {
   return (window as unknown as { __JUCE__?: { backend?: JuceBackend } }).__JUCE__?.backend;
 }
 
+/** The host kind the engine baked into window.__JUCE__ before this page's
+    first script ran (withInitialisationData). The same fact rides the appInfo
+    push, but a push can be dropped while the view is hidden — which is how a
+    DAW may open an editor — and the session-restore decision is one-shot:
+    mistaking a plugin for the standalone applies the standalone's autosaved
+    working rack over the DAW's session. Absent on an engine older than the
+    field. */
+function bootHostKind(): 'standalone' | 'plugin' | undefined {
+  const pushed = (window as unknown as { __JUCE__?: { initialisationData?: { host?: unknown[] } } })
+    .__JUCE__?.initialisationData?.host;
+  const kind = Array.isArray(pushed) ? pushed[0] : undefined;
+  return kind === 'standalone' || kind === 'plugin' ? kind : undefined;
+}
+
+/** bootHostKind as an AppInfo fragment: an absent answer contributes no `host`
+    key at all, keeping "engine older than the field" indistinguishable from
+    the default it always meant. */
+function hostSeed(): Pick<AppInfo, 'host'> {
+  const kind = bootHostKind();
+  return kind === undefined ? {} : { host: kind };
+}
+
 /** True when running inside the JUCE WebBrowserComponent. */
 export function juceAvailable(): boolean {
   return backend() !== undefined;
@@ -319,6 +341,19 @@ export class JuceEngine implements EngineBridge {
   // Audio truth (from C++), metadata truth (owned here), and live values.
   private nodes: NodeInfo[] = [];
   private meta = new Map<string, ModuleMeta>();
+
+  /** Resolved by the first appInfo push. Its `host` field decides where the
+      working session lives (working-rack.json vs the engine's document), so
+      the session restore waits here before touching either location. Declared
+      before the promise: property initializers run in order. */
+  private appInfoSeen = false;
+  private resolveAppInfoKnown: () => void = () => {};
+  private appInfoKnown = new Promise<void>((resolve) => {
+    this.resolveAppInfoKnown = resolve;
+  });
+  /** A DAW project reload pushed a new session document while this editor was
+      open; adoption waits for the engine's rack apply to report done. */
+  private pendingSessionAdoption = false;
   private values = new Map<string, Map<number, ParamValue>>();
   // Value→text tables (from C++'s paramTexts, re-sent on every watch change).
   // Lets optimistic writes show the plugin's formatted value immediately
@@ -348,7 +383,11 @@ export class JuceEngine implements EngineBridge {
   private statusListeners = new Set<(status: StatusState) => void>();
   private appSettings = { ...DEFAULT_APP_SETTINGS };
   private appSettingsListeners = new Set<(settings: AppSettings) => void>();
-  private appInfo: AppInfo = { ...DEFAULT_APP_INFO };
+  // Seeded with the boot-baked host kind so isPluginHost() answers right from
+  // the first frame — its other callers (the session autosave target, the DAW
+  // reload adoption) run before any appInfo push can land. The push re-states
+  // the same fact.
+  private appInfo: AppInfo = { ...DEFAULT_APP_INFO, ...hostSeed() };
   private appInfoListeners = new Set<(info: AppInfo) => void>();
   // Raw MIDI trigger stream (a stream, not state — nothing replays) and the
   // auto-opened input list (state — the last push replays on subscribe).
@@ -521,10 +560,36 @@ export class JuceEngine implements EngineBridge {
       this.setStarterInstalling(false);
       for (const listener of this.installFinishedListeners) listener(result);
     });
-    // Static host facts. Answered once, from the boot request below.
+    // Static host facts. Answered once, from the boot request below. The
+    // `host` field also decides where the working session lives (see
+    // readWorkingSession), so the first arrival resolves the gate the session
+    // restore waits behind.
     b?.addEventListener('appInfo', (data) => {
-      this.appInfo = { ...DEFAULT_APP_INFO, ...(data as Partial<AppInfo>) };
+      // hostSeed under the push: the boot-baked host kind stays the floor even
+      // if a push ever arrives without the field.
+      this.appInfo = { ...DEFAULT_APP_INFO, ...hostSeed(), ...(data as Partial<AppInfo>) };
+      this.appInfoSeen = true;
+      this.resolveAppInfoKnown();
       this.emitAppInfo();
+    });
+    // The engine's session document changed under the page: a DAW project
+    // reload pushed new state into the plugin while this editor was open. The
+    // engine is rebuilding the rack; adopt the new metadata once its apply
+    // reports done (see the rigApplyProgress listener), not now — a partial
+    // rack echo would prune the incoming mappings.
+    b?.addEventListener('sessionChanged', () => {
+      if (!this.isPluginHost()) return;
+      this.pendingSessionAdoption = true;
+      this.applyingRack = true;
+      // Belt and braces: if the done event is dropped (occluded window), the
+      // adoption must not wedge autosaves forever. Past the engine's own
+      // 120 s apply watchdog, adopt whatever state has settled.
+      setTimeout(() => {
+        if (this.pendingSessionAdoption) {
+          this.pendingSessionAdoption = false;
+          void this.finishSessionAdoption();
+        }
+      }, 130_000);
     });
     b?.addEventListener('pluginStateChanged', (data) => {
       this.markSessionDirty(500);
@@ -551,6 +616,12 @@ export class JuceEngine implements EngineBridge {
             pluginName: progress.pluginName || undefined,
           };
       this.emitBusy();
+      // A DAW-driven state load finished rebuilding the rack: now the new
+      // session document can be adopted against the settled module list.
+      if (progress.done && this.pendingSessionAdoption) {
+        this.pendingSessionAdoption = false;
+        void this.finishSessionAdoption();
+      }
     });
     b?.addEventListener('paramValues', (data) => this.applyValues(data as ValueUpdate[]));
     b?.addEventListener('paramTexts', (data) => this.applyTexts(data as TextUpdate[]));
@@ -610,6 +681,8 @@ export class JuceEngine implements EngineBridge {
     b?.addEventListener('fileReadChunk', (data) => this.resolveFileReadChunk(data));
     b?.addEventListener('filesListed', (data) => this.resolvePending(data));
     b?.addEventListener('fileWritten', (data) => this.resolvePending(data));
+    b?.addEventListener('sessionRead', (data) => this.resolvePending(data));
+    b?.addEventListener('sessionWritten', (data) => this.resolvePending(data));
     b?.addEventListener('looperSessionSaved', (data) => this.onLooperSessionSaved(data));
     b?.addEventListener('looperSessionLoaded', (data) => this.resolvePending(data));
     b?.addEventListener('tone3000State', (data) => this.onTone3000State(data));
@@ -3174,8 +3247,116 @@ export class JuceEngine implements EngineBridge {
     this.emitRigs();
   }
 
+  /** True when the engine is the VST3 build inside a DAW. Only meaningful once
+      the first appInfo push has landed (awaitHostKind). */
+  private isPluginHost(): boolean {
+    return this.appInfo.host === 'plugin';
+  }
+
+  /** Blocks until the engine has said which host it is. The baked-in boot
+      answer settles it before the wait starts; the bounded ask-and-wait loop
+      below survives only for an engine older than that field, where after a
+      re-ask the answer defaults to standalone rather than wedging the session
+      restore forever. */
+  private async awaitHostKind(): Promise<void> {
+    if (bootHostKind() !== undefined) return; // seeded into appInfo at construction
+    for (let attempt = 0; attempt < 2 && !this.appInfoSeen; attempt++) {
+      await Promise.race([
+        this.appInfoKnown,
+        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+      ]);
+      if (!this.appInfoSeen) backend()?.emitEvent('requestAppInfo', {});
+    }
+  }
+
+  /** Adopts a stored session's metadata without touching the live rack. The
+      plugin's engine outlives the page, so the rack playing right now IS the
+      session — clientIds are kept verbatim (they name the live slots), and
+      only the page-owned half is seeded: mappings, names, appearance, scenes,
+      lane metadata. Every field passes the same sanitizing gates applyStored
+      applies, since the document once rode a DAW project file. */
+  private adoptStoredMetadata(stored: StoredRack): void {
+    const nextMeta = new Map<string, ModuleMeta>();
+    for (const m of stored.modules) {
+      nextMeta.set(m.clientId, {
+        displayName: m.displayName,
+        color: asModuleColor(m.color),
+        styleVariant: asStyleVariant(m.styleVariant),
+        icon: asModuleIcon(m.icon),
+        texture: asModuleTexture(m.texture),
+        midi: sanitizeTrigger(m.midi),
+        tone3000: isTone3000Provenance(m.tone3000) ? m.tone3000 : undefined,
+        knobs: m.knobs.map((k) => ({ ...k, knobId: uid('knob'), midi: sanitizeTrigger(k.midi) })),
+      });
+    }
+    this.meta = nextMeta;
+    this.values.clear();
+    this.emitWatch();
+
+    // Identity remap: scene ids reference the live clientIds, and remapSceneIds
+    // is reused purely for its validation of a document off a project file.
+    this.scenes = remapSceneIds(
+      stored.scenes ?? [],
+      new Map(stored.modules.map((m) => [m.clientId, m.clientId])),
+    );
+    this.activeSceneId = this.rememberedScene();
+    this.emitScenes();
+
+    const routing = stored.routing ? normalizeRoutingState(stored.routing) : { groups: [] };
+    this.laneNames = new Map(
+      routing.groups.flatMap((g) => g.lanes.map((lane) => [lane.id, lane.name] as const)),
+    );
+    this.laneMidi = new Map(
+      routing.groups.flatMap((g) =>
+        g.lanes.flatMap((lane) => (lane.midi ? [[lane.id, lane.midi] as const] : [])),
+      ),
+    );
+
+    // Re-echo so the adopted metadata joins the live modules on screen.
+    backend()?.emitEvent('requestRack', {});
+  }
+
+  /** The plugin's session restore: read the engine-held document and adopt its
+      metadata. No sentinel, no quarantine — the DAW project owns the state's
+      crash story, and nothing here instantiates a plugin. */
+  private async restorePluginSession(): Promise<void> {
+    try {
+      const stored = await this.request('readSession', {});
+      if (stored.ok) {
+        const parsed = safeParse<unknown>((stored.text as string) ?? '');
+        if (isStoredRack(parsed)) this.adoptStoredMetadata(parsed);
+      }
+    } catch (error: unknown) {
+      console.error('Failed to read the plugin session', error);
+    } finally {
+      this.sessionReady = true;
+      this.setBusy(false);
+      this.suppressToneDirty(TONE_DIRTY_APPLY_GRACE_MS);
+    }
+  }
+
+  private async finishSessionAdoption(): Promise<void> {
+    try {
+      const stored = await this.request('readSession', {});
+      const parsed = stored.ok ? safeParse<unknown>((stored.text as string) ?? '') : null;
+      if (isStoredRack(parsed)) this.adoptStoredMetadata(parsed);
+    } catch (error: unknown) {
+      console.error('Failed to adopt the reloaded session', error);
+    } finally {
+      this.applyingRack = false;
+      this.suppressToneDirty(TONE_DIRTY_APPLY_GRACE_MS);
+    }
+  }
+
   private async restorePreviousSession(): Promise<void> {
     await this.appSettingsLoaded;
+    // Which host this is decides where the session lives — and the plugin's
+    // path is adoption, not application: its rack is already running.
+    await this.awaitHostKind();
+    if (this.isPluginHost()) {
+      await this.restorePluginSession();
+      return;
+    }
     const names = await this.listFiles('');
     try {
       // The previous launch died while restoring this session (a plugin or
@@ -3286,12 +3467,7 @@ export class JuceEngine implements EngineBridge {
     let failed = false;
     this.sessionSaveChain = this.sessionSaveChain
       .then(async () => {
-        if (
-          await this.writeFile(
-            WORKING_FILE,
-            JSON.stringify(await this.captureStoredRack(), null, 2),
-          )
-        )
+        if (await this.writeWorkingSession(JSON.stringify(await this.captureStoredRack(), null, 2)))
           return;
         failed = true;
         this.sessionDirty = true;
@@ -3305,6 +3481,26 @@ export class JuceEngine implements EngineBridge {
     // A retry backs off: a lasting failure (a full disk) would otherwise spin
     // the timer at 0 ms for as long as it lasts.
     if (this.sessionDirty) this.scheduleSessionSave(failed ? SESSION_SAVE_RETRY_MS : 0);
+  }
+
+  /** Where the working session lands: working-rack.json in the standalone, the
+      engine-held document in the plugin — which rides the DAW project instead
+      of a global file two instances would fight over, and survives the page
+      dying with every editor close. */
+  private async writeWorkingSession(text: string): Promise<boolean> {
+    if (!this.isPluginHost()) return this.writeFile(WORKING_FILE, text);
+
+    const ok = await this.request('writeSession', { text }).then(
+      (d) => d.ok !== false,
+      (error: unknown) => {
+        console.error('Failed to write the plugin session', error);
+        return false;
+      },
+    );
+    // The same scoped notice writeFile raises, under the session's own name.
+    if (!ok) this.setPersistenceError(WORKING_FILE);
+    else if (this.status.persistenceError === WORKING_FILE) this.setPersistenceError(null);
+    return ok;
   }
 
   private async captureStoredRack(): Promise<StoredRack> {

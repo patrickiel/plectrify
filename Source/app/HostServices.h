@@ -1,0 +1,115 @@
+#pragma once
+
+#include <JuceHeader.h>
+
+#include <utility>
+
+/**
+    The engine's only route to anything host-shaped.
+
+    PlectrifyEngine owns the rack, the plugin library, the catalogue, the
+    TONE3000 slice and the whole UI bridge — everything that is the same
+    whether Plectrify runs as the standalone app or as a VST3 plugin. What
+    differs is who owns the audio device, the MIDI inputs and the window, and
+    every one of those questions is asked through this interface: the
+    standalone shell (MainComponent) answers from its AudioDeviceManager, the
+    plugin processor answers from what its DAW host gave it.
+
+    All methods are called on the message thread.
+*/
+namespace plectrify
+{
+
+/** Which host-owned facilities exist around the engine. Pushed to the page
+    (as part of appInfo) so standalone-only panels — the setup wizard, the
+    audio-device settings, window chrome, Auto Standby — can hide themselves
+    where the host owns those concerns. Defaults describe the standalone. */
+struct HostCapabilities
+{
+    bool audioDevices = true;   ///< device picker, setup wizard, Advanced audio…
+    bool midiDevices  = true;   ///< MIDI device list (the event stream flows regardless)
+    bool windowChrome = true;   ///< resize handles, window theme mirroring
+    bool autoStandby  = true;   ///< the idle park/wake machinery
+};
+
+class HostServices
+{
+public:
+    virtual ~HostServices() = default;
+
+    virtual HostCapabilities capabilities() const = 0;
+
+    /** Which binary this engine is running inside, exactly as the page's
+        AppInfo reports it. */
+    virtual const char* hostKind() const { return "standalone"; }
+
+    /** True where the host persists the engine's state itself (the VST3, whose
+        DAW project carries it). Gates the engine's periodic state-capture
+        cache, which serializes every hosted plugin's state and therefore must
+        not run in the standalone for nothing. */
+    virtual bool capturesHostState() const { return false; }
+
+    /** Sample rate + block size plugins are instantiated at: the open device's
+        in the app, the host's prepareToPlay values in a plugin — or sensible
+        defaults while neither exists yet. */
+    virtual std::pair<double, int> currentRateAndBlock() const = 0;
+
+    /** CPU load fraction for the status payload's readout. */
+    virtual double cpuLoad() const = 0;
+
+    /** Driver dropout count, or -1 where nothing can count them. */
+    virtual int audioXRuns() const = 0;
+
+    /** Converter/driver input+output latency in samples, or -1 when no device
+        is open. The engine adds the chain's own latency on top for the status
+        payload's round-trip figure. */
+    virtual int deviceLatencySamples() const = 0;
+
+    /** The About dialog's audio-device group (driver, device, bit depth,
+        channel counts, latencies), or void when no device is open — the report
+        then dashes those rows out rather than describing a device that isn't. */
+    virtual juce::var audioDeviceInfo() const = 0;
+
+    /** Host-side reasons Auto Standby may not engage: no device open (the
+        detector would read permanent silence), or the setup wizard's input
+        meters armed (silence there is the question being answered). The engine
+        contributes its own reasons — scans, installs, editors, modals — in
+        PlectrifyEngine::standbyIsBlocked(). */
+    virtual bool blocksAutoStandby() const = 0;
+
+    /** MIDI input device names for the page's MIDI dialog. Empty where the
+        host owns MIDI routing (a DAW). */
+    virtual juce::StringArray midiDeviceNames() const { return {}; }
+
+    /** Re-enumerates MIDI devices before the engine answers requestMidiDevices,
+        so the reply reflects this instant rather than a hot-plug poll's last
+        pass. */
+    virtual void refreshMidiDevices() {}
+
+    /** The graph's total latency moved — a plugin toggled oversampling, or the
+        chain itself changed. The standalone needs nothing (the figure already
+        rides the status payload); the plugin reports it to its DAW host. */
+    virtual void graphLatencyChanged (int totalLatencySamples) { juce::ignoreUnused (totalLatencySamples); }
+
+    /** A fixed-node/engine setting changed (gains, tuner, looper and metronome
+        preferences). The standalone persists them at exit into
+        audio_settings.xml; the plugin marks its host-saved state dirty. */
+    virtual void engineSettingsChanged() {}
+
+    /** One 15 Hz engine tick, after the status push. The standalone emits the
+        setup wizard's input meters here while they are armed. */
+    virtual void onEngineTick() {}
+
+    // --- Bridge events only a host can answer ------------------------------
+    // Registered by the engine, delegated here; hosts without the facility
+    // inherit the harmless no-op and the page hides the surface behind
+    // HostCapabilities.
+    virtual void handleOpenAudioSettings() {}
+    virtual void handleRequestAudioDevices (const juce::var&) {}
+    virtual void handleSetAudioDevice (const juce::var&) {}
+    virtual void handleWatchInputLevels (const juce::var&) {}
+    virtual void handleStartWindowResize (const juce::var&) {}
+    virtual void handleSetWindowTheme (const juce::var&) {}
+};
+
+} // namespace plectrify

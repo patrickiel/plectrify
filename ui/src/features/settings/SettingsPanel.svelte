@@ -9,7 +9,12 @@
   } from 'phosphor-svelte';
   import { slide } from 'svelte/transition';
   import type { EngineBridge } from '../../lib/engine/EngineBridge';
-  import type { AppSettings, MidiTrigger, ThemeName } from '../../lib/engine/types';
+  import type {
+    AppSettings,
+    HostCapabilities,
+    MidiTrigger,
+    ThemeName,
+  } from '../../lib/engine/types';
   import {
     MAX_RACK_ZOOM,
     MAX_UI_SCALE,
@@ -36,6 +41,9 @@
     engine: EngineBridge;
     appSettings: AppSettings;
     onSetAppSettings: (settings: Partial<AppSettings>) => void;
+    /** Which host-owned facilities exist — standalone-only rows (audio setup,
+        Auto Standby) hide where a DAW owns those concerns. */
+    capabilities: HostCapabilities;
     /** Which view the panel shows: the settings list, or the MIDI learn
         table it links to. Owned by ToolSidebar so it can reset to 'main'
         whenever the panel closes. */
@@ -54,6 +62,7 @@
     engine,
     appSettings,
     onSetAppSettings,
+    capabilities,
     view,
     onShowMidi,
     onOpenSetup,
@@ -113,6 +122,7 @@
     </button>
     <MidiSettingsPanel
       {engine}
+      midiDevicesAvailable={capabilities.midiDevices}
       midiBindings={appSettings.midiBindings}
       onSetAppSettings={setBindings}
       {otherLearnActive}
@@ -126,15 +136,21 @@
     <Card>
       <!-- First, and named for the question rather than for the panel: this is
            the one every player has to answer, and the row below is the one only
-           some of them ever need. -->
-      <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={onOpenSetup}>
-        <PlugIcon size={15} aria-hidden="true" />
-        Audio setup…
-      </RowButton>
-      <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={() => engine.openAudioSettings()}>
-        <SlidersHorizontalIcon size={15} aria-hidden="true" />
-        Advanced audio…
-      </RowButton>
+           some of them ever need. In a DAW neither exists — the host owns the
+           audio device — while MIDI settings stay: bindings still work there. -->
+      {#if capabilities.audioDevices}
+        <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={onOpenSetup}>
+          <PlugIcon size={15} aria-hidden="true" />
+          Audio setup…
+        </RowButton>
+        <RowButton
+          class="gap-2 rounded-none text-[.8rem]"
+          onclick={() => engine.openAudioSettings()}
+        >
+          <SlidersHorizontalIcon size={15} aria-hidden="true" />
+          Advanced audio…
+        </RowButton>
+      {/if}
       <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={onShowMidi}>
         <PianoKeysIcon size={15} aria-hidden="true" />
         MIDI settings…
@@ -237,71 +253,76 @@
          is off: three delays that govern nothing are noise, and their
          appearing *is* the feedback that the toggle took — which is why they
          slide rather than snap, so the eye follows the card growing instead of
-         having to re-find what changed. -->
-    <Card>
-      <div>
-        <MenuCheckbox
-          checked={appSettings.standbyEnabled}
-          label="Auto standby"
-          onChange={(checked) => onSetAppSettings({ standbyEnabled: checked })}
-        />
-        <p
-          class="mt-[-.15rem] pt-0 pr-[.6rem] pb-[.4rem] pl-[1.95rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
-        >
-          Saves CPU and RAM while the guitar is quiet.
-        </p>
-      </div>
+         having to re-find what changed.
 
-      {#if appSettings.standbyEnabled}
-        <div transition:slide={reveal.slide()}>
-          <CardRow label="Suspend after" class="font-sans text-[.8rem] font-medium">
-            <Select
-              options={lightDelayOptions}
-              value={String(appSettings.standbyLightAfterMinutes)}
-              filterable={false}
-              size="sm"
-              variant="plain"
-              class="h-[1.65rem] min-w-[5.5rem]"
-              aria-label="Suspend the rig after"
-              onSelect={(value) => onSetAppSettings({ standbyLightAfterMinutes: Number(value) })}
-            />
-          </CardRow>
-          <CardRow label="Wake above" class="font-sans text-[.8rem] font-medium">
-            <Select
-              options={thresholdOptions}
-              value={String(appSettings.standbyWakeThresholdDb)}
-              filterable={false}
-              size="sm"
-              variant="plain"
-              class="h-[1.65rem] min-w-[5.5rem]"
-              aria-label="Wake when the input rises above"
-              onSelect={(value) => onSetAppSettings({ standbyWakeThresholdDb: Number(value) })}
-            />
-          </CardRow>
-          <CardRow label="Unload plugins" class="font-sans text-[.8rem] font-medium">
-            <Select
-              options={deepDelayOptions}
-              value={String(appSettings.standbyDeepAfterMinutes)}
-              filterable={false}
-              size="sm"
-              variant="plain"
-              class="h-[1.65rem] min-w-[5.5rem]"
-              aria-label="Unload the plugins after"
-              onSelect={(value) => onSetAppSettings({ standbyDeepAfterMinutes: Number(value) })}
-            />
-          </CardRow>
-          <!-- Shown only once unloading is actually on: it is the one part of
-               this feature with a cost, and the default state stays clean. -->
-          {#if deepEnabled}
-            <p
-              class="mt-[-.25rem] px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
-              transition:slide={reveal.slide()}
-            >
-              Waking then reloads the rig, which takes a moment.
-            </p>
-          {/if}
+         Whole card gated away in a DAW: suspension is the host's business
+         (offline render, freeze), and controls that govern nothing are noise. -->
+    {#if capabilities.autoStandby}
+      <Card>
+        <div>
+          <MenuCheckbox
+            checked={appSettings.standbyEnabled}
+            label="Auto standby"
+            onChange={(checked) => onSetAppSettings({ standbyEnabled: checked })}
+          />
+          <p
+            class="mt-[-.15rem] pt-0 pr-[.6rem] pb-[.4rem] pl-[1.95rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
+          >
+            Saves CPU and RAM while the guitar is quiet.
+          </p>
         </div>
-      {/if}
-    </Card>
+
+        {#if appSettings.standbyEnabled}
+          <div transition:slide={reveal.slide()}>
+            <CardRow label="Suspend after" class="font-sans text-[.8rem] font-medium">
+              <Select
+                options={lightDelayOptions}
+                value={String(appSettings.standbyLightAfterMinutes)}
+                filterable={false}
+                size="sm"
+                variant="plain"
+                class="h-[1.65rem] min-w-[5.5rem]"
+                aria-label="Suspend the rig after"
+                onSelect={(value) => onSetAppSettings({ standbyLightAfterMinutes: Number(value) })}
+              />
+            </CardRow>
+            <CardRow label="Wake above" class="font-sans text-[.8rem] font-medium">
+              <Select
+                options={thresholdOptions}
+                value={String(appSettings.standbyWakeThresholdDb)}
+                filterable={false}
+                size="sm"
+                variant="plain"
+                class="h-[1.65rem] min-w-[5.5rem]"
+                aria-label="Wake when the input rises above"
+                onSelect={(value) => onSetAppSettings({ standbyWakeThresholdDb: Number(value) })}
+              />
+            </CardRow>
+            <CardRow label="Unload plugins" class="font-sans text-[.8rem] font-medium">
+              <Select
+                options={deepDelayOptions}
+                value={String(appSettings.standbyDeepAfterMinutes)}
+                filterable={false}
+                size="sm"
+                variant="plain"
+                class="h-[1.65rem] min-w-[5.5rem]"
+                aria-label="Unload the plugins after"
+                onSelect={(value) => onSetAppSettings({ standbyDeepAfterMinutes: Number(value) })}
+              />
+            </CardRow>
+            <!-- Shown only once unloading is actually on: it is the one part of
+               this feature with a cost, and the default state stays clean. -->
+            {#if deepEnabled}
+              <p
+                class="mt-[-.25rem] px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
+                transition:slide={reveal.slide()}
+              >
+                Waking then reloads the rig, which takes a moment.
+              </p>
+            {/if}
+          </div>
+        {/if}
+      </Card>
+    {/if}
   </div>
 {/if}

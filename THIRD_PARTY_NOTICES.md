@@ -27,6 +27,23 @@ The Windows installer may include Microsoft's x64 Visual C++ Redistributable.
 It remains subject to Microsoft's licence terms. See
 <https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist>.
 
+## Steinberg VST3 SDK
+
+Plectrify is built against the VST3 SDK that Steinberg distributes with JUCE
+(`modules/juce_audio_processors/format_types/VST3_SDK`), in both directions:
+it **hosts** VST3 plugins, and the Windows installer offers **Plectrify itself
+as a VST3 plug-in** built with the same SDK.
+
+The SDK is dual-licensed: the proprietary Steinberg VST 3 licence or **GPLv3**.
+Plectrify **elects the GPLv3 option**, for the same reason as the ASIO election
+below: the proprietary arm requires a signed agreement with Steinberg and
+imposes terms that AGPLv3 §7 does not permit us to pass on to you, while
+AGPLv3 and GPLv3 are explicitly compatible (see the FSF's GPL FAQ, "AGPLGPL").
+The SDK source ships inside the corresponding-source archive as part of the
+pinned JUCE tree.
+
+VST is a registered trademark of Steinberg Media Technologies GmbH.
+
 ## Steinberg ASIO SDK
 
 Plectrify's ASIO device support is built against the ASIO 2.3 interface headers
@@ -42,10 +59,13 @@ combine cleanly.
 
 ## Neural Amp Modeler (bundled)
 
-Plectrify's installer contains one VST3 plugin: **Neural Amp Modeler**, by Steven
-Atkinson, under the MIT licence. It is installed inside the application folder
-(macOS: inside the app bundle), is loaded only by Plectrify, and is removed when
-Plectrify is uninstalled.
+Plectrify's installer contains one **third-party** VST3 plugin: **Neural Amp
+Modeler**, by Steven Atkinson, under the MIT licence. (The Plectrify VST3
+plug-in the Windows installer also offers is Plectrify itself — two builds of
+the same AGPLv3 source, covered by `LICENSE`, not a third-party plugin.)
+Neural Amp Modeler is installed inside the application folder (macOS: inside
+the app bundle), is loaded only by Plectrify, and is removed when Plectrify is
+uninstalled.
 
 It is bundled rather than offered because Plectrify's TONE3000 integration is
 built on it: every tone downloaded from TONE3000 is a capture or impulse
@@ -56,8 +76,10 @@ Upstream publishes no binary for the version shipped here — releases after
 v0.7.13 are source-only, and the author's own Windows builds moved to a
 separately-copyrighted fork with no published licence, which Plectrify therefore
 cannot redistribute. Its source, and that of every one of its dependencies
-(NAM Core and AudioDSPTools MIT, the VST3 SDK MIT, iPlug2 zlib-style, Eigen
-MPL-2.0), is permissively licensed, so Plectrify compiles that source itself and
+(NAM Core and AudioDSPTools MIT, that project's own vendored VST3 SDK copy
+MIT, iPlug2 zlib-style, Eigen MPL-2.0 — distinct from the JUCE-bundled SDK
+Plectrify itself uses under GPLv3, above), is permissively licensed, so
+Plectrify compiles that source itself and
 ships the result. What is distributed is a binary Plectrify built under a licence
 that permits it, not a copy of anyone else's build.
 
@@ -71,7 +93,8 @@ that permits it, not a copy of anyone else's build.
 
 ## Other VST3 plugins
 
-Beyond the one above, Plectrify redistributes no third-party plugin.
+Beyond the one above, Plectrify redistributes no third-party plugin. (The
+Plectrify VST3 plug-in is not one: it is Plectrify.)
 
 On explicit user action — the **Packages** panel — Plectrify can download a small
 set of open-source plugins. Each is fetched over HTTPS from that project's own

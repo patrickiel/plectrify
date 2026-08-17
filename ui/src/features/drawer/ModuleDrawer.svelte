@@ -20,6 +20,7 @@
     groupPluginsByMaker,
     orderPatchEntries,
     packageDrawerItems,
+    packageIdForPatch,
     type DrawerPatch,
   } from '../../lib/engine/drawerGroups';
   import { onRevealRequest, type RevealRequest } from './reveal';
@@ -103,6 +104,11 @@
     onRepairPatch?: (patchId: string) => void;
     /** Open a tone's page on TONE3000 — what a patch tile's T3K mark does. */
     onOpenToneUrl?: (url: string) => void;
+    /** Show a package in the Packages panel — what a pack patch's **Pack**
+        badge does. The drawer resolves which package; the caller owns opening
+        the sidebar, since the panel is only mounted while it is the active
+        tool. */
+    onShowPackage?: (packageId: string) => void;
   }
 
   let {
@@ -133,10 +139,20 @@
     missingCaptures,
     onRepairPatch,
     onOpenToneUrl,
+    onShowPackage,
   }: Props = $props();
 
   let filter = $state('');
   const filterActive = $derived(filter.trim() !== '');
+
+  /** The package a pack patch's **Pack** badge points at, or undefined — for a
+      patch the user saved, or for a pack whose package this build's catalogue
+      does not list (an entry withdrawn since it was installed). The badge then
+      stays the plain label it has always been rather than offering a jump to a
+      row that is not there. */
+  function packageIdOf(patch: Patch): string | undefined {
+    return packageIdForPatch(patch, catalogue.items);
+  }
 
   /** Named once: it is the button's own words and its aria-label, and the
       narrow header shows only the latter. */
@@ -885,6 +901,9 @@
                       onRepair={() => onRepairPatch?.(entry.patch.id)}
                       onOpenTone={entry.patch.tone3000?.url && onOpenToneUrl
                         ? () => onOpenToneUrl(entry.patch.tone3000!.url!)
+                        : undefined}
+                      onShowPackage={packageIdOf(entry.patch) && onShowPackage
+                        ? () => onShowPackage(packageIdOf(entry.patch)!)
                         : undefined}
                     />
                   </div>

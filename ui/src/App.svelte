@@ -9,7 +9,11 @@
   import { DEFAULT_APP_SETTINGS } from './lib/engine/appSettings';
   import { applyTheme, bootTheme } from './lib/theme';
   import type { EngineBridge, PluginScanState } from './lib/engine/EngineBridge';
-  import { DEFAULT_APP_INFO, DEFAULT_STATUS_STATE } from './lib/engine/types';
+  import {
+    DEFAULT_APP_INFO,
+    DEFAULT_STATUS_STATE,
+    STANDALONE_CAPABILITIES,
+  } from './lib/engine/types';
   import type {
     AppInfo,
     AppSettings,
@@ -91,6 +95,10 @@
   // because the Info panel's diagnostics report needs all three; the rack's
   // scan/blacklist dialogs read the latter two as props.
   let appInfo = $state<AppInfo>({ ...DEFAULT_APP_INFO });
+  // Absence means standalone (which has everything): the field postdates the
+  // engines that lacked it, so the page never flashes a degraded layout
+  // before the push lands.
+  const caps = $derived(appInfo.capabilities ?? STANDALONE_CAPABILITIES);
   let pluginScan = $state<PluginScanState>({ status: 'idle', pluginCount: 0 });
   let blacklistedPlugins = $state<BlacklistedPlugin[]>([]);
   // The catalogue is owned here for the rack's module drawer, which files
@@ -135,8 +143,11 @@
   let settingsLoaded = $state(false);
   /** The wizard reopened deliberately from Settings, as opposed to owed. */
   let setupReopened = $state(false);
+  // Gated on the capability: in a DAW the host owns the audio device, so the
+  // first-run audio wizard must never appear.
   const setupOpen = $derived(
-    setupReopened || (settingsLoaded && !appSettings.setupCompleted && !splashOpen),
+    caps.audioDevices &&
+      (setupReopened || (settingsLoaded && !appSettings.setupCompleted && !splashOpen)),
   );
   /** Finished or waved away — the same write either way. A player who dismissed
       it must not be asked again on every launch, and Settings keeps the way
@@ -363,6 +374,7 @@
     {appSettings}
     onSetAppSettings={(settings) => engine.setAppSettings(settings)}
     {appInfo}
+    capabilities={caps}
     {getReport}
     bind:looperMidiLearning
     bind:metronomeMidiLearning
@@ -502,7 +514,8 @@
   onDismiss={(version) => engine.setAppSettings({ updateDismissedVersion: version })}
 />
 
-{#if nativeHost}
+<!-- Also capability-gated: the DAW owns the plugin window's frame. -->
+{#if nativeHost && caps.windowChrome}
   <WindowResizeHandles {engine} />
 {/if}
 

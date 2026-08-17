@@ -12,6 +12,9 @@
   import type { Patch, PluginInfo, RackModule } from '../../lib/engine/types';
   import { packageDrawerItems } from '../../lib/engine/drawerGroups';
   import { revealPackageInDrawer } from '../drawer/reveal';
+  import { onPanelRevealRequest } from './reveal';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { tick } from 'svelte';
   import {
     EMPTY_CATALOGUE_STATE,
     describeInstallError,
@@ -129,6 +132,50 @@
   // Opening the panel re-resolves the catalogue: someone who has just come
   // online should not have to restart to see the current list.
   onMount(() => engine.refreshCatalogue());
+
+  /** The scrolling list, so a row is found inside the panel rather than
+      anywhere on the page. */
+  let listEl = $state<HTMLDivElement>();
+  /** The package drawn with the pulse right now; cleared once it has run. */
+  let revealedId = $state<string | null>(null);
+  let revealTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Two 0.6s pulses (--animate-reveal-pulse), plus a breath so the last one
+      finishes rather than being cut off mid-fade. The drawer's REVEAL_MS, for
+      the same animation and the same reason. */
+  const REVEAL_MS = 1400;
+
+  // "Show me the package this patch came from", asked by a pack patch's Pack
+  // badge in the drawer. The mirror of showInDrawer below.
+  onMount(() => {
+    const stop = onPanelRevealRequest(async (packageId) => {
+      // Every narrowing is capable of hiding the very row we were asked to
+      // show, so all three stand down — a view, a typed query and a chosen
+      // tag chip. Simple mode already forces the first two (effectiveView /
+      // effectiveQuery), but the state behind them survives the switch back,
+      // so clearing it here is not redundant.
+      view = 'all';
+      query = '';
+      tag = '';
+      revealedId = packageId;
+
+      // The list is derived from the filters just cleared, and this panel may
+      // have mounted a tick ago for this very request.
+      await tick();
+      const el = listEl?.querySelector(`[data-reveal-id="${CSS.escape(packageId)}"]`);
+      el?.scrollIntoView({
+        block: 'center',
+        behavior: prefersReducedMotion.current ? 'instant' : 'smooth',
+      });
+
+      clearTimeout(revealTimer);
+      revealTimer = setTimeout(() => (revealedId = null), REVEAL_MS);
+    });
+    return () => {
+      stop();
+      clearTimeout(revealTimer);
+    };
+  });
 
   /** Which slice of the catalogue is on screen, and what is typed in the filter
       box. Panel state and nothing more: neither is persisted, because both are
@@ -627,7 +674,15 @@
        can offer this platform today. -->
   {@const unavailable = !item.available && !item.installed}
   {@const revealable = drawerItems(item)}
-  <div class="flex flex-col">
+  <!-- data-reveal-id is how a reveal finds this row; the ring is drawn on the
+       row as a whole (identity plus its buttons and progress), which is the
+       unit the question "which package?" is about. The *inset* pulse, because
+       a row fills its Card edge to edge and the Card clips: an outward ring
+       would lose its left and right sides. -->
+  <div
+    data-reveal-id={item.id}
+    class={['flex flex-col', revealedId === item.id && 'animate-reveal-pulse-inset']}
+  >
     <div class="flex items-center gap-1 pr-[.35rem]">
       <!-- An installed package's name is a way back to it: the drawer is where
            it can actually be used, and finding one plugin among a scanned
@@ -905,7 +960,11 @@
   {/each}
 {/snippet}
 
-<div class="flex flex-col gap-2 px-[.6rem] pt-2 pb-[.6rem]">
+<!-- bind:this scopes a reveal's lookup to this panel. Not document-wide, and
+     the reason is concrete: a single-patch pack installs a patch whose id *is*
+     the package id, so the drawer carries a tile with the very same
+     data-reveal-id and a loose query would scroll the wrong component. -->
+<div bind:this={listEl} class="flex flex-col gap-2 px-[.6rem] pt-2 pb-[.6rem]">
   <!-- Bundles first: a bundle is what someone with an empty rack actually wants,
        and the individual plugins below are for everyone else. Shown whatever
        the list below is narrowed to — a bundle is a standing offer about the

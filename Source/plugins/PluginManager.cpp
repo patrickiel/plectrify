@@ -44,16 +44,10 @@ juce::File PluginManager::getBundledPluginDirectory()
         return fromSourceTree;
    #endif
 
-   #if JUCE_MAC
-    // Inside the bundle, under the same Resources the UI is served from, so it
-    // is covered by the same code signature seal.
-    return juce::File::getSpecialLocation (juce::File::currentApplicationFile)
-        .getChildFile ("Contents/Resources/plugins");
-   #else
-    return juce::File::getSpecialLocation (juce::File::currentExecutableFile)
-        .getParentDirectory()
-        .getChildFile ("plugins");
-   #endif
+    // Under the same resource root the UI is served from (beside the exe on
+    // Windows, Contents/Resources on macOS — inside the signature seal there),
+    // resolved from the running module so a VST3 build finds its own copy.
+    return plectrify::moduleResourceDir().getChildFile ("plugins");
 }
 
 juce::FileSearchPath PluginManager::getDefaultSearchPaths() const
@@ -198,7 +192,20 @@ void PluginManager::saveToSettings()
     {
         auto file = getCacheFile();
         file.getParentDirectory().createDirectory();
-        xml->writeTo (file);
+
+        // Through a sibling temp file and an atomic swap: the standalone and a
+        // DAW-hosted plugin instance share this cache across processes, and a
+        // plain write interleaving with another's could leave it torn. Last
+        // writer wins, which is the accepted trade for a rebuildable cache.
+        const auto temporary = file.getSiblingFile (file.getFileName() + ".tmp");
+        temporary.deleteFile();
+        if (xml->writeTo (temporary))
+        {
+            if (file.existsAsFile())
+                temporary.replaceFileIn (file);
+            else
+                temporary.moveFileTo (file);
+        }
     }
 }
 

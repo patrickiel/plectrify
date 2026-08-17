@@ -41,6 +41,12 @@ ChangesAssociations=no
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Tasks]
+; Checked by default: the plugin is inert in Common Files until a DAW scans
+; it, and a checkbox nobody notices is how a feature stays undiscovered. A
+; standalone-only user unchecks it here.
+Name: "vst3"; Description: "Install the Plectrify VST3 plug-in (run the same rig inside your DAW)"
+
 [InstallDelete]
 ; Vite filenames are content-hashed, so an upgrade must replace the UI tree
 ; instead of merging the new payload with assets left by an older release.
@@ -48,6 +54,12 @@ Type: filesandordirs; Name: "{app}\ui"
 ; Same reasoning for the shipped plugins: a bundle is a folder of many files,
 ; and a new version's must replace the old one rather than be merged into it.
 Type: filesandordirs; Name: "{app}\plugins"
+; Deliberately NOT gated on the vst3 task: the app and the plugin share one
+; engine and its session/state formats, so a version-skewed pair must be
+; unrepresentable — every install either replaces the bundle (task checked) or
+; removes it (task unchecked). Unchecking on an upgrade therefore uninstalls
+; the plugin rather than leaving last release's copy behind.
+Type: filesandordirs; Name: "{commoncf64}\VST3\Plectrify.vst3"
 
 [Files]
 Source: "{#StageDir}\Plectrify.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -57,6 +69,13 @@ Source: "{#StageDir}\ui\*"; DestDir: "{app}\ui"; Flags: ignoreversion recursesub
 ; the Packages panel, and removed with it. Neural Amp Modeler is here because
 ; every TONE3000 tone is a capture that loads into it.
 Source: "{#StageDir}\plugins\*"; DestDir: "{app}\plugins"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Plectrify itself as a VST3, for DAWs. Self-contained: the bundle carries its
+; own ui/ and plugins/ under Contents/Resources (see moduleResourceDir() in
+; Source/app/AppPaths.h), because a Release binary has no source-tree fallback
+; and must not depend on {app} existing. {commoncf64}\VST3 is the standard
+; machine-wide VST3 folder every host scans; PrivilegesRequired=admin already
+; covers writing it.
+Source: "{#StageDir}\vst3\Plectrify.vst3\*"; DestDir: "{commoncf64}\VST3\Plectrify.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: vst3
 Source: "{#StageDir}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StageDir}\JUCE_LICENSE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#StageDir}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -83,3 +102,7 @@ Type: filesandordirs; Name: "{app}\ui"
 ; Ours, unlike {commonappdata}\Plectrify\plugins above: shipped with the app,
 ; never the user's own install, so it goes when the app goes.
 Type: filesandordirs; Name: "{app}\plugins"
+; The Plectrify VST3 is ours by the same rule — installed by this setup, never
+; the user's own build — so it goes with the app. Only the bundle: the shared
+; {commoncf64}\VST3 folder belongs to every vendor on the machine.
+Type: filesandordirs; Name: "{commoncf64}\VST3\Plectrify.vst3"

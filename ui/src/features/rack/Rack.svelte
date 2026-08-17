@@ -68,6 +68,7 @@
   import { canRevertViaScene, rigSignature } from '../../lib/engine/rigSignature';
   import ModuleCard from '../module/ModuleCard.svelte';
   import ModuleDrawer from '../drawer/ModuleDrawer.svelte';
+  import { revealPackageInPanel } from '../plugins/reveal';
   import { revealBrowseInDrawer } from '../drawer/reveal';
   import LaneSwitchButton from './LaneSwitchButton.svelte';
   import BlacklistDialog from './BlacklistDialog.svelte';
@@ -2136,6 +2137,13 @@
               {missingCaptures}
               {onRepairPatch}
               onOpenToneUrl={(url) => engine.openExternalUrl(url)}
+              onShowPackage={(packageId) => {
+                // Both halves, in this order: the panel is only mounted while
+                // Packages is the active tool, so the request is held by
+                // reveal.ts until it subscribes on mount.
+                onSetAppSettings({ activeTool: 'plugins' });
+                revealPackageInPanel(packageId);
+              }}
             />
 
             <!-- The one destructive drop, and the whole drawer is it: while a

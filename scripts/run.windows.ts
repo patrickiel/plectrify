@@ -22,13 +22,23 @@
  *                               size corrupts the heap at startup.
  *   pnpm app --dist --config Release
  *                               Release build (stages ui/ beside the exe).
+ *   pnpm app --plugin           Build the Debug VST3 instead of the app and
+ *                               install it for this user's DAWs
+ *                               (%LOCALAPPDATA%\Programs\Common\VST3). Starts
+ *                               Vite like the default loop; launch the DAW
+ *                               with PLECTRIFY_DEV_URL set for live HMR. A
+ *                               Debug .vst3 needs no staging at all — UI,
+ *                               catalogue and bundled plugins resolve from
+ *                               the source tree. Release staging for the
+ *                               plugin is release plumbing, not built yet, so
+ *                               --plugin refuses --dist and --ui-only.
  *
  * This replaced run-windows.ps1 one-for-one; the Windows-only hazards it
  * carried live on in windows.ts (the MSBuild .tlog interrupted-build
  * marker, the WebView2 orphan hunt, the Event Log crash lookup).
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -57,12 +67,17 @@ const { values } = parseArgs({
     'no-ui': { type: 'boolean', default: false },
     'no-run': { type: 'boolean', default: false },
     clean: { type: 'boolean', default: false },
+    plugin: { type: 'boolean', default: false },
     config: { type: 'string', default: 'Debug' },
   },
 });
 
 const config = values.config!;
 const uiDir = join(ROOT, 'ui');
+
+if (values.plugin && (values.dist || values['ui-only'])) {
+  fail('--plugin is the Debug dev loop only for now; staging a Release .vst3 is release plumbing.');
+}
 
 let needsClean = values.clean;
 
@@ -112,6 +127,33 @@ function stageBundledPlugins(): void {
 
 function installUiDependencies(): void {
   pnpm('Installing UI dependencies', ['install', '--frozen-lockfile'], { cwd: uiDir });
+}
+
+/** Copies the built .vst3 bundle where spec-compliant hosts search for a
+    user's own plugins — no elevation, no installer. The whole bundle folder is
+    replaced, never merged, the same rule the installer applies to ui/. */
+function installPluginForHosts(): void {
+  const built = join(ROOT, 'build', 'PlectrifyPlugin_artefacts', config, 'VST3', 'Plectrify.vst3');
+  if (!existsSync(join(built, 'Contents'))) fail(`plugin bundle not found: ${built}`);
+
+  const destination = join(
+    process.env.LOCALAPPDATA ?? fail('LOCALAPPDATA is not set'),
+    'Programs', 'Common', 'VST3', 'Plectrify.vst3',
+  );
+
+  console.log(`==> Installing ${destination}`);
+  try {
+    rmSync(destination, { recursive: true, force: true });
+    mkdirSync(join(destination, '..'), { recursive: true });
+    cpSync(built, destination, { recursive: true });
+  } catch (error) {
+    // stopApp() kills Plectrify.exe and WebView2 orphans, but nothing can
+    // release a .vst3 a DAW is holding open.
+    fail(
+      `could not replace ${destination} — a DAW is probably holding it open. ` +
+        `Close the DAW and retry.\n${String(error)}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +249,27 @@ stageBundledPlugins();
 
 const cmake = findCMake();
 run('Configuring', cmake, ['-B', join(ROOT, 'build'), '-S', ROOT]);
+
+// ---------------------------------------------------------------------------
+// --plugin: the same loop, hosted by a DAW instead of our own exe. The DAW is
+// the process to (re)start, so nothing is launched from here — and it is also
+// the process holding the installed bundle, which is why the copy step is
+// where a stale DAW shows up (see installPluginForHosts).
+// ---------------------------------------------------------------------------
+if (values.plugin) {
+  nativeBuild(cmake, 'PlectrifyPlugin_VST3');
+  installPluginForHosts();
+  console.log(`
+==> Debug Plectrify.vst3 installed for this user's DAWs.
+    The Vite dev server is running on http://localhost:5173. For live HMR the
+    DAW must inherit PLECTRIFY_DEV_URL — e.g. from PowerShell:
+
+      $env:PLECTRIFY_DEV_URL = 'http://localhost:5173'; & 'C:\\path\\to\\your\\DAW.exe'
+
+    Launched plainly, the plugin serves the last-built ui/dist instead.`);
+  process.exit(0);
+}
+
 stopApp();
 nativeBuild(cmake, 'Plectrify');
 

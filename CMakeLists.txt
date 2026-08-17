@@ -141,8 +141,6 @@ juce_add_gui_app(Plectrify
     ICON_SMALL   "${CMAKE_CURRENT_SOURCE_DIR}/Assets/PlectrifyIconSmall.png"
     ${PLECTRIFY_PLATFORM_APP_ARGS})
 
-juce_generate_juce_header(Plectrify)
-
 # Replace the .icns JUCE derives from ICON_BIG/ICON_SMALL with a full macOS
 # icon ladder built from the same artwork — every representation the OS asks
 # for, sized onto Apple's icon grid. See cmake/MakeMacAppIcon.cmake for why the
@@ -187,23 +185,16 @@ juce_add_binary_data(PlectrifyAssets
         Assets/PlectrifyIcon.png
         Assets/PlectrifyIconSmall.png)
 
-# Keep Visual Studio's F5 debugger on the native host. With Debugger Type set
-# to Auto, VS may attach its JavaScript debugger to msedgewebview2.exe and stop
-# the entire app on WebView2's internal debug breaks. The custom property sheet
-# imports the developer's normal platform user props before applying this one
-# project-specific setting.
-if (MSVC)
-    set_target_properties(Plectrify PROPERTIES
-        VS_USER_PROPS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Plectrify.user.props")
-endif()
-
-target_sources(Plectrify PRIVATE
+# Sources shared by every target that embeds the engine — the standalone app
+# and the VST3 plugin. The standalone shell (Main.cpp, MainComponent.cpp,
+# WindowLookAndFeel.cpp) and the plugin's processor/editor stay per-target;
+# everything else is the one engine both of them run.
+set(PLECTRIFY_ENGINE_SOURCES
     Source/app/BuildInfo.cpp
+    Source/app/EngineWebView.cpp
     Source/app/LooperSessionStore.cpp
-    Source/app/Main.cpp
-    Source/app/MainComponent.cpp
     Source/app/MidiInputManager.cpp
-    Source/app/WindowLookAndFeel.cpp
+    Source/app/PlectrifyEngine.cpp
     Source/audio/LooperProcessor.cpp
     Source/audio/MetronomeProcessor.cpp
     Source/audio/RackProcessor.cpp
@@ -220,6 +211,12 @@ target_sources(Plectrify PRIVATE
     Source/tone3000/Tone3000SelectUrl.cpp
     Source/tone3000/Tone3000Service.cpp
     Source/tone3000/Tone3000WindowState.cpp)
+
+target_sources(Plectrify PRIVATE
+    ${PLECTRIFY_ENGINE_SOURCES}
+    Source/app/Main.cpp
+    Source/app/MainComponent.cpp
+    Source/app/WindowLookAndFeel.cpp)
 
 # ---------------------------------------------------------------------------
 # Build provenance for the About dialog's diagnostics: commit, dirty flag and
@@ -286,117 +283,218 @@ add_custom_target(PlectrifyBuildInfo
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/WriteBuildInfo.cmake"
     COMMENT "Plectrify: stamping build provenance"
     VERBATIM)
-add_dependencies(Plectrify PlectrifyBuildInfo)
-
 # The header must exist before the first build, or the initial compile of
-# BuildInfo.cpp races the custom target.
+# BuildInfo.cpp races the custom target. (Each engine target's dependency on
+# PlectrifyBuildInfo is added by plectrify_configure_target below.)
 execute_process(COMMAND ${CMAKE_COMMAND}
     "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
     "-DTEMPLATE_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/PlectrifyBuildInfo.h.in"
     "-DOUTPUT_FILE=${PLECTRIFY_BUILD_INFO_DIR}/PlectrifyBuildInfo.h"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/WriteBuildInfo.cmake")
 
-# Vertical slices — each feature folder is on the include path so cross-slice
-# #include "Header.h" keeps working without long relative paths.
-target_include_directories(Plectrify PRIVATE
-    Source/app
-    Source/audio
-    Source/plugins
-    Source/rackui
-    Source/tone3000
-    "${PLECTRIFY_BUILD_INFO_DIR}")
+# ---------------------------------------------------------------------------
+# One configuration for every engine-carrying target — the standalone app and
+# the VST3 plugin. Both compile PLECTRIFY_ENGINE_SOURCES, so their include
+# paths, compile definitions and link libraries must be identical: a
+# definition present on one and not the other is an ODR hazard in the shared
+# objects. Per-target facts stay outside this function — JUCE_ASIO (app-only;
+# a DAW owns the driver), the shell/plugin sources, and the plugin's format
+# arguments.
+# ---------------------------------------------------------------------------
+function(plectrify_configure_target target)
+    juce_generate_juce_header(${target})
+    add_dependencies(${target} PlectrifyBuildInfo)
 
-# Windows-only build switches. None of these may leak onto other platforms:
-# JUCE_ASIO on macOS would make the About diagnostics falsely claim ASIO
-# support, and the WebView2/WinRT symbols are meaningless outside Windows
-# (macOS renders the UI in the OS-provided WKWebView and talks CoreAudio and
-# CoreMIDI natively).
+    # Keep Visual Studio's F5 debugger on the native host. With Debugger Type
+    # set to Auto, VS may attach its JavaScript debugger to msedgewebview2.exe
+    # and stop the entire app on WebView2's internal debug breaks. The custom
+    # property sheet imports the developer's normal platform user props before
+    # applying this one project-specific setting.
+    if (MSVC)
+        set_target_properties(${target} PROPERTIES
+            VS_USER_PROPS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Plectrify.user.props")
+    endif()
+
+    # Vertical slices — each feature folder is on the include path so
+    # cross-slice #include "Header.h" keeps working without long relative
+    # paths.
+    target_include_directories(${target} PRIVATE
+        Source/app
+        Source/audio
+        Source/plugins
+        Source/rackui
+        Source/tone3000
+        "${PLECTRIFY_BUILD_INFO_DIR}")
+
+    # Windows-only build switches. None of these may leak onto other
+    # platforms: the WebView2/WinRT symbols are meaningless outside Windows
+    # (macOS renders the UI in the OS-provided WKWebView and talks CoreAudio
+    # and CoreMIDI natively). JUCE_ASIO deliberately is NOT here — it belongs
+    # to the standalone alone, since a hosted plugin never opens a driver and
+    # its About diagnostics must not claim ASIO support it cannot use.
+    if (WIN32)
+        target_compile_definitions(${target} PRIVATE
+            JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1  # NEEDS_WEBVIEW2 links the static loader
+            PLECTRIFY_DISABLE_WEBVIEW2_ZOOM=1  # rack zoom is UI-owned; disable WebView2 page/pinch zoom
+            # MIDI runs on the legacy Win32 (winmm) backend only. JUCE 8.0.14's
+            # WinRT/UMP backends corrupt the heap on current Windows 11 builds
+            # (the OS-side Windows MIDI Services rework), so with WINRT off and
+            # JUCE_USE_WINDOWS_MIDI_SERVICES left at its default of 0 that code
+            # is never compiled and the backend factory falls through to winmm.
+            # Devices are opened only by MidiInputManager (the standalone
+            # shell); AudioDeviceManager's MIDI machinery is still bypassed —
+            # see audioSetupFromXml.
+            JUCE_USE_WINRT_MIDI=0)
+    endif()
+
+    target_compile_definitions(${target} PRIVATE
+        JUCE_PLUGINHOST_VST3=1          # host VST3 plugins
+        JUCE_PLUGINHOST_VST=0           # legacy VST2 needs the Steinberg SDK/licence
+        JUCE_PLUGINHOST_LADSPA=0
+        JUCE_WEB_BROWSER=1              # host the embedded Svelte UI
+        JUCE_USE_CURL=0
+        # Debug-only source-tree fallback for serving ui/dist. Release binaries
+        # must not bake a dev-machine path; they serve only the staged ui/
+        # directory — next to the executable on Windows (scripts/run.windows.ts
+        # stages it there), inside the bundle at Contents/Resources/ui on macOS
+        # (scripts/run.macos.ts stages it). The same fallback is what lets a
+        # Debug plugin build run with no staging at all.
+        $<$<CONFIG:Debug>:PLECTRIFY_UI_DIST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ui/dist">
+        # Debug-only: read the plugin catalogue straight from the source
+        # tree, so editing the JSON and restarting is the whole dev loop — no
+        # upload, no cache to clear, no network.
+        #
+        # This path is UNSIGNED. Release builds must reach a parsed catalogue only
+        # through signature verification, so the bypass is a compile-time symbol
+        # that does not exist outside Debug — never a runtime flag, setting or env
+        # var, any of which would let a downgrade attack switch verification off.
+        $<$<CONFIG:Debug>:PLECTRIFY_CATALOGUE_FILE="${CMAKE_CURRENT_SOURCE_DIR}/packaging/catalogue.json">
+        # Debug-only: where the shipped plugins would be. A release stages them
+        # beside the executable (inside the bundle on macOS); a Debug build has no
+        # such layout, so it looks here instead — drop NeuralAmpModeler.vst3 into
+        # third_party/plugins/ to exercise what a shipped install actually has.
+        # Gitignored like the rest of third_party/, and simply absent otherwise, in
+        # which case the dev loop finds whatever is installed on the machine.
+        $<$<CONFIG:Debug>:PLECTRIFY_BUNDLED_PLUGIN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/third_party/plugins">
+        PLECTRIFY_CATALOGUE_URL="${PLECTRIFY_CATALOGUE_URL}"
+        # TONE3000. The redirect URI differs per configuration because localhost is
+        # always accepted for development, which keeps the dev loop independent of
+        # whatever is deployed to plectrify.com. Both must be listed under the key's
+        # allowed redirect URIs, or OAuth refuses them.
+        PLECTRIFY_TONE3000_CLIENT_ID="${PLECTRIFY_TONE3000_CLIENT_ID}"
+        PLECTRIFY_TONE3000_API="${PLECTRIFY_TONE3000_API}"
+        $<$<CONFIG:Debug>:PLECTRIFY_TONE3000_REDIRECT_URI="${PLECTRIFY_TONE3000_REDIRECT_URI_DEBUG}">
+        $<$<NOT:$<CONFIG:Debug>>:PLECTRIFY_TONE3000_REDIRECT_URI="${PLECTRIFY_TONE3000_REDIRECT_URI}">
+        JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:${target},JUCE_PRODUCT_NAME>"
+        JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:${target},JUCE_VERSION>")
+
+    target_link_libraries(${target} PRIVATE
+        juce::juce_audio_utils          # AudioDeviceSelectorComponent, AudioProcessorPlayer
+        juce::juce_audio_processors      # plugin hosting + AudioProcessorGraph
+        juce::juce_audio_devices
+        juce::juce_gui_extra
+        juce::juce_cryptography          # SHA256 for asset pins, RSAKey for manifest signatures
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags)
+
+    if (WIN32)
+        # GetProcessMemoryInfo for the status-bar RAM readout.
+        target_link_libraries(${target} PRIVATE psapi)
+
+        # Release builds emit a PDB. Without one, a field crash is an Event Log
+        # entry with a raw offset and nothing to map it to — access violations in
+        # installed builds were undiagnosable. /Zi + /DEBUG cost nothing at
+        # runtime and do not reduce optimisation; /OPT:REF,ICF restores the
+        # dead-stripping that /DEBUG would otherwise turn off. The release script
+        # archives the PDB beside the installer (never inside it) so any dump or
+        # fault offset from that build stays symbolisable.
+        target_compile_options(${target} PRIVATE $<$<CONFIG:Release>:/Zi>)
+        target_link_options(${target} PRIVATE $<$<CONFIG:Release>:/DEBUG /OPT:REF /OPT:ICF>)
+    endif()
+endfunction()
+
+plectrify_configure_target(Plectrify)
+
+# ASIO — low-latency Windows audio, the driver a live guitar rig wants. The
+# standalone alone: a hosted plugin never opens a driver, and its About
+# diagnostics must not claim ASIO support. JUCE bundles the Steinberg ASIO 2.3
+# headers under juce_audio_devices/native/asio, so no external SDK download is
+# needed: JUCE_ASIO_USE_EXTERNAL_SDK stays at its default of 0 and the bundled
+# header is used. The resulting binary is subject to Steinberg's ASIO SDK
+# licence terms.
 if (WIN32)
-    target_compile_definitions(Plectrify PRIVATE
-        JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1  # NEEDS_WEBVIEW2 links the static loader
-        PLECTRIFY_DISABLE_WEBVIEW2_ZOOM=1  # rack zoom is UI-owned; disable WebView2 page/pinch zoom
-        # MIDI runs on the legacy Win32 (winmm) backend only. JUCE 8.0.14's
-        # WinRT/UMP backends corrupt the heap on current Windows 11 builds (the
-        # OS-side Windows MIDI Services rework), so with WINRT off and
-        # JUCE_USE_WINDOWS_MIDI_SERVICES left at its default of 0 that code is
-        # never compiled and the backend factory falls through to winmm. Devices
-        # are opened only by MidiInputManager; AudioDeviceManager's MIDI machinery
-        # (openLastRequestedMidiDevices) is still bypassed — see audioSetupFromXml.
-        JUCE_USE_WINRT_MIDI=0
-        # ASIO — low-latency Windows audio, the driver a live guitar rig wants.
-        # JUCE bundles the Steinberg ASIO 2.3 headers under
-        # juce_audio_devices/native/asio, so no external SDK download is needed:
-        # JUCE_ASIO_USE_EXTERNAL_SDK stays at its default of 0 and the bundled
-        # header is used. The resulting binary is subject to Steinberg's ASIO SDK
-        # licence terms.
-        JUCE_ASIO=1)
+    target_compile_definitions(Plectrify PRIVATE JUCE_ASIO=1)
 endif()
 
-target_compile_definitions(Plectrify PRIVATE
-    JUCE_PLUGINHOST_VST3=1          # host VST3 plugins
-    JUCE_PLUGINHOST_VST=0           # legacy VST2 needs the Steinberg SDK/licence
-    JUCE_PLUGINHOST_LADSPA=0
-    JUCE_WEB_BROWSER=1              # host the embedded Svelte UI
-    JUCE_USE_CURL=0
-    # Debug-only source-tree fallback for serving ui/dist. Release binaries
-    # must not bake a dev-machine path; they serve only the staged ui/
-    # directory — next to the executable on Windows (scripts/run.windows.ts
-    # stages it there), inside the bundle at Contents/Resources/ui on macOS
-    # (scripts/run.macos.ts stages it).
-    $<$<CONFIG:Debug>:PLECTRIFY_UI_DIST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/ui/dist">
-    # Debug-only: read the plugin catalogue straight from the source
-    # tree, so editing the JSON and restarting is the whole dev loop — no
-    # upload, no cache to clear, no network.
-    #
-    # This path is UNSIGNED. Release builds must reach a parsed catalogue only
-    # through signature verification, so the bypass is a compile-time symbol
-    # that does not exist outside Debug — never a runtime flag, setting or env
-    # var, any of which would let a downgrade attack switch verification off.
-    $<$<CONFIG:Debug>:PLECTRIFY_CATALOGUE_FILE="${CMAKE_CURRENT_SOURCE_DIR}/packaging/catalogue.json">
-    # Debug-only: where the shipped plugins would be. A release stages them
-    # beside the executable (inside the bundle on macOS); a Debug build has no
-    # such layout, so it looks here instead — drop NeuralAmpModeler.vst3 into
-    # third_party/plugins/ to exercise what a shipped install actually has.
-    # Gitignored like the rest of third_party/, and simply absent otherwise, in
-    # which case the dev loop finds whatever is installed on the machine.
-    $<$<CONFIG:Debug>:PLECTRIFY_BUNDLED_PLUGIN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/third_party/plugins">
-    PLECTRIFY_CATALOGUE_URL="${PLECTRIFY_CATALOGUE_URL}"
-    # TONE3000. The redirect URI differs per configuration because localhost is
-    # always accepted for development, which keeps the dev loop independent of
-    # whatever is deployed to plectrify.com. Both must be listed under the key's
-    # allowed redirect URIs, or OAuth refuses them.
-    PLECTRIFY_TONE3000_CLIENT_ID="${PLECTRIFY_TONE3000_CLIENT_ID}"
-    PLECTRIFY_TONE3000_API="${PLECTRIFY_TONE3000_API}"
-    $<$<CONFIG:Debug>:PLECTRIFY_TONE3000_REDIRECT_URI="${PLECTRIFY_TONE3000_REDIRECT_URI_DEBUG}">
-    $<$<NOT:$<CONFIG:Debug>>:PLECTRIFY_TONE3000_REDIRECT_URI="${PLECTRIFY_TONE3000_REDIRECT_URI}">
-    JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Plectrify,JUCE_PRODUCT_NAME>"
-    JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Plectrify,JUCE_VERSION>")
+# The window-chrome assets (title-bar wordmark font, icons) are the shell's
+# alone — the plugin has no JUCE-drawn chrome.
+target_link_libraries(Plectrify PRIVATE PlectrifyAssets)
 
-target_link_libraries(Plectrify PRIVATE
-    PlectrifyAssets
-    juce::juce_audio_utils          # AudioDeviceSelectorComponent, AudioProcessorPlayer
-    juce::juce_audio_processors      # plugin hosting + AudioProcessorGraph
-    juce::juce_audio_devices
-    juce::juce_gui_extra
-    juce::juce_cryptography          # SHA256 for asset pins, RSAKey for manifest signatures
-    PUBLIC
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
-    juce::juce_recommended_warning_flags)
-
+# ---------------------------------------------------------------------------
+# The VST3 plugin: the same engine hosted inside a DAW. Shares
+# PLECTRIFY_ENGINE_SOURCES and the whole configuration function with the app;
+# only the thin processor/editor pair in Source/plugin/ is its own. The same
+# per-user data root means rigs, patches, installed packages and the TONE3000
+# account are shared with the standalone by construction.
+# ---------------------------------------------------------------------------
 if (WIN32)
-    # GetProcessMemoryInfo for the status-bar RAM readout.
-    target_link_libraries(Plectrify PRIVATE psapi)
+    set(PLECTRIFY_PLATFORM_PLUGIN_ARGS NEEDS_WEBVIEW2 TRUE)
+elseif (APPLE)
+    # Hardened runtime + disable-library-validation mirror the app: the
+    # signing itself is release plumbing, but the arguments must be here so a
+    # signed build keeps the ability to load third-party VST3 code. (Note the
+    # DAW process's own entitlements are what actually govern library loading
+    # at runtime — every mainstream host disables validation.)
+    set(PLECTRIFY_PLATFORM_PLUGIN_ARGS
+        BUNDLE_ID io.github.patrickiel.plectrify.plugin
+        HARDENED_RUNTIME_ENABLED TRUE
+        HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input com.apple.security.cs.disable-library-validation)
+else()
+    set(PLECTRIFY_PLATFORM_PLUGIN_ARGS "")
+endif()
 
-    # Release builds emit a PDB. Without one, a field crash is an Event Log
-    # entry with a raw offset and nothing to map it to — access violations in
-    # installed builds were undiagnosable. /Zi + /DEBUG cost nothing at
-    # runtime and do not reduce optimisation; /OPT:REF,ICF restores the
-    # dead-stripping that /DEBUG would otherwise turn off. The release script
-    # archives the PDB beside the installer (never inside it) so any dump or
-    # fault offset from that build stays symbolisable.
-    target_compile_options(Plectrify PRIVATE $<$<CONFIG:Release>:/Zi>)
-    target_link_options(Plectrify PRIVATE $<$<CONFIG:Release>:/DEBUG /OPT:REF /OPT:ICF>)
+juce_add_plugin(PlectrifyPlugin
+    PRODUCT_NAME "Plectrify"
+    COMPANY_NAME "Plectrify"
+    VERSION      "${PROJECT_VERSION}"
+    FORMATS VST3
+    PLUGIN_MANUFACTURER_CODE Plct
+    PLUGIN_CODE Pfy1
+    VST3_CATEGORIES Fx
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT TRUE              # rig/scene switching, MIDI learn — from the host track
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    COPY_PLUGIN_AFTER_BUILD FALSE      # the dev loop / release scripts place the bundle
+    # juce_vst3_helper generates moduleinfo.json by LOADING the built plugin at
+    # build time — which would spin up WebView2 statics and the engine inside
+    # the build. Opt out; the plugin loads fine without the fast-scan manifest.
+    VST3_AUTO_MANIFEST FALSE
+    ${PLECTRIFY_PLATFORM_PLUGIN_ARGS})
+
+target_sources(PlectrifyPlugin PRIVATE
+    ${PLECTRIFY_ENGINE_SOURCES}
+    Source/plugin/PluginProcessor.cpp
+    Source/plugin/PluginEditor.cpp)
+
+# There has never been a VST2 Plectrify, so the VST3 keeps its own parameter-ID
+# scheme instead of emulating a VST2 predecessor's — the alternative trips the
+# plugin client's parameter-automation-conflict guard.
+target_compile_definitions(PlectrifyPlugin PRIVATE JUCE_VST3_CAN_REPLACE_VST2=0)
+
+plectrify_configure_target(PlectrifyPlugin)
+
+# The Release PDB flags again, on the format target this time. juce_add_plugin
+# splits the plugin in two: PlectrifyPlugin is a shared-code static library
+# (where the function's /Zi lands, correctly — that is where the sources
+# compile), but the DLL is linked by PlectrifyPlugin_VST3, and link options on
+# a static library reach no linker. Without this the Release .vst3 has no PDB
+# and a DAW-side field crash is an unmappable offset; the release script gates
+# on exactly that.
+if (WIN32)
+    target_link_options(PlectrifyPlugin_VST3 PRIVATE $<$<CONFIG:Release>:/DEBUG /OPT:REF /OPT:ICF>)
 endif()
 
 # Focused synthetic-signal coverage for the tuner DSP. This remains a separate

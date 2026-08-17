@@ -7,6 +7,7 @@
     AppInfo,
     AppSettings,
     EngineBusyState,
+    HostCapabilities,
     MidiActionId,
     Rig,
     SceneState,
@@ -36,6 +37,9 @@
     onSetAppSettings: (settings: Partial<AppSettings>) => void;
     /** Host version and build, for the Info panel. */
     appInfo: AppInfo;
+    /** Which host-owned facilities exist, for the Settings panel's gates —
+        already defaulted by App, so this is never absent here. */
+    capabilities: HostCapabilities;
     /** Builds the Info panel's diagnostics report from App's live state; the
         panel supplies the browser facts it measured once at mount. */
     getReport: (browser: BrowserFacts) => DiagReport;
@@ -80,6 +84,7 @@
     appSettings,
     onSetAppSettings,
     appInfo,
+    capabilities,
     getReport,
     looperMidiLearning = $bindable(false),
     metronomeMidiLearning = $bindable(false),
@@ -525,6 +530,7 @@
               {engine}
               {appSettings}
               {onSetAppSettings}
+              {capabilities}
               view={settingsView}
               onShowMidi={openMidiView}
               {onOpenSetup}

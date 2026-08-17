@@ -15,6 +15,10 @@
 
   interface Props {
     engine: EngineBridge;
+    /** False when the host (a DAW) owns the MIDI devices: the Inputs strip
+        makes no sense there, but the bindings below still work — the track's
+        MIDI arrives on the same event stream. */
+    midiDevicesAvailable?: boolean;
     midiBindings: Record<string, MidiTrigger>;
     onSetAppSettings: (settings: { midiBindings: Record<string, MidiTrigger> }) => void;
     /** True while this view's MIDI learn is armed. Bindable so App can pause
@@ -28,6 +32,7 @@
 
   let {
     engine,
+    midiDevicesAvailable = true,
     midiBindings,
     onSetAppSettings,
     midiLearning = $bindable(false),
@@ -312,10 +317,13 @@
   <ol
     class="flex list-inside list-decimal flex-col gap-[.3rem] text-xs leading-[1.5] text-muted marker:font-medium marker:text-[color-mix(in_srgb,var(--color-ink)_55%,transparent)]"
   >
-    <li>
-      Check that your controller is listed under <span class="text-ink">Inputs</span> below — if
-      not, plug it in and click <span class="text-ink">Refresh</span>.
-    </li>
+    <!-- Step 1 is about the Inputs strip, so it goes wherever the strip goes. -->
+    {#if midiDevicesAvailable}
+      <li>
+        Check that your controller is listed under <span class="text-ink">Inputs</span> below — if
+        not, plug it in and click <span class="text-ink">Refresh</span>.
+      </li>
+    {/if}
     <li>
       Click the <span class="text-ink">Learn</span> button beside the rig or scene you want, then press
       the switch you want to use.
@@ -330,45 +338,53 @@
     themselves, in the tools sidebar).
   </p>
   <!-- The device strip. A recessed bar, so "what is plugged in" reads as live
-       status rather than as another paragraph. -->
-  <div
-    class="mt-[.9rem] flex flex-wrap items-center gap-[.6rem] rounded-lg border border-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-ink)_4%,transparent)] py-[.4rem] pr-[.4rem] pl-[.65rem]"
-  >
-    <span
-      class="text-[.625rem] font-semibold tracking-[.14em] whitespace-nowrap text-muted uppercase"
-      id="midi-inputs-label">Inputs</span
-    >
+       status rather than as another paragraph. Host-owned devices (the VST3
+       build) leave nothing to list or refresh, so one line says where the
+       MIDI comes from instead. -->
+  {#if !midiDevicesAvailable}
+    <p class="mt-[.9rem] text-xs text-[color-mix(in_srgb,var(--color-muted)_75%,transparent)]">
+      MIDI arrives from your DAW's track routing.
+    </p>
+  {:else}
     <div
-      class="flex min-w-0 flex-1 flex-wrap items-center gap-[.35rem]"
-      role="status"
-      aria-labelledby="midi-inputs-label"
+      class="mt-[.9rem] flex flex-wrap items-center gap-[.6rem] rounded-lg border border-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-ink)_4%,transparent)] py-[.4rem] pr-[.4rem] pl-[.65rem]"
     >
-      {#if devices.length > 0}
-        {#each devices as device (device)}
-          <span
-            class="inline-flex items-center gap-[.35rem] rounded-full border border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-[.55rem] py-[.1rem] text-[.7rem] whitespace-nowrap text-[color-mix(in_srgb,var(--color-ink)_85%,transparent)]"
-          >
+      <span
+        class="text-[.625rem] font-semibold tracking-[.14em] whitespace-nowrap text-muted uppercase"
+        id="midi-inputs-label">Inputs</span
+      >
+      <div
+        class="flex min-w-0 flex-1 flex-wrap items-center gap-[.35rem]"
+        role="status"
+        aria-labelledby="midi-inputs-label"
+      >
+        {#if devices.length > 0}
+          {#each devices as device (device)}
             <span
-              class="size-1.5 rounded-full bg-accent shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
-              aria-hidden="true"
-            ></span>
-            {device}
-          </span>
-        {/each}
-      {:else}
-        <span class="text-xs text-[color-mix(in_srgb,var(--color-muted)_75%,transparent)]"
-          >No MIDI inputs detected</span
-        >
-      {/if}
+              class="inline-flex items-center gap-[.35rem] rounded-full border border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-[.55rem] py-[.1rem] text-[.7rem] whitespace-nowrap text-[color-mix(in_srgb,var(--color-ink)_85%,transparent)]"
+            >
+              <span
+                class="size-1.5 rounded-full bg-accent shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
+                aria-hidden="true"
+              ></span>
+              {device}
+            </span>
+          {/each}
+        {:else}
+          <span class="text-xs text-[color-mix(in_srgb,var(--color-muted)_75%,transparent)]"
+            >No MIDI inputs detected</span
+          >
+        {/if}
+      </div>
+      <Button
+        size="sm"
+        onclick={() => engine.refreshMidiDevices()}
+        tip="Re-scan the connected MIDI inputs"
+      >
+        Refresh
+      </Button>
     </div>
-    <Button
-      size="sm"
-      onclick={() => engine.refreshMidiDevices()}
-      tip="Re-scan the connected MIDI inputs"
-    >
-      Refresh
-    </Button>
-  </div>
+  {/if}
 
   <!-- The mappings. No tuner row here: its binding is learned on the tuner
        itself (hover the tuner in the status bar), beside the readout it

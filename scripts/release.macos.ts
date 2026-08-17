@@ -56,7 +56,10 @@
  * there is a user base to annoy.
  */
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync,
+  symlinkSync, writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -244,6 +247,7 @@ pnpm('Building UI', ['build'], { cwd: uiDir });
 // --- Native build + tests ----------------------------------------------------
 configure(CONFIG);
 buildTarget(CONFIG, 'Plectrify');
+buildTarget(CONFIG, 'PlectrifyPlugin_VST3');
 if (!values['skip-tests']) {
   // A target missing from TEST_TARGETS is reported by ctest as "Not Run" rather
   // than as a pass, so that list carries one entry per add_test() in
@@ -257,6 +261,14 @@ if (!values['skip-tests']) {
 const app = appPath(CONFIG);
 if (!existsSync(join(app, 'Contents/MacOS/Plectrify'))) {
   fail(`release app was not produced at ${app}.`);
+}
+
+// The VST3's bundle, gated the same way as the app: on its Mach-O. (No dSYM
+// gate on either — the mac build produces no separate debug symbols yet;
+// Windows gates on PDBs because MSVC already emits them.)
+const vst3Built = join(buildDir(CONFIG), 'PlectrifyPlugin_artefacts', CONFIG, 'VST3', 'Plectrify.vst3');
+if (!existsSync(join(vst3Built, 'Contents/MacOS/Plectrify'))) {
+  fail(`release VST3 was not produced at ${vst3Built}.`);
 }
 
 // --- JUCE provenance gate ----------------------------------------------------
@@ -346,6 +358,15 @@ function stageBundledPlugins(destination: string): void {
     if (!existsSync(bundle))
       fail(`${plugin.name}'s archive did not contain ${plugin.bundleName}.`);
 
+    // The pinned archive records no Unix modes at all, so ditto extracts the
+    // Mach-O 0644. dyld will dlopen a bundle without +x today, but nothing
+    // shipped should lean on that leniency — and whatever sits under
+    // Contents/MacOS is executable by definition, so the bit is restored from
+    // that knowledge rather than from metadata the archive failed to carry.
+    const machODir = join(bundle, 'Contents/MacOS');
+    if (existsSync(machODir))
+      for (const binary of readdirSync(machODir)) chmodSync(join(machODir, binary), 0o755);
+
     // Signed as part of the app: a nested bundle has to be sealed before its
     // container, and the deep sign the app gets below does not reach an
     // unsigned one that arrived after it. Ad-hoc is enough for loading, so in
@@ -376,9 +397,14 @@ ${sourceUrl}
 ${sourceArchiveHash ? `\nSHA-256: ${sourceArchiveHash}\n` : ''}
 THIRD-PARTY PLUGINS
 
-This offer covers Plectrify itself. Plectrify ships one VST3 plugin, Neural Amp
-Modeler, under the MIT licence; its source, the exact version, and where that
-binary came from are recorded in THIRD_PARTY_NOTICES.md. At your request
+This offer covers Plectrify itself — the standalone application and the
+Plectrify VST3 plug-in this disk image carries, which are two builds of the
+same AGPLv3 source in the archive above. (Both are built against Steinberg's
+VST3 SDK as bundled with JUCE, which Plectrify uses under the SDK's GPLv3
+option; see THIRD_PARTY_NOTICES.md.) Plectrify ships one third-party VST3
+plugin, Neural Amp Modeler, under the MIT licence; its source, the exact
+version, and where that binary came from are recorded in
+THIRD_PARTY_NOTICES.md. At your request
 Plectrify can also download further open-source plugins directly from each
 project's own release page; those transfers are from the project to you, so each
 project supplies its own binaries and its own corresponding source, at the
@@ -420,15 +446,56 @@ run('Verifying the signature', 'codesign', ['--verify', '--strict', '--verbose=2
 
 const outputDir = join(ROOT, 'artifacts');
 mkdirSync(outputDir, { recursive: true });
+
+// --- The VST3, made self-contained and sealed on its own ---------------------
+// A Release binary has no source-tree fallback (the PLECTRIFY_UI_DIST_DIR /
+// PLECTRIFY_BUNDLED_PLUGIN_DIR compile symbols are Debug-only), so the bundle
+// carries its own copy of the UI and the shipped plugins under
+// Contents/Resources — the layout moduleResourceDir() resolves. Same rule as
+// the Windows installer's vst3 staging: a plugin loaded by a DAW must not
+// depend on where, or whether, the standalone is installed.
+//
+// It gets a seal of its own, independent of the app's: the two bundles are
+// installed to different places and either can outlive the other. Explicit
+// entitlements because this is a Ninja build — the plugin target's
+// HARDENED_RUNTIME_OPTIONS in CMakeLists.txt only take effect under the Xcode
+// generator — and the file's two entitlements are exactly that list.
+const dmgStage = join(outputDir, 'dmg-stage');
+rmSync(dmgStage, { recursive: true, force: true });
+mkdirSync(dmgStage, { recursive: true });
+
+const vst3Stage = join(dmgStage, 'Plectrify.vst3');
+run('Staging Plectrify.vst3', 'ditto', [vst3Built, vst3Stage]);
+cpSync(join(uiDir, 'dist'), join(vst3Stage, 'Contents/Resources/ui'), { recursive: true });
+stageBundledPlugins(join(vst3Stage, 'Contents/Resources/plugins'));
+run('Codesigning Plectrify.vst3', 'codesign', [
+  '--entitlements', join(ROOT, 'cmake/Plectrify.entitlements'),
+  ...signArgs(),
+  vst3Stage,
+]);
+run('Verifying the plugin signature', 'codesign', ['--verify', '--strict', '--verbose=2', vst3Stage]);
+
+// --- The DMG: app + plugin + where the plugin goes ---------------------------
+// The app keeps the drag-install model; the plugin gets the plugin-DMG
+// convention, a symlink to the machine-wide /Library/Audio/Plug-Ins/VST3
+// (every host scans it; dropping the bundle there costs one Finder auth
+// prompt, not an elevated installer). The per-user
+// ~/Library/Audio/Plug-Ins/VST3 the catalogue installer writes to cannot be
+// offered here: a symlink's target is a literal path, never tilde-expanded,
+// and every account's home is a different literal.
+run('Staging Plectrify.app', 'ditto', [app, join(dmgStage, 'Plectrify.app')]);
+symlinkSync('/Applications', join(dmgStage, 'Applications'));
+symlinkSync('/Library/Audio/Plug-Ins/VST3', join(dmgStage, 'VST3'));
+
 const dmgName = `Plectrify-${version}-macos-arm64.dmg`;
 const dmgPath = join(outputDir, dmgName);
 rmSync(dmgPath, { force: true });
 
 // Plain hdiutil rather than a DMG-decorating dependency: the artifact is the
-// app; a background image is not worth a supply-chain edge.
+// staged folder; a background image is not worth a supply-chain edge.
 run('Building the DMG', 'hdiutil', [
   'create', '-volname', `Plectrify ${version}`,
-  '-srcfolder', app, '-format', 'UDZO', '-ov', dmgPath,
+  '-srcfolder', dmgStage, '-format', 'UDZO', '-ov', dmgPath,
 ]);
 // The DMG's own signature exists to be notarized; ad-hoc has nothing to submit
 // it to, and an ad-hoc seal over a disk image tells a downloader nothing that

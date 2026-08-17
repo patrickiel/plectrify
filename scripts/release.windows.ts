@@ -467,6 +467,7 @@ if (existsSync(buildPath)) {
 }
 run('Configuring Release build', cmakePath, ['-S', ROOT, '-B', buildPath, '-A', 'x64']);
 run('Building Plectrify Release', cmakePath, ['--build', buildPath, '--config', configuration, '--target', 'Plectrify']);
+run('Building Plectrify VST3 Release', cmakePath, ['--build', buildPath, '--config', configuration, '--target', 'PlectrifyPlugin_VST3']);
 if (!values['skip-tests']) {
   // Every test exe, or ctest silently re-runs a stale binary — and a target
   // missing from TEST_TARGETS is worse than stale: ctest reports "Not Run" for a
@@ -486,6 +487,16 @@ if (!existsSync(executablePath)) fail(`release executable was not produced at ${
 // back to a function. CMakeLists.txt enables /Zi + /DEBUG for Release.
 const pdbPath = join(buildPath, 'Plectrify_artefacts', configuration, 'Plectrify.pdb');
 if (!existsSync(pdbPath)) fail(`release PDB was not produced at ${pdbPath}.`);
+
+// The VST3's bundle and its PDB. The linker drops the .pdb (with .lib/.exp)
+// beside the bundle in the VST3/ artefact folder, not inside it, so staging
+// the bundle folder alone keeps them out of the installer while this copy
+// keeps a DAW-side crash symbolisable exactly as the app's is.
+const vst3BundlePath = join(buildPath, 'PlectrifyPlugin_artefacts', configuration, 'VST3', 'Plectrify.vst3');
+const vst3BinaryPath = join(vst3BundlePath, 'Contents', 'x86_64-win', 'Plectrify.vst3');
+if (!existsSync(vst3BinaryPath)) fail(`release VST3 was not produced at ${vst3BinaryPath}.`);
+const vst3PdbPath = join(buildPath, 'PlectrifyPlugin_artefacts', configuration, 'VST3', 'Plectrify.pdb');
+if (!existsSync(vst3PdbPath)) fail(`release VST3 PDB was not produced at ${vst3PdbPath}.`);
 
 // --- JUCE provenance gate ---------------------------------------------------------------
 // The published source must be the exact patched tree the binary was built
@@ -520,6 +531,18 @@ copyFileSync(join(ROOT, 'LICENSE'), join(stagePath, 'LICENSE'));
 copyFileSync(join(juceSourcePath, 'LICENSE.md'), join(stagePath, 'JUCE_LICENSE.md'));
 copyFileSync(join(ROOT, 'THIRD_PARTY_NOTICES.md'), join(stagePath, 'THIRD_PARTY_NOTICES.md'));
 stageBundledPlugins(join(stagePath, 'plugins'));
+
+// The VST3, made self-contained: a Release binary has no source-tree fallback
+// (the PLECTRIFY_UI_DIST_DIR / PLECTRIFY_BUNDLED_PLUGIN_DIR compile symbols
+// are Debug-only), so the bundle carries its own copies of ui/ and the
+// shipped plugins under Contents/Resources — the layout moduleResourceDir()
+// resolves. Duplicating them rather than pointing at {app} is deliberate: a
+// plugin loaded by a DAW must not depend on where, or whether, the standalone
+// is installed.
+const vst3StagePath = join(stagePath, 'vst3', 'Plectrify.vst3');
+cpSync(vst3BundlePath, vst3StagePath, { recursive: true });
+cpSync(join(ROOT, 'ui', 'dist'), join(vst3StagePath, 'Contents', 'Resources', 'ui'), { recursive: true });
+stageBundledPlugins(join(vst3StagePath, 'Contents', 'Resources', 'plugins'));
 
 // --- Corresponding source ---------------------------------------------------------------
 // Built from the committed Plectrify tree and the exact, already-patched JUCE
@@ -583,9 +606,13 @@ beside the installer.
 
 THIRD-PARTY PLUGINS
 
-This offer covers Plectrify itself. Plectrify's installer contains one VST3
-plugin, Neural Amp Modeler, under the MIT licence; its source, the exact
-version, and where that binary came from are recorded in
+This offer covers Plectrify itself — the standalone application and the
+Plectrify VST3 plug-in the installer offers, which are two builds of the same
+AGPLv3 source in the archive above. (Both are built against Steinberg's VST3
+SDK as bundled with JUCE, which Plectrify uses under the SDK's GPLv3 option;
+see THIRD_PARTY_NOTICES.md.) Plectrify's installer also contains one
+third-party VST3 plugin, Neural Amp Modeler, under the MIT licence; its
+source, the exact version, and where that binary came from are recorded in
 THIRD_PARTY_NOTICES.md. At your request Plectrify can also download further
 open-source plugins directly from each project's own release page; those
 transfers are from the project to you, so each project supplies its own
@@ -638,6 +665,10 @@ const installerHash = sha256File(installerPath);
 const checksumPath = join(outputPath, `Plectrify-${version}-win-x64-setup.exe.sha256`);
 writeFileSync(checksumPath, `${installerHash}  ${basename(installerPath)}`, 'ascii');
 copyFileSync(pdbPath, join(outputPath, `Plectrify-${version}-win-x64.pdb`));
+// The VST3's PDB under a name of its own, archived beside the installer like
+// the app's (never inside it, never uploaded): the exe and the plugin are
+// separate links, and a DAW-side crash offset only maps through the plugin's.
+copyFileSync(vst3PdbPath, join(outputPath, `Plectrify-${version}-win-x64-vst3.pdb`));
 copyFileSync(buildInfoPath, join(outputPath, 'BUILD_INFO.txt'));
 writeFileSync(
   join(outputPath, 'release-manifest.json'),

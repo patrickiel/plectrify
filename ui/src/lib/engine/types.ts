@@ -919,6 +919,31 @@ export interface BlacklistedPlugin {
   name: string;
 }
 
+/** Which host-owned facilities exist around the engine. The engine pushes this
+    with appInfo so standalone-only surfaces — the setup wizard, the audio
+    device settings, window chrome, Auto Standby — can hide themselves where
+    the host (a DAW, for the VST3 build) owns those concerns. */
+export interface HostCapabilities {
+  /** Device picker, setup wizard, Advanced audio… */
+  audioDevices: boolean;
+  /** The MIDI device list. The event stream itself flows regardless — in a
+      plugin the DAW's track MIDI arrives on the same events. */
+  midiDevices: boolean;
+  /** Resize handles and window-theme mirroring. */
+  windowChrome: boolean;
+  /** The idle park/wake machinery. */
+  autoStandby: boolean;
+}
+
+/** What absence of the capabilities field means: the standalone, which has it
+    all — every engine older than the field was one. */
+export const STANDALONE_CAPABILITIES: HostCapabilities = {
+  audioDevices: true,
+  midiDevices: true,
+  windowChrome: true,
+  autoStandby: true,
+};
+
 /** Facts about the running host only the engine knows — the About dialog and the
     diagnostics a bug report should carry. Not static for the session: the audio
     device and the plugin counts change, and the engine re-pushes the whole block
@@ -937,6 +962,13 @@ export interface AppInfo {
       whether ASIO is even a fact worth stating). Absent on an engine older
       than the field — treat absence as 'windows', the only OS those ran on. */
   platform?: 'windows' | 'macos';
+  /** Which binary the engine is: the standalone app or the VST3 plugin inside
+      a DAW. Absent means 'standalone' — every engine older than the field. */
+  host?: 'standalone' | 'plugin';
+  /** Which host-owned facilities exist. Absent means everything (standalone);
+      gate with `appInfo.capabilities ?? STANDALONE_CAPABILITIES` so the page
+      can never flash a degraded layout before the engine's push lands. */
+  capabilities?: HostCapabilities;
   juceVersion: string;
   buildInfo?: AppBuildInfo;
   system?: AppSystemInfo;

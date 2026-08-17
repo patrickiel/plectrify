@@ -18,12 +18,19 @@
  *   pnpm app --dist --config Release
  *                               Release build; stages ui/dist into the bundle
  *                               at Contents/Resources/ui.
+ *   pnpm app --plugin           Build the Debug VST3 instead of the app and
+ *                               install it to ~/Library/Audio/Plug-Ins/VST3.
+ *                               Starts Vite like the default loop; launch the
+ *                               DAW with PLECTRIFY_DEV_URL set for live HMR.
+ *                               Refuses --dist and --ui-only — Release
+ *                               staging for the plugin is release plumbing.
  *
  * Deliberately absent relative to run.windows.ts: the .build-unfinished marker (an
  * MSBuild .tlog-staleness hazard Ninja does not have) and the WebView2 orphan
  * hunt (WKWebView holds no per-profile lock).
  */
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
@@ -55,12 +62,37 @@ const { values } = parseArgs({
     'no-ui': { type: 'boolean', default: false },
     'no-run': { type: 'boolean', default: false },
     clean: { type: 'boolean', default: false },
+    plugin: { type: 'boolean', default: false },
     config: { type: 'string', default: 'Debug' },
   },
 });
 
 const config = values.config!;
 const uiDir = join(ROOT, 'ui');
+
+if (values.plugin && (values.dist || values['ui-only'])) {
+  fail('--plugin is the Debug dev loop only; a Release .vst3 is staged and sealed by the release pipeline (pnpm release).');
+}
+
+/** Copies the built .vst3 into the per-user VST3 folder — the same directory
+    the catalogue installer uses, which every host already searches. ditto, not
+    cpSync: the bundle's Mach-O has to stay executable or it extracts fine and
+    refuses to load. Replaced whole, never merged. */
+function installPluginForHosts(): void {
+  // JUCE inserts a $<CONFIG> segment even under single-config generators
+  // (JUCEUtils.cmake's products_folder), same as the app's artefact path.
+  const built = join(
+    ROOT, `build-macos-${config.toLowerCase()}`, 'PlectrifyPlugin_artefacts', config, 'VST3', 'Plectrify.vst3',
+  );
+  if (!existsSync(join(built, 'Contents'))) fail(`plugin bundle not found: ${built}`);
+
+  const destination = join(homedir(), 'Library', 'Audio', 'Plug-Ins', 'VST3', 'Plectrify.vst3');
+
+  console.log(`==> Installing ${destination}`);
+  mkdirSync(join(destination, '..'), { recursive: true });
+  rmSync(destination, { recursive: true, force: true });
+  run('install plugin', 'ditto', [built, destination]);
+}
 
 /** Locked, reproducible UI install. Rewriting the lockfile must be an explicit
     action (it would later trip the release scripts' clean-tree gate), never a
@@ -193,6 +225,25 @@ if (status === 'free') {
 stageBundledPlugins();
 
 configure(config);
+
+// ---------------------------------------------------------------------------
+// --plugin: the same loop, hosted by a DAW instead of our own app. The DAW is
+// the process to (re)start, so nothing is launched from here.
+// ---------------------------------------------------------------------------
+if (values.plugin) {
+  buildTarget(config, 'PlectrifyPlugin_VST3', values.clean);
+  installPluginForHosts();
+  console.log(`
+==> Debug Plectrify.vst3 installed for this user's DAWs.
+    The Vite dev server is running on http://localhost:5173. For live HMR the
+    DAW must inherit PLECTRIFY_DEV_URL — e.g. from Terminal:
+
+      PLECTRIFY_DEV_URL=http://localhost:5173 open -a "Your DAW"
+
+    Launched plainly, the plugin serves the last-built ui/dist instead.`);
+  process.exit(0);
+}
+
 await stopApp();
 buildTarget(config, 'Plectrify', values.clean);
 
