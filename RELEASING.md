@@ -68,7 +68,7 @@ git checkout vX.Y.Z
 pnpm release
 ```
 
-This builds, signs the app and the VST3 with the hardened runtime and
+This builds, signs the app and the plug-ins (VST3 + AU) with the hardened runtime and
 `cmake/Plectrify.entitlements`, packages both into one installer pkg (signed
 with the Developer ID *Installer* certificate — a separate certificate type
 from the Application one), notarizes it, staples, checks it with `spctl`, and

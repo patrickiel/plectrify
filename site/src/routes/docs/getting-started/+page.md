@@ -12,8 +12,9 @@ Grab the build for your machine from the [download section](/#download).
   plug-in** (checked by default), installed to `C:\Program Files\Common Files\VST3` — the same
   rig, running on a track inside your DAW, sharing your rigs and patches with the standalone.
 - **macOS** (Apple Silicon, 13.3 or newer): run the installer. It installs the app to
-  Applications and **Plectrify as a VST3 plug-in** to `/Library/Audio/Plug-Ins/VST3` — the
-  same rig, running on a track inside your DAW, sharing your rigs and patches with the
+  Applications and **Plectrify as a plug-in** — VST3 to `/Library/Audio/Plug-Ins/VST3` and
+  Audio Unit to `/Library/Audio/Plug-Ins/Components`, for Logic and GarageBand — the same
+  rig, running on a track inside your DAW, sharing your rigs and patches with the
   standalone. The build is not notarized, so macOS refuses to open the installer at first:
   see [Opening it on macOS](/docs/opening-on-macos), which is a two-minute detour you do
   once.

@@ -18,8 +18,9 @@
  *   pnpm app --dist --config Release
  *                               Release build; stages ui/dist into the bundle
  *                               at Contents/Resources/ui.
- *   pnpm app --plugin           Build the Debug VST3 instead of the app and
- *                               install it to ~/Library/Audio/Plug-Ins/VST3.
+ *   pnpm app --plugin           Build the Debug VST3 + AU instead of the app
+ *                               and install them under ~/Library/Audio/Plug-Ins
+ *                               (VST3/ and Components/).
  *                               Starts Vite like the default loop; launch the
  *                               DAW with PLECTRIFY_DEV_URL set for live HMR.
  *                               Refuses --dist and --ui-only — Release
@@ -74,24 +75,28 @@ if (values.plugin && (values.dist || values['ui-only'])) {
   fail('--plugin is the Debug dev loop only; a Release .vst3 is staged and sealed by the release pipeline (pnpm release).');
 }
 
-/** Copies the built .vst3 into the per-user VST3 folder — the same directory
-    the catalogue installer uses, which every host already searches. ditto, not
-    cpSync: the bundle's Mach-O has to stay executable or it extracts fine and
-    refuses to load. Replaced whole, never merged. */
+/** Copies the built plugin bundles into the per-user plug-in folders — the
+    VST3 beside the catalogue installer's, the AU where Logic and GarageBand
+    look. ditto, not cpSync: a bundle's Mach-O has to stay executable or it
+    extracts fine and refuses to load. Replaced whole, never merged. */
 function installPluginForHosts(): void {
   // JUCE inserts a $<CONFIG> segment even under single-config generators
   // (JUCEUtils.cmake's products_folder), same as the app's artefact path.
-  const built = join(
-    ROOT, `build-macos-${config.toLowerCase()}`, 'PlectrifyPlugin_artefacts', config, 'VST3', 'Plectrify.vst3',
-  );
-  if (!existsSync(join(built, 'Contents'))) fail(`plugin bundle not found: ${built}`);
+  const artefacts = join(ROOT, `build-macos-${config.toLowerCase()}`, 'PlectrifyPlugin_artefacts', config);
+  const pluginsRoot = join(homedir(), 'Library', 'Audio', 'Plug-Ins');
 
-  const destination = join(homedir(), 'Library', 'Audio', 'Plug-Ins', 'VST3', 'Plectrify.vst3');
+  for (const format of [
+    { built: join(artefacts, 'VST3', 'Plectrify.vst3'), folder: 'VST3', bundle: 'Plectrify.vst3' },
+    { built: join(artefacts, 'AU', 'Plectrify.component'), folder: 'Components', bundle: 'Plectrify.component' },
+  ]) {
+    if (!existsSync(join(format.built, 'Contents'))) fail(`plugin bundle not found: ${format.built}`);
 
-  console.log(`==> Installing ${destination}`);
-  mkdirSync(join(destination, '..'), { recursive: true });
-  rmSync(destination, { recursive: true, force: true });
-  run('install plugin', 'ditto', [built, destination]);
+    const destination = join(pluginsRoot, format.folder, format.bundle);
+    console.log(`==> Installing ${destination}`);
+    mkdirSync(join(destination, '..'), { recursive: true });
+    rmSync(destination, { recursive: true, force: true });
+    run('install plugin', 'ditto', [format.built, destination]);
+  }
 }
 
 /** Locked, reproducible UI install. Rewriting the lockfile must be an explicit
@@ -232,9 +237,10 @@ configure(config);
 // ---------------------------------------------------------------------------
 if (values.plugin) {
   buildTarget(config, 'PlectrifyPlugin_VST3', values.clean);
+  buildTarget(config, 'PlectrifyPlugin_AU');
   installPluginForHosts();
   console.log(`
-==> Debug Plectrify.vst3 installed for this user's DAWs.
+==> Debug Plectrify.vst3 and Plectrify.component installed for this user's DAWs.
     The Vite dev server is running on http://localhost:5173. For live HMR the
     DAW must inherit PLECTRIFY_DEV_URL — e.g. from Terminal:
 

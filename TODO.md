@@ -96,7 +96,14 @@ it is empty.
       the standalone, let the plugin read the shared cache. Cheap interim: a
       plugin-mode warning line on the Rescan affordance.
 - [ ] Host-exposed automation parameters (the plugin currently exposes none).
-- [ ] AU format for Logic users.
+- [x] AU format for Logic users: `FORMATS VST3 AU` on macOS, registered
+      `aufx` (not JUCE's `aumf` default — Logic files MIDI-controlled effects
+      outside the Audio FX menu; the trade is that Logic sends no MIDI, so
+      MIDI learn is VST3-hosts-only). Dev loop installs it to
+      `~/Library/Audio/Plug-Ins/Components`; the pkg gets a third component
+      into `/Library/Audio/Plug-Ins/Components`. auval passes (one expected
+      aufx/MIDI pairing warning); pluginval strictness 5 passes.
+  - [ ] Smoke it in Logic or GarageBand once (neither is installed here).
 - [ ] Host-tempo sync for looper/metronome (`AudioPlayHead`).
 - [ ] Cross-process locking for `known_plugins.xml` (currently atomic write,
       last-writer-wins).

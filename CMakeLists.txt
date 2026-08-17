@@ -455,14 +455,30 @@ else()
     set(PLECTRIFY_PLATFORM_PLUGIN_ARGS "")
 endif()
 
+# AU exists for Logic and GarageBand, the mainstream hosts that load no other
+# format; every other mac DAW takes the VST3. Windows has no AU at all.
+if (APPLE)
+    set(PLECTRIFY_PLUGIN_FORMATS VST3 AU)
+else()
+    set(PLECTRIFY_PLUGIN_FORMATS VST3)
+endif()
+
 juce_add_plugin(PlectrifyPlugin
     PRODUCT_NAME "Plectrify"
     COMPANY_NAME "Plectrify"
     VERSION      "${PROJECT_VERSION}"
-    FORMATS VST3
+    FORMATS ${PLECTRIFY_PLUGIN_FORMATS}
     PLUGIN_MANUFACTURER_CODE Plct
     PLUGIN_CODE Pfy1
     VST3_CATEGORIES Fx
+    # A plain effect (aufx), overriding JUCE's default for a MIDI-wanting
+    # plugin (aumf, "MIDI-controlled Effect"): Logic files aumf units outside
+    # the Audio FX menu on audio tracks — the one place a guitar rig must
+    # appear. The cost is that Logic delivers no MIDI to an aufx, so MIDI
+    # learn works in VST3 hosts and not there; discoverability wins. auval
+    # notes the pairing ("implements MusicDeviceMIDIEvent but is of type
+    # 'aufx'") and passes.
+    AU_MAIN_TYPE kAudioUnitType_Effect
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT TRUE              # rig/scene switching, MIDI learn — from the host track
     NEEDS_MIDI_OUTPUT FALSE

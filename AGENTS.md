@@ -713,10 +713,12 @@ open one, and how pluginval found a page that guessed standalone and applied
 the standalone's autosaved working rack over the DAW's session. Layout may
 safely default; where the session lives may not.
 
-**The plugin build** (`juce_add_plugin(PlectrifyPlugin FORMATS VST3)` — the
-same `PLECTRIFY_ENGINE_SOURCES` and one `plectrify_configure_target()`
-function, so the two targets cannot drift on definitions; `JUCE_ASIO` stays
-app-only) takes over the `AudioProcessorPlayer`'s job in
+**The plugin build** (`juce_add_plugin(PlectrifyPlugin ...)` — VST3
+everywhere, plus AU on macOS for Logic and GarageBand, the hosts that load no
+other format; the same `PLECTRIFY_ENGINE_SOURCES` and one
+`plectrify_configure_target()` function, so the targets cannot drift on
+definitions; `JUCE_ASIO` stays app-only) takes over the
+`AudioProcessorPlayer`'s job in
 `prepareToPlay`/`processBlock`, honouring the graph's suspension under its
 callback lock exactly as the player did. Buses are mono-or-stereo in, stereo
 out; the router always taps channel 0 (the DAW routes; the graph's render-time
@@ -725,11 +727,17 @@ clamp covers mono). The engine publishes graph latency on a diff every tick →
 standalone's no-op keeps its behaviour unchanged. Host MIDI is collected
 lock-free in `processBlock` and flushed to the page's `midiEvents` stream on
 the engine tick with `MidiInputManager`'s exact coalescing rule, so MIDI learn
-works unmodified. The plugin's WebView2 profile is `WebView2-Plugin`, never
-the app's — two processes must not share a profile lock. `moduleResourceDir()`
-in `AppPaths.h` is what lets `provideUiResource` and the bundled-plugin
-directory resolve inside either the exe's folder or a `.vst3` bundle's
-`Contents/Resources`.
+works unmodified — except in Logic, deliberately: the AU registers as a plain
+effect (`aufx`, not JUCE's default `aumf`) because Logic files
+"MIDI-controlled Effects" outside the Audio FX menu on audio tracks, the one
+place a guitar rig must appear, and an aufx receives no MIDI there.
+Discoverability wins; the trade is documented at the `AU_MAIN_TYPE` line in
+`CMakeLists.txt`, and auval warns about the pairing and passes. The plugin's
+WebView2 profile is `WebView2-Plugin`, never the app's — two processes must
+not share a profile lock. `moduleResourceDir()` in `AppPaths.h` is what lets
+`provideUiResource` and the bundled-plugin directory resolve inside either the
+exe's folder or a plugin bundle's `Contents/Resources` (`.vst3` and
+`.component` alike).
 
 **Host-saved state.** `getStateInformation` persists one JSON document
 (`PlectrifyEngine::currentHostState()`): the rack in `applyRigEntries`' shape,
@@ -753,8 +761,9 @@ feedback guard, tuner, looper and metronome all remain.
 Both release pipelines ship the plugin self-contained (`ui/` + the bundled NAM
 in `Contents/Resources`): the Windows installer behind a default-on task into
 `{commoncf64}\VST3`, the mac artifact as one installer pkg that always
-installs both builds — app to `/Applications`, sealed `Plectrify.vst3` to the
-machine-wide `/Library/Audio/Plug-Ins/VST3`. A pkg rather than a DMG because
+installs every build — app to `/Applications`, sealed `Plectrify.vst3` to the
+machine-wide `/Library/Audio/Plug-Ins/VST3`, sealed `Plectrify.component` to
+`/Library/Audio/Plug-Ins/Components`. A pkg rather than a DMG because
 that folder does not exist on a Mac that never had a VST3 installed (stock
 macOS creates `Components` and `HAL` under `/Library/Audio/Plug-Ins`, never
 `VST3`), so a disk image's drag target dangles on exactly the machines a first

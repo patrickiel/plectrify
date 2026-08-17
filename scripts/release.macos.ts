@@ -26,7 +26,7 @@
  * fails with "the original item can't be found" on exactly the machines a
  * first install meets. An installer package creates its destinations itself,
  * which is why a .pkg is what audio software actually ships as. One product
- * installs both builds, always: no component choice, so an app/plugin version
+ * installs every build, always: no component choice, so an app/plugin version
  * skew is unrepresentable — the same promise the Windows installer makes with
  * [InstallDelete], made here by never installing half.
  *
@@ -278,6 +278,7 @@ pnpm('Building UI', ['build'], { cwd: uiDir });
 configure(CONFIG);
 buildTarget(CONFIG, 'Plectrify');
 buildTarget(CONFIG, 'PlectrifyPlugin_VST3');
+buildTarget(CONFIG, 'PlectrifyPlugin_AU');
 if (!values['skip-tests']) {
   // A target missing from TEST_TARGETS is reported by ctest as "Not Run" rather
   // than as a pass, so that list carries one entry per add_test() in
@@ -293,12 +294,17 @@ if (!existsSync(join(app, 'Contents/MacOS/Plectrify'))) {
   fail(`release app was not produced at ${app}.`);
 }
 
-// The VST3's bundle, gated the same way as the app: on its Mach-O. (No dSYM
-// gate on either — the mac build produces no separate debug symbols yet;
+// The plugin bundles, gated the same way as the app: on their Mach-Os. (No
+// dSYM gate on any — the mac build produces no separate debug symbols yet;
 // Windows gates on PDBs because MSVC already emits them.)
-const vst3Built = join(buildDir(CONFIG), 'PlectrifyPlugin_artefacts', CONFIG, 'VST3', 'Plectrify.vst3');
+const pluginArtefacts = join(buildDir(CONFIG), 'PlectrifyPlugin_artefacts', CONFIG);
+const vst3Built = join(pluginArtefacts, 'VST3', 'Plectrify.vst3');
 if (!existsSync(join(vst3Built, 'Contents/MacOS/Plectrify'))) {
   fail(`release VST3 was not produced at ${vst3Built}.`);
+}
+const auBuilt = join(pluginArtefacts, 'AU', 'Plectrify.component');
+if (!existsSync(join(auBuilt, 'Contents/MacOS/Plectrify'))) {
+  fail(`release AU was not produced at ${auBuilt}.`);
 }
 
 // --- JUCE provenance gate ----------------------------------------------------
@@ -428,10 +434,11 @@ ${sourceArchiveHash ? `\nSHA-256: ${sourceArchiveHash}\n` : ''}
 THIRD-PARTY PLUGINS
 
 This offer covers Plectrify itself — the standalone application and the
-Plectrify VST3 plug-in this installer installs, which are two builds of the
-same AGPLv3 source in the archive above. (Both are built against Steinberg's
-VST3 SDK as bundled with JUCE, which Plectrify uses under the SDK's GPLv3
-option; see THIRD_PARTY_NOTICES.md.) Plectrify ships one third-party VST3
+Plectrify VST3 and Audio Unit plug-ins this installer installs, which are
+builds of the same AGPLv3 source in the archive above. (All of them host VST3
+plug-ins and are built against Steinberg's VST3 SDK as bundled with JUCE,
+which Plectrify uses under the SDK's GPLv3 option; see
+THIRD_PARTY_NOTICES.md.) Plectrify ships one third-party VST3
 plugin, Neural Amp Modeler, under the MIT licence; its source, the exact
 version, and where that binary came from are recorded in
 THIRD_PARTY_NOTICES.md. At your request
@@ -477,34 +484,39 @@ run('Verifying the signature', 'codesign', ['--verify', '--strict', '--verbose=2
 const outputDir = join(ROOT, 'artifacts');
 mkdirSync(outputDir, { recursive: true });
 
-// --- The VST3, made self-contained and sealed on its own ---------------------
+// --- The plugins, made self-contained and sealed on their own ----------------
 // A Release binary has no source-tree fallback (the PLECTRIFY_UI_DIST_DIR /
-// PLECTRIFY_BUNDLED_PLUGIN_DIR compile symbols are Debug-only), so the bundle
-// carries its own copy of the UI and the shipped plugins under
+// PLECTRIFY_BUNDLED_PLUGIN_DIR compile symbols are Debug-only), so each
+// bundle carries its own copy of the UI and the shipped plugins under
 // Contents/Resources — the layout moduleResourceDir() resolves. Same rule as
 // the Windows installer's vst3 staging: a plugin loaded by a DAW must not
 // depend on where, or whether, the standalone is installed.
 //
-// It gets a seal of its own, independent of the app's: the two bundles are
-// installed to different places and either can outlive the other. Explicit
+// Each gets a seal of its own, independent of the app's: the bundles are
+// installed to different places and any can outlive the others. Explicit
 // entitlements because this is a Ninja build — the plugin target's
 // HARDENED_RUNTIME_OPTIONS in CMakeLists.txt only take effect under the Xcode
 // generator — and the file's two entitlements are exactly that list.
 const pkgStage = join(outputDir, 'pkg-stage');
 rmSync(pkgStage, { recursive: true, force: true });
-mkdirSync(join(pkgStage, 'vst3'), { recursive: true });
 mkdirSync(join(pkgStage, 'app'), { recursive: true });
 
-const vst3Stage = join(pkgStage, 'vst3', 'Plectrify.vst3');
-run('Staging Plectrify.vst3', 'ditto', [vst3Built, vst3Stage]);
-cpSync(join(uiDir, 'dist'), join(vst3Stage, 'Contents/Resources/ui'), { recursive: true });
-stageBundledPlugins(join(vst3Stage, 'Contents/Resources/plugins'));
-run('Codesigning Plectrify.vst3', 'codesign', [
-  '--entitlements', join(ROOT, 'cmake/Plectrify.entitlements'),
-  ...signArgs(),
-  vst3Stage,
-]);
-run('Verifying the plugin signature', 'codesign', ['--verify', '--strict', '--verbose=2', vst3Stage]);
+for (const plugin of [
+  { built: vst3Built, root: 'vst3', bundle: 'Plectrify.vst3' },
+  { built: auBuilt, root: 'au', bundle: 'Plectrify.component' },
+]) {
+  const staged = join(pkgStage, plugin.root, plugin.bundle);
+  mkdirSync(join(pkgStage, plugin.root), { recursive: true });
+  run(`Staging ${plugin.bundle}`, 'ditto', [plugin.built, staged]);
+  cpSync(join(uiDir, 'dist'), join(staged, 'Contents/Resources/ui'), { recursive: true });
+  stageBundledPlugins(join(staged, 'Contents/Resources/plugins'));
+  run(`Codesigning ${plugin.bundle}`, 'codesign', [
+    '--entitlements', join(ROOT, 'cmake/Plectrify.entitlements'),
+    ...signArgs(),
+    staged,
+  ]);
+  run('Verifying the plugin signature', 'codesign', ['--verify', '--strict', '--verbose=2', staged]);
+}
 
 // --- The installer: one pkg, both builds, no choices -------------------------
 // A component plist per bundle, because pkgbuild's defaults are wrong for
@@ -534,6 +546,7 @@ function componentPlist(bundleName: string): string {
 }
 writeFileSync(join(pkgStage, 'app.plist'), componentPlist('Plectrify.app'));
 writeFileSync(join(pkgStage, 'vst3.plist'), componentPlist('Plectrify.vst3'));
+writeFileSync(join(pkgStage, 'au.plist'), componentPlist('Plectrify.component'));
 
 // The components are left unsigned — the signature that counts is the
 // product's, below — and carry no scripts, so notarization has nothing to
@@ -553,6 +566,14 @@ run('Packaging the VST3 component', 'pkgbuild', [
   '--version', version,
   '--install-location', '/Library/Audio/Plug-Ins/VST3',
   join(pkgStage, 'PlectrifyVst3.pkg'),
+]);
+run('Packaging the AU component', 'pkgbuild', [
+  '--root', join(pkgStage, 'au'),
+  '--component-plist', join(pkgStage, 'au.plist'),
+  '--identifier', 'io.github.patrickiel.plectrify.pkg.au',
+  '--version', version,
+  '--install-location', '/Library/Audio/Plug-Ins/Components',
+  join(pkgStage, 'PlectrifyAu.pkg'),
 ]);
 
 // customize="never": both components install, always — an app/plugin version
@@ -576,6 +597,7 @@ writeFileSync(
         <line choice="default">
             <line choice="app"/>
             <line choice="vst3"/>
+            <line choice="au"/>
         </line>
     </choices-outline>
     <choice id="default" title="Plectrify"/>
@@ -585,8 +607,12 @@ writeFileSync(
     <choice id="vst3" visible="false">
         <pkg-ref id="io.github.patrickiel.plectrify.pkg.vst3"/>
     </choice>
+    <choice id="au" visible="false">
+        <pkg-ref id="io.github.patrickiel.plectrify.pkg.au"/>
+    </choice>
     <pkg-ref id="io.github.patrickiel.plectrify.pkg.app" version="${version}">PlectrifyApp.pkg</pkg-ref>
     <pkg-ref id="io.github.patrickiel.plectrify.pkg.vst3" version="${version}">PlectrifyVst3.pkg</pkg-ref>
+    <pkg-ref id="io.github.patrickiel.plectrify.pkg.au" version="${version}">PlectrifyAu.pkg</pkg-ref>
 </installer-gui-script>
 `,
 );
