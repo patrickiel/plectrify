@@ -61,9 +61,14 @@ it is empty.
       VST3 installed; `customize="never"` makes version skew unrepresentable).
       Rehearsed with `--ad-hoc --no-upload`; payload layout, bundle seals and
       self-containment verified, pluginval passes on the staged bundle.
-  - [ ] Notarize for real once the Developer ID certificates exist (this
-        machine's keychain has neither Application nor Installer; the
-        notarytool flow is unchanged and covers the pkg's payload).
+  - [ ] Notarization is deliberately deferred, not pending: mac releases ship
+        with `pnpm release --ad-hoc` until the project earns the Apple
+        Developer membership (99 USD/year, no open-source exemption). The
+        cost is the pkg's one-time Open Anyway and the per-update microphone
+        re-prompt, both documented on the site. When bought: both Developer
+        ID certificates (Application + Installer) into the keychain, a
+        notarytool profile, drop `--ad-hoc` — the whole flow is already
+        wired and probed for.
   - [x] Ran the built pkg on a Mac with no `/Library/Audio/Plug-Ins/VST3`:
         both destinations landed, Installer created the folder, the installed
         standalone runs, and Ableton Live loads and plays the installed
