@@ -103,7 +103,9 @@ it is empty.
       `~/Library/Audio/Plug-Ins/Components`; the pkg gets a third component
       into `/Library/Audio/Plug-Ins/Components`. auval passes (one expected
       aufx/MIDI pairing warning); pluginval strictness 5 passes.
-  - [ ] Smoke it in Logic or GarageBand once (neither is installed here).
+  - [x] Smoked in GarageBand: appears under Audio Units on a track's plug-in
+        slot, loads, and the rig UI runs (fixed window size there — see the
+        GarageBand-resize note under Later).
 - [ ] Host-tempo sync for looper/metronome (`AudioPlayHead`).
 - [ ] Cross-process locking for `known_plugins.xml` (currently atomic write,
       last-writer-wins).
@@ -112,6 +114,13 @@ it is empty.
 - [ ] Feedback-guard slideout copy: note it is tuned for a live guitar input —
       sustained steady program material in a DAW can false-trip it (defaults
       off either way).
+- [ ] GarageBand cannot resize the editor window: its frame shows resize
+      cursors (the AU reports a resizable view) but the drag is never carried
+      out — a known GarageBand quirk; Logic, Live and the standalone all
+      resize fine. If it ever matters: an in-UI size control in plugin mode,
+      driving `AudioProcessorEditor::setSize` over the bridge — programmatic
+      resizes work even in GarageBand, which is why some vendors ship a
+      window-size menu. New bridge surface, so deliberately not built yet.
 - [ ] macOS debug symbols: the Release build emits no dSYM for the app or the
       plugin (no symbolication equivalent of the archived Windows PDBs) —
       add `-g` + dsymutil to the Release build and archive the dSYMs beside
