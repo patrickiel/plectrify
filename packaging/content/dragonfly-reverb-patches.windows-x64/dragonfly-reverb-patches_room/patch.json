@@ -1,0 +1,42 @@
+{
+  "name": "Small Room",
+  "pluginName": "Dragonfly Room Reverb",
+  "displayName": "Small Room",
+  "color": "#22c55e",
+  "icon": "reverb",
+  "texture": "tolex",
+  "knobs": [
+    {
+      "paramIndex": 2,
+      "label": "Dry",
+      "pos": 0
+    },
+    {
+      "paramIndex": 5,
+      "label": "Late",
+      "pos": 1
+    },
+    {
+      "paramIndex": 6,
+      "label": "Size",
+      "pos": 2
+    },
+    {
+      "paramIndex": 9,
+      "label": "Decay",
+      "pos": 3
+    },
+    {
+      "paramIndex": 8,
+      "label": "Predelay",
+      "pos": 4
+    },
+    {
+      "paramIndex": 13,
+      "label": "High Cut",
+      "pos": 5
+    }
+  ],
+  "pluginVersion": "3.2.10",
+  "state": "VkMyIUsCAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjM2My5lOEVZdlkxV3lRV1h6VTFXaFUxWW80MVdlQS5ieFUxYmtRRy5NVUZZb1VXYWZMRGFrRWxiZkgwYXUwRi5lOEVZdlkxV3lRV1h6VTFXazRGWWU4RS5lOEVZdlkxV3ZFbGJnMFZZelVsYnk4a1hrY1ZadDgwVy5QbGI0OEVha1lXWXJBLk52LlBZZ0lHYTQ4RWFrWVdZckFQTDAzQkx2LkNMdi5TTjBMeU0uVFZYeHdWZGVNV1l0UUYueC5DLnJFRmNrOEVha1lXWXJBUEwzLnZib29XWS5EQ00uYldaalFHWi5EQ0x2Li5ieFVGWWt3Vlg0QVBMdi4uWWtNVlg0QS5MdGZTTndqU040alNNNGpDTTEuLllvWWxZME1XWS5iQ0wuTEdibzRGLnYzQk52LkNMdi5DTHdEU054REMuMkVsYWpVbGIuUENMLmpsYWVnVlptZzFXaVVHYy5EaUx4VENMLlRWWHh3VmRlUVZYc0FHLncuQ0x2LkMuckVGY2s4RVlnMEZiLmpDTXYuQy5yODFjZUkxYXVNR2MuVENMLkgxYXVNR2NlWWxia0VHLjEuQ0wuamxhZXcxYTI4MFgwUUcuei52V2VRRmJsOEViZ0lXWHNVRmNrSTJiZVVsYWo4MFcuM08uPC9JQ29tcG9uZW50PjwvVlNUM1BsdWdpblN0YXRlPgA="
+}

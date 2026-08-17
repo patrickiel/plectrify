@@ -1,0 +1,42 @@
+{
+  "name": "Concert Hall",
+  "pluginName": "Dragonfly Hall Reverb",
+  "displayName": "Concert Hall",
+  "color": "#8b5cf6",
+  "icon": "reverb",
+  "texture": "carbon",
+  "knobs": [
+    {
+      "paramIndex": 2,
+      "label": "Dry",
+      "pos": 0
+    },
+    {
+      "paramIndex": 4,
+      "label": "Late",
+      "pos": 1
+    },
+    {
+      "paramIndex": 5,
+      "label": "Size",
+      "pos": 2
+    },
+    {
+      "paramIndex": 17,
+      "label": "Decay",
+      "pos": 3
+    },
+    {
+      "paramIndex": 7,
+      "label": "Predelay",
+      "pos": 4
+    },
+    {
+      "paramIndex": 12,
+      "label": "High Cut",
+      "pos": 5
+    }
+  ],
+  "pluginVersion": "3.2.10",
+  "state": "VkMyIUICAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjM1Ni5lOEVZdlkxV3lRV1h6VTFXaFUxWW80MVdlQS5ieFUxYmtRRy5TMFZYcndGSEN3VllnSUdISEVGYXJBdldlUUZibDgwYnpFRmNrOFVZdFExV2VBdldlUUZibDhFYmdJV1hzVUZja0kyYmVJVllta2xhZThFLmpJV2Rld1ZZMVVGYS5mQ0wuVFZYeHdWZGV3VlkxVUZhLkRpTC52Vlh6VTFXclVsY2t3Ri53ZkMueWtsZGtBZkwyM1JNLmJXWmpRR1ouRENMdi4uWWt3Vlg0QWZMdi4uWW9ZbFkwTVdZLmpDTC52MWEyODBYMFFHLnouLmF1YzJXMzhGLjAuQ0wudjFhMjhVYTB3RmMuRGlLeGpTTjRqU040VGlMeUhDLm5rMVluODBYMFFHLjIuQ0x2Li5ab2NGWmVnMmEuVFNNdi5DLm5rMVluOFVhMHdGYy4uaUswLnZidmtsYS5MaUt4alNONGpTTjRUaUx5SEMuMkVsYWpVbGIuRFNNLlBWWWlFVmQuSGlLdmJTTjRqU040SHlMMkRDLmtFbGJyazJXeVVsYWpBZkx2LlBhdVFWY3JFRmNvOGxhLkRTTS43MFdqQW1ZZUFXWHhFVmFrUVdZeE0yV2s0RlllOEUuOUMuPC9JQ29tcG9uZW50PjwvVlNUM1BsdWdpblN0YXRlPgA="
+}

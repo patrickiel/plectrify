@@ -356,17 +356,23 @@
     {
       "id": "starter",
       "name": "Starter bundle",
-      "description": "The usual pedals in one go: drive, chorus, delay, and reverb.",
-      "version": "11",
+      "description": "The usual pedals in one go: drive, chorus, delay, and reverb - each with a patch to start from.",
+      "version": "12",
       "_selectionNote": "A hand-picked pedalboard, in signal-chain order: PeakEater is drive, Lupex Chorus is modulation, Lupex Delay and QDelay are the two delay flavours (dark analog repeats vs a clean dual delay), Dragonfly is the ambience reverb. ON macOS ONLY QDELAY AND DRAGONFLY ARE OFFERED - PeakEater and both Lupex pedals are Windows-only - and that is accepted: a bundle is one list of ids with no per-platform form, and the panel skips unavailable ids rather than queueing installs that cannot succeed. A bundle is one list of ids with no per-platform form, and it should stay that way: two lists would drift, and a bundle that quietly means something different per OS is worse than one that is visibly incomplete - the panel skips unavailable ids rather than queueing installs that cannot succeed.",
       "_capturesNote": "Neural Amp Modeler is no longer here, and not because it stopped mattering: it ships inside Plectrify now (packaging/bundled-plugins.json). Every TONE3000 tone is a capture that loads into it, so a catalogue of captures with nothing to play them in is not a product - and a plugin the app assumes is present has no business being one the user might not have installed. Nothing in the catalogue is responsible for making the app audible any more; this bundle is effects and nothing else.",
       "packageIds": [
         "peakeater",
+        "peakeater-patches",
         "lupex-chorus",
+        "lupex-chorus-patches",
         "lupex-delay",
+        "lupex-delay-patches",
         "qdelay",
-        "dragonfly-reverb"
-      ]
+        "qdelay-patches",
+        "dragonfly-reverb",
+        "dragonfly-reverb-patches"
+      ],
+      "_patchesNote": "EACH PEDAL SHIPS WITH A PATCH, listed beside it rather than appended, so the ids still read in signal-chain order. The patch packs are Windows-only because three of the five plugins are, and because a patch bakes its install root into the saved tone and has only been authored against the Windows root so far - so macOS gets qdelay and dragonfly-reverb alone, exactly as it did before. Listing a patch here is belt and braces: each names its plugin in dependsOn, so installing the pack alone would pull the plugin in anyway."
     }
   ],
   "_packagesComment": [
@@ -523,6 +529,39 @@
       "_includeNote": "The archive is a peakeater_artefacts/Release/ tree holding CLAP and LV2 builds beside the VST3 - roughly two thirds of it. The include patterns match only .vst3 paths, so both are dropped at extraction; that, not a truncated download, is why the installed plugin is about a third of what came down. The bundle itself is nested at Release/VST3/peakeater.vst3/, which '**/' handles, so no per-platform include is needed.",
       "_licenceNote": "LICENSE.md is the bare GPLv3 text with no 'or any later version' offer from the project itself, so GPL-3.0-only - the same reading as dragonfly-reverb, reev-r and open-spatial-delay. selfHosted is false, so the project conveys its own binary and section 6 rests with it.",
       "_rotNote": "UPSTREAM IS DORMANT: v0.8.2 was cut in August 2023 and nothing has been pushed since. That is not a reason to drop the entry - the pin is an immutable release tag and the plugin works - but expect check-updates to report it current forever, and do not read a long-unchanged version as a stale pin here."
+    },
+    {
+      "id": "peakeater-patches",
+      "kind": "content",
+      "category": [
+        "Effects",
+        "Drive & distortion"
+      ],
+      "tags": [
+        "Distortion",
+        "Patches"
+      ],
+      "name": "PeakEater patches",
+      "purpose": "Soft Clip - a cubic clipper set up as a guitar drive, six knobs mapped",
+      "version": "1",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+      "projectUrl": "https://plectrify.com",
+      "installDir": "patches",
+      "preserveStructure": true,
+      "dependsOn": "peakeater",
+      "include": [
+        "**/patch.json"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/peakeater-patches/plectrify-peakeater-patches-1-windows-x64.zip",
+          "sha256": "2a39c0b5f347ae330a444501b14f2aad34cf4470d07f9b79ba5c71ac42ce5418",
+          "downloadBytes": 1391,
+          "selfHosted": true
+        }
+      },
+      "_macNote": "Windows-only because PeakEater is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not."
     },
     {
       "id": "fire",
@@ -697,6 +736,39 @@
       "_versionNote": "v0.1.0 is the project's first and so far only release, cut the same day as Lupex Delay v1.1.0. A 0.x version is the author's own numbering, not a beta channel; there is no other tag to prefer."
     },
     {
+      "id": "lupex-chorus-patches",
+      "kind": "content",
+      "category": [
+        "Effects",
+        "Modulation"
+      ],
+      "tags": [
+        "Modulation",
+        "Patches"
+      ],
+      "name": "Lupex Chorus patches",
+      "purpose": "Wide Shimmer - a slow, shallow BBD chorus, five knobs mapped",
+      "version": "1",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+      "projectUrl": "https://plectrify.com",
+      "installDir": "patches",
+      "preserveStructure": true,
+      "dependsOn": "lupex-chorus",
+      "include": [
+        "**/patch.json"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-1-windows-x64.zip",
+          "sha256": "5e1bf9e503f61de8aeb460cb52dacd2ec0a7e4123cc33237fef2c6bcdeac9364",
+          "downloadBytes": 1291,
+          "selfHosted": true
+        }
+      },
+      "_macNote": "Windows-only because Lupex Chorus is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not."
+    },
+    {
       "id": "uhhyou-ordinary-phaser",
       "kind": "plugin",
       "category": [
@@ -795,6 +867,39 @@
       "_versionNote": "The asset filename carries no version - every tag ships 'Lupex-Windows-VST3.zip' - so only the tag in the URL path distinguishes releases. That is still immutable per tag, and check-updates compares by asset URL, so a new tag reads as a new URL correctly. It does mean a downloaded file tells you nothing about which release it is; take the version from the tag."
     },
     {
+      "id": "lupex-delay-patches",
+      "kind": "content",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay",
+        "Patches"
+      ],
+      "name": "Lupex Delay patches",
+      "purpose": "Dark Repeats - a 400 ms analog delay that sits behind the note, five knobs mapped",
+      "version": "1",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+      "projectUrl": "https://plectrify.com",
+      "installDir": "patches",
+      "preserveStructure": true,
+      "dependsOn": "lupex-delay",
+      "include": [
+        "**/patch.json"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-delay-patches/plectrify-lupex-delay-patches-1-windows-x64.zip",
+          "sha256": "26e39d388cfb2e89346f0a74653ee7421146c3680daef02414b04d971afcfe09",
+          "downloadBytes": 1269,
+          "selfHosted": true
+        }
+      },
+      "_macNote": "Windows-only because Lupex Delay is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not."
+    },
+    {
       "id": "qdelay",
       "kind": "plugin",
       "category": [
@@ -826,6 +931,39 @@
           "downloadBytes": 3341979
         }
       }
+    },
+    {
+      "id": "qdelay-patches",
+      "kind": "content",
+      "category": [
+        "Effects",
+        "Delay"
+      ],
+      "tags": [
+        "Delay",
+        "Patches"
+      ],
+      "name": "QDelay patches",
+      "purpose": "Dotted Eighth - a dotted-eighth dual delay with diffusion and movement, six knobs mapped",
+      "version": "1",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+      "projectUrl": "https://plectrify.com",
+      "installDir": "patches",
+      "preserveStructure": true,
+      "dependsOn": "qdelay",
+      "include": [
+        "**/patch.json"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-1-windows-x64.zip",
+          "sha256": "1ac03c02976a8b1e0d6d9c1fe2b037909c86f4280de965acabf3c693ee3c4f1d",
+          "downloadBytes": 3415,
+          "selfHosted": true
+        }
+      },
+      "_macNote": "QDelay is offered on macOS and this pack is not, yet. A patch bakes its install root's absolute path into the saved tone, so each platform is authored separately, on that platform - hence content/<id>.macos-arm64/, saved out of a Mac. A pack with no folder for a platform is simply not offered there."
     },
     {
       "id": "sirial",
@@ -1036,6 +1174,40 @@
       },
       "_macNote": "THE MAC ASSET IS A RE-HOST OF UPSTREAM'S OWN 3.2.10 UNIVERSAL DMG, not a build of ours and not another release. Release 3.2.10 ships mac only as .dmg images (universal and intel), which cannot back an asset url - the app will not mount a disk image on a user's behalf - so `host-plugin` mounted it here as plain data, expanded the dragonfly-reverb-AudioPlugins.pkg inside it, and re-zipped the four VST3 bundles unmodified (see PROVENANCE-macos-arm64.txt beside the archive, which records the dmg's own sha256). Nothing from the payload was executed. Note what was NOT done: release 3.2.7 ships dragonfly-reverb-mac-universal-3.2.7.zip, which would unzip perfectly well, and pinning it would have been wrong - one `version` covers every platform's payload, so this entry would say 3.2.10 while handing Macs a 3.2.7 binary, and every update check, install marker and support question downstream would inherit that lie. The universal dmg carries x86_64 and arm64; only the arm64 slice matters here and it is checked with lipo before archiving, which is why the asset is keyed macos-arm64 rather than by what else is in the binary.",
       "_hostingNote": "THE FIRST ENTRY SERVED FROM BOTH PLACES AT ONCE, which is what `selfHosted` sitting on the ASSET is for: mac comes from our bucket, Windows straight from the project's release page, and each asset says which. WHAT FOLLOWS FROM THE MAC HALF: Plectrify is the distributor of that binary, so GPL-3.0 section 6 attaches to us and the corresponding source must stay available for as long as we offer it - one self-hosted platform is enough for `validate` to demand a sourceUrl, which is the rule that makes a half-mirrored entry safe. sourceUrl names upstream's own 3.2.10 src.tar.xz, which section 6d permits (a different server, with clear directions next to the object code), but the obligation does not move with the file: if that asset ever disappears, mirror it into our bucket beside the archive and re-point sourceUrl. Do not simply drop the field. Four bundles, one package: Hall, Room, Plate and Early Reflections install together, exactly as they do from the Windows zip."
+    },
+    {
+      "id": "dragonfly-reverb-patches",
+      "kind": "content",
+      "category": [
+        "Effects",
+        "Reverb"
+      ],
+      "tags": [
+        "Reverb",
+        "Patches"
+      ],
+      "name": "Dragonfly Reverb patches",
+      "purpose": "One patch for each of the four reverbs - hall, room, plate and early reflections",
+      "version": "1",
+      "licenseId": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
+      "projectUrl": "https://plectrify.com",
+      "installDir": "patches",
+      "preserveStructure": true,
+      "dependsOn": "dragonfly-reverb",
+      "include": [
+        "**/patch.json"
+      ],
+      "assets": {
+        "windows-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-1-windows-x64.zip",
+          "sha256": "d6b16363c7ecb69093df8e8179f23354398a617e0b6e63db90dcbef44082648b",
+          "downloadBytes": 4048,
+          "selfHosted": true
+        }
+      },
+      "_macNote": "Dragonfly Reverb is offered on macOS and this pack is not, yet. A patch bakes its install root's absolute path into the saved tone, so each platform is authored separately, on that platform - hence content/<id>.macos-arm64/, saved out of a Mac. A pack with no folder for a platform is simply not offered there.",
+      "_shapeNote": "Four patches in one package, because dragonfly-reverb installs four plugins - Hall, Room, Plate and Early Reflections are separate VST3s, and a patch names one plugin. So the source folder holds no patch.json of its own: one <packageId>_<name> folder per patch instead, shipped as it stands rather than wrapped. The underscore is what files a pack patch under its package in the drawer (drawerGroups.isPatchOfPackage), so no other name will do."
     },
     {
       "id": "cloud-reverb",
