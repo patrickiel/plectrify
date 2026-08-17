@@ -93,8 +93,8 @@ export const DOWNLOADS: Download[] = [
     platform: 'macos',
     os: 'macOS',
     requirement: 'Apple Silicon, macOS 13.3+',
-    file: `${ASSET_BASE}-${VERSION}-macos-arm64.dmg`,
-    url: asset(`${ASSET_BASE}-${VERSION}-macos-arm64.dmg`),
+    file: `${ASSET_BASE}-${VERSION}-macos-arm64.pkg`,
+    url: asset(`${ASSET_BASE}-${VERSION}-macos-arm64.pkg`),
   },
 ];
 

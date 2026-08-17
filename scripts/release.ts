@@ -11,7 +11,7 @@
  * So this dispatches on platform, exactly as run.ts does for `pnpm app`:
  *
  *   Windows   pnpm release           step 1 — build, tag, publish the pre-release
- *   macOS     pnpm release           step 2 — build, sign, notarize, upload the DMG
+ *   macOS     pnpm release           step 2 — build, sign, notarize, upload the installer pkg
  *   Windows   pnpm release:promote   step 3 — flip the verified release to latest
  *
  * Promotion stays a command of its own, and deliberately so: steps 1 and 2
@@ -66,11 +66,14 @@ if (process.platform === 'win32') {
   await import('./release.windows.ts');
 } else if (process.platform === 'darwin') {
   // The banner names what this run will actually produce: --ad-hoc publishes a
-  // DMG that is signed but not notarized, and saying "notarized" there would be
-  // the one line of output most worth trusting and least true.
+  // pkg whose bundles are ad-hoc signed but which is itself unsigned and not
+  // notarized, and saying "notarized" there would be the one line of output
+  // most worth trusting and least true.
   announce(
     'Release step 2 of 3',
-    args.includes('--ad-hoc') ? 'ad-hoc signed macOS DMG (not notarized)' : 'signed, notarized macOS DMG',
+    args.includes('--ad-hoc')
+      ? 'macOS installer pkg, ad-hoc signed bundles (pkg unsigned, not notarized)'
+      : 'signed, notarized macOS installer pkg',
   );
   console.log('Next: pnpm release:promote on Windows, once you have tested the build.\n');
 

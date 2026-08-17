@@ -68,11 +68,13 @@ git checkout vX.Y.Z
 pnpm release
 ```
 
-This builds, signs with the hardened runtime and `cmake/Plectrify.entitlements`,
-packages a DMG, notarizes it, staples, checks it with `spctl`, and uploads the
-DMG, its checksum and `release-manifest-macos.json` onto the existing `vX.Y.Z`
-release. Re-running replaces the mac assets without touching the Windows ones or
-the notes.
+This builds, signs the app and the VST3 with the hardened runtime and
+`cmake/Plectrify.entitlements`, packages both into one installer pkg (signed
+with the Developer ID *Installer* certificate — a separate certificate type
+from the Application one), notarizes it, staples, checks it with `spctl`, and
+uploads the pkg, its checksum and `release-manifest-macos.json` onto the
+existing `vX.Y.Z` release. Re-running replaces the mac assets without touching
+the Windows ones or the notes.
 
 Unlike the Windows side, there is no unsigned local half of this script:
 `codesign` runs unconditionally, so **every** path through `scripts/release.macos.ts`
@@ -87,22 +89,25 @@ pnpm release --ad-hoc
 ```
 
 Developer ID signing and notarization both require a paid membership (99 USD a
-year); there is no free tier and no open-source exemption. `--ad-hoc` signs with
-the ad-hoc identity, skips notarization and the `spctl` assessment, and is
+year); there is no free tier and no open-source exemption. `--ad-hoc` signs the app and
+the VST3 with the ad-hoc identity, leaves the pkg unsigned (installer products
+have no ad-hoc mode), skips notarization and the `spctl` assessment, and is
 allowed to upload anyway — the one publishable mode that needs no Apple account.
 It also drops the hardened runtime, deliberately: the runtime is a *requirement
 of* notarization rather than a benefit on its own, and leaving it on would
 enforce library validation against third-party VST3s signed by other people,
 which is the exact thing `disable-library-validation` exists to undo.
 
-The cost falls on whoever downloads it. A browser marks the DMG quarantined,
-and macOS refuses a quarantined ad-hoc app with the words *"Plectrify is damaged
-and can't be opened"* — so `site/src/routes/docs/opening-on-macos/+page.md`
-exists to be linked from the release notes, and the download buttons point at it
-on every OS but Windows. Channels that set no quarantine flag (a Homebrew tap,
-`curl`, `git`) are unaffected. One further consequence: TCC keys microphone
-permission to an ad-hoc app's exact build, so **every update asks for the
-microphone again**.
+The cost falls on whoever downloads it. A browser marks the pkg quarantined,
+and macOS refuses to open a quarantined unsigned installer (the wording varies
+by macOS version — "unidentified developer", "could not verify", "damaged") —
+so `site/src/routes/docs/opening-on-macos/+page.md` exists to be linked from
+the release notes, and the download buttons point at it on every OS but
+Windows. The gate is on the pkg alone: Installer does not pass the quarantine
+flag on to what it installs, so the installed app and plug-in open normally.
+Channels that set no quarantine flag (a Homebrew tap, `curl`, `git`) are
+unaffected. One further consequence: TCC keys microphone permission to an
+ad-hoc app's exact build, so **every update asks for the microphone again**.
 
 `release-manifest-macos.json` records which mode produced the artifact —
 `signature: "ad-hoc" | "developer-id"` and `notarized: true | false`, two fields
@@ -117,7 +122,7 @@ error rather than failing at the first `codesign` twenty minutes into a build.
 `pnpm release --no-upload` is still worth a run before the real one if you want
 to exercise signing and notarization without publishing — but it is a test of
 the process, not a dry run of the artifact: signing timestamps make every build
-unique, so the real run produces a different DMG and a rehearsal must never be
+unique, so the real run produces a different pkg and a rehearsal must never be
 uploaded by hand.
 
 ### 5. Verify the release as a whole
@@ -145,7 +150,7 @@ pnpm release:promote
 
 Clears the pre-release flag and marks the release **latest**, which is what the
 in-app update check reads. It does not rebuild and does not touch the notes, and
-it refuses until the release carries the macOS DMG, its checksum and its
+it refuses until the release carries the macOS pkg, its checksum and its
 manifest — so "latest" never means Windows only.
 
 It then points plectrify.com at the new version and deploys it: `VERSION` in

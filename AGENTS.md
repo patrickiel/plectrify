@@ -55,7 +55,7 @@ scripts/              # root dev/release tooling — every entry point `pnpm` ru
   run.windows.ts      # Windows dev loop; run.macos.ts is its mac twin
   release.ts          # `pnpm release` — dispatches by platform; `pnpm release:promote` is step 3
   release.windows.ts  # Windows release pipeline (Inno Setup installer)
-  release.macos.ts    # macOS release pipeline (signed/notarized DMG)
+  release.macos.ts    # macOS release pipeline (signed/notarized installer pkg)
   shared.ts           # helpers: OS-neutral (shared.ts) and per-OS (windows.ts, macos.ts)
 Source/               # C++ — vertical slices, each folder is on the include path
   app/                # Main.cpp (app entry), MainComponent (standalone shell),
@@ -752,14 +752,18 @@ feedback guard, tuner, looper and metronome all remain.
 
 Both release pipelines ship the plugin self-contained (`ui/` + the bundled NAM
 in `Contents/Resources`): the Windows installer behind a default-on task into
-`{commoncf64}\VST3`, the mac DMG as a sealed `Plectrify.vst3` beside the app
-with a symlink to the machine-wide `/Library/Audio/Plug-Ins/VST3` (a per-user
-`~/Library` symlink is impossible — a symlink target is a literal path, never
-tilde-expanded — and dropping the bundle on the machine-wide one costs a
-Finder auth prompt, not an elevated installer). The Steinberg VST3 SDK notice
-electing GPLv3 is in `THIRD_PARTY_NOTICES.md`, ASIO-notice pattern. Still to
-come: out-of-process scanning — Rescan inside a DAW still loads plugins
-in-process, where a crashing plugin takes the host down.
+`{commoncf64}\VST3`, the mac artifact as one installer pkg that always
+installs both builds — app to `/Applications`, sealed `Plectrify.vst3` to the
+machine-wide `/Library/Audio/Plug-Ins/VST3`. A pkg rather than a DMG because
+that folder does not exist on a Mac that never had a VST3 installed (stock
+macOS creates `Components` and `HAL` under `/Library/Audio/Plug-Ins`, never
+`VST3`), so a disk image's drag target dangles on exactly the machines a first
+install meets; `customize="never"` makes an app/plugin version skew
+unrepresentable, the Windows `[InstallDelete]` promise by other means. The
+Steinberg VST3 SDK notice electing GPLv3 is in `THIRD_PARTY_NOTICES.md`,
+ASIO-notice pattern. Still to come: out-of-process scanning — Rescan inside a
+DAW still loads plugins in-process, where a crashing plugin takes the host
+down.
 
 ### UI ↔ engine contract
 

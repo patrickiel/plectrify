@@ -141,8 +141,8 @@ if (values.promote) {
   })();
   const published = new Set(releaseAssets.map((asset) => asset.name));
   const macArtifacts = [
-    `Plectrify-${version}-macos-arm64.dmg`,
-    `Plectrify-${version}-macos-arm64.dmg.sha256`,
+    `Plectrify-${version}-macos-arm64.pkg`,
+    `Plectrify-${version}-macos-arm64.pkg.sha256`,
     'release-manifest-macos.json',
   ];
   const missing = macArtifacts.filter((name) => !published.has(name));

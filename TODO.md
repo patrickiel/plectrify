@@ -53,15 +53,18 @@ it is empty.
 - [x] macOS release: `release.macos.ts` builds `PlectrifyPlugin_VST3`, gates
       on its Mach-O, stages UI+NAM into `Contents/Resources`, seals the
       `.vst3` with its own hardened-runtime signature (explicit entitlements —
-      Ninja never applies the CMake `HARDENED_RUNTIME_OPTIONS`), and builds
-      the DMG from a staged folder: app + plugin + `Applications` symlink +
-      `VST3` symlink to the machine-wide `/Library/Audio/Plug-Ins/VST3` (a
-      `~/Library` symlink is impossible — targets are literal paths).
-      Rehearsed with `--ad-hoc --no-upload`; DMG layout, plugin seal and
+      Ninja never applies the CMake `HARDENED_RUNTIME_OPTIONS`), and packages
+      one installer pkg that always installs both builds (a DMG's drag target
+      for `/Library/Audio/Plug-Ins/VST3` dangles on a Mac that never had a
+      VST3 installed; `customize="never"` makes version skew unrepresentable).
+      Rehearsed with `--ad-hoc --no-upload`; payload layout, bundle seals and
       self-containment verified, pluginval passes on the staged bundle.
-  - [ ] Notarize for real once a Developer ID certificate exists (this
-        machine's keychain has none; the notarytool flow is unchanged and
-        covers the nested `.vst3`).
+  - [ ] Notarize for real once the Developer ID certificates exist (this
+        machine's keychain has neither Application nor Installer; the
+        notarytool flow is unchanged and covers the pkg's payload).
+  - [ ] Run the built pkg once on a clean-ish Mac: both destinations land,
+        `/Library/Audio/Plug-Ins/VST3` is created where absent, and a DAW
+        loads the installed Release plugin.
 - [x] Licensing notices: `## Steinberg VST3 SDK` section in
       `THIRD_PARTY_NOTICES.md` electing GPLv3 (ASIO-notice pattern, VST
       trademark line included); both SOURCE_OFFER texts updated; the
@@ -90,7 +93,7 @@ it is empty.
 - [ ] macOS debug symbols: the Release build emits no dSYM for the app or the
       plugin (no symbolication equivalent of the archived Windows PDBs) —
       add `-g` + dsymutil to the Release build and archive the dSYMs beside
-      the DMG if a mac crash ever needs mapping.
+      the pkg if a mac crash ever needs mapping.
 
 ## Housekeeping
 

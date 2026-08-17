@@ -1,21 +1,19 @@
 ---
 title: Opening it on macOS
-description: macOS may refuse the first launch and call Plectrify damaged. It is not; the build is unnotarized. Here is what that means and the two ways past it.
+description: macOS may refuse to open the Plectrify installer. Nothing is wrong with it; the build is unnotarized. Here is what that means and the two ways past it.
 ---
 
 ## What you will see
 
-The first time you open Plectrify on macOS, the system may refuse it:
-
-```
-"Plectrify" is damaged and can't be opened.
-You should move it to the Trash.
-```
+When you open the downloaded `Plectrify-<version>-macos-arm64.pkg`, macOS may refuse it.
+The exact wording depends on your macOS version — "from an unidentified developer",
+"Apple could not verify that it is free of malware", or even "damaged" — but they all mean
+the same thing.
 
 Nothing is damaged, and nothing is wrong with your download. That wording is what macOS
-says about **any** app it cannot check with Apple, whatever the reason, and it is the same
-sentence a genuinely corrupt file would get, which is why it is worth explaining rather than
-apologising for.
+says about **any** installer it cannot check with Apple, whatever the reason, and it is the
+same sentence a genuinely corrupt file would get, which is why it is worth explaining rather
+than apologising for.
 
 ## Why
 
@@ -24,8 +22,8 @@ membership (currently 99 USD a year) and submits each build to Apple to be _nota
 There is no free tier and no exemption for open-source projects.
 
 Plectrify is written by one person and given away under the AGPL. Until there is a user base
-that justifies the yearly fee, the macOS build is signed but not notarized, so Gatekeeper has
-nothing from Apple to check it against and refuses it by default.
+that justifies the yearly fee, the macOS build is not notarized, so Gatekeeper has nothing
+from Apple to check it against and refuses it by default.
 
 You can decide for yourself whether that is worth trusting. Two things help more than our
 say-so: the [complete source](https://github.com/patrickiel/plectrify) is published for every
@@ -33,47 +31,48 @@ release, and every download is published with a SHA-256 checksum you can verify 
 
 ## Opening it anyway
 
-Drag Plectrify to your **Applications** folder first. Do this before either method, because
-clearing the quarantine flag applies to where the app is _now_, and moving it afterwards is
-one more step to repeat.
+The gate is on the installer alone. Once it has run, the app and the VST3 plug-in it
+installed open normally — the quarantine flag belongs to the file your browser saved, and
+the installer does not pass it on to what it installs.
 
 ### If macOS offers "Open Anyway"
 
-1. Open Plectrify once and let it be refused. Click **Done** or **Cancel**.
+1. Open the `.pkg` once and let it be refused. Click **Done** or **Cancel**.
 2. Open **System Settings → Privacy & Security**.
-3. Scroll to the **Security** section. A line names Plectrify as having been blocked.
+3. Scroll to the **Security** section. A line names the installer as having been blocked.
 4. Click **Open Anyway**, and confirm with your password or Touch ID.
-5. Open Plectrify again. It launches, and never asks again.
+5. The installer opens; click through it. You will not be asked again.
 
 You have to try to open it first: the button appears only after macOS has blocked something,
 and it clears within the hour, so do the two steps together.
 
-> On macOS 15 (Sequoia) and later, right-clicking the app and choosing **Open** no longer
+> On macOS 15 (Sequoia) and later, right-clicking a file and choosing **Open** no longer
 > works as a shortcut for this. It was the standard advice for years and is still repeated all
 > over the web; ignore it and use System Settings.
 
-### If it says "damaged", or there is no Open Anyway button
+### If there is no Open Anyway button
 
 Then macOS is refusing before it offers you the choice, and the quarantine flag has to be
 removed directly. Open **Terminal** (Applications → Utilities) and paste:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/Plectrify.app
+xattr -d com.apple.quarantine ~/Downloads/Plectrify-*.pkg
 ```
 
-Press Return. There is no output, and that means it worked. Open Plectrify normally afterwards.
+Press Return. There is no output, and that means it worked. Open the installer normally
+afterwards.
 
 That command removes the "downloaded from the internet" marker macOS attaches to files
-your browser saves. It changes nothing inside the app and affects no other software.
+your browser saves. It changes nothing inside the installer and affects no other software.
 
 ## Verifying your download first
 
 If you would rather check the file before running any of this, every release publishes a
-checksum beside the disk image. Download `Plectrify-<version>-macos-arm64.dmg.sha256` from
+checksum beside the installer. Download `Plectrify-<version>-macos-arm64.pkg.sha256` from
 the [releases page](https://github.com/patrickiel/plectrify/releases), then run:
 
 ```sh
-shasum -a 256 ~/Downloads/Plectrify-<version>-macos-arm64.dmg
+shasum -a 256 ~/Downloads/Plectrify-<version>-macos-arm64.pkg
 ```
 
 Compare the long hex string it prints with the one in the `.sha256` file. If they match, the

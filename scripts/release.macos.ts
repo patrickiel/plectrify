@@ -14,33 +14,45 @@
  * THE MAC ARTIFACT RIDES THE WINDOWS RELEASE. Step 1 on the Windows box creates
  * the tag, the GitHub pre-release, and the AGPL corresponding-source archive;
  * this script verifies it is building the very same commit, then uploads
- * Plectrify-<version>-macos-arm64.dmg beside the Windows installer. Update
+ * Plectrify-<version>-macos-arm64.pkg beside the Windows installer. Update
  * discovery reads only the release tag, so a second asset needs no app change.
  * Run order per release: pnpm release (Windows box) → pnpm release (Mac) →
  * pnpm release:promote (Windows box).
  *
+ * THE ARTIFACT IS AN INSTALLER PACKAGE, NOT A DISK IMAGE. A DMG can only offer
+ * drag targets, and the plugin's — /Library/Audio/Plug-Ins/VST3 — does not
+ * exist on a Mac that has never had a VST3 installed (stock macOS creates
+ * Components and HAL under /Library/Audio/Plug-Ins, never VST3), so the drag
+ * fails with "the original item can't be found" on exactly the machines a
+ * first install meets. An installer package creates its destinations itself,
+ * which is why a .pkg is what audio software actually ships as. One product
+ * installs both builds, always: no component choice, so an app/plugin version
+ * skew is unrepresentable — the same promise the Windows installer makes with
+ * [InstallDelete], made here by never installing half.
+ *
  * One-time Mac setup (see RELEASING.md): an Apple Developer ID Application
- * certificate in the keychain, and a notarytool keychain profile:
+ * certificate (seals the bundles) and a Developer ID Installer certificate
+ * (seals the pkg) in the keychain, and a notarytool keychain profile:
  *   xcrun notarytool store-credentials plectrify --apple-id ... --team-id ...
  *
  * Signing gates that differ from Windows (which ships unsigned for now):
  * hardened runtime + notarization are the default here — Gatekeeper blocks an
  * unsigned download outright — and the entitlements in
  * cmake/Plectrify.entitlements (audio input, library validation off for
- * third-party VST3s) must ride the signature or the app is silent and
+ * third-party VST3s) must ride the bundle signatures or the app is silent and
  * pluginless.
  *
  * --ad-hoc IS THE ONE PUBLISHABLE MODE THAT NEEDS NO APPLE ACCOUNT. Developer ID
  * signing and notarization both require a paid Apple Developer Program
  * membership; there is no free tier and no open-source exemption. Rather than
- * leave the Mac unreleasable until that is bought, --ad-hoc signs with the
- * ad-hoc identity (`-`), skips notarization, and is still allowed to upload.
- * What that costs is real and falls on the user, not on this script: the DMG
+ * leave the Mac unreleasable until that is bought, --ad-hoc signs the bundles
+ * with the ad-hoc identity (`-`), leaves the pkg unsigned (there is no ad-hoc
+ * for installer products), skips notarization, and is still allowed to upload.
+ * What that costs is real and falls on the user, not on this script: the pkg
  * carries a quarantine flag when downloaded through a browser, and macOS
- * refuses a quarantined ad-hoc app with the words "Plectrify is damaged and
- * can't be opened" — a lie the install instructions have to pre-empt by name.
- * Recovering from it is System Settings -> Privacy & Security -> Open Anyway,
- * or `xattr -dr com.apple.quarantine`; distribution channels that do not set
+ * refuses to open a quarantined unsigned installer. Recovering from it is
+ * System Settings -> Privacy & Security -> Open Anyway, or
+ * `xattr -d com.apple.quarantine`; distribution channels that do not set
  * quarantine at all (a Homebrew tap, curl, git) are unaffected.
  *
  * Ad-hoc deliberately drops the hardened runtime along with the certificate.
@@ -58,7 +70,7 @@
 import { createHash } from 'node:crypto';
 import {
   chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync,
-  symlinkSync, writeFileSync,
+  writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -81,6 +93,7 @@ const { values } = parseArgs({
   options: {
     version: { type: 'string' },
     identity: { type: 'string', default: 'Developer ID Application' },
+    'installer-identity': { type: 'string', default: 'Developer ID Installer' },
     'keychain-profile': { type: 'string', default: 'plectrify' },
     'skip-tests': { type: 'boolean', default: false },
     'ad-hoc': { type: 'boolean', default: false },
@@ -93,6 +106,7 @@ const CONFIG = 'Release';
 
 const adHoc = values['ad-hoc']!;
 const identity = adHoc ? '-' : values.identity!;
+const installerIdentity = values['installer-identity']!;
 const notarize = !adHoc && !values['no-notarize'];
 
 // --identity names a certificate; ad-hoc is the absence of one. Taking both
@@ -100,10 +114,13 @@ const notarize = !adHoc && !values['no-notarize'];
 if (adHoc && values.identity !== 'Developer ID Application') {
   fail(`--ad-hoc signs with no certificate, so it cannot also use --identity '${values.identity}'. Drop one.`);
 }
+if (adHoc && values['installer-identity'] !== 'Developer ID Installer') {
+  fail(`--ad-hoc leaves the pkg unsigned, so it cannot also use --installer-identity '${values['installer-identity']}'. Drop one.`);
+}
 
 // A rehearsal cannot be promoted by hand: notarization staples a ticket into
-// the DMG, so an un-notarized rehearsal artifact differs from the real one.
-// --ad-hoc is exempt because there the un-notarized DMG *is* the artifact —
+// the pkg, so an un-notarized rehearsal artifact differs from the real one.
+// --ad-hoc is exempt because there the un-notarized pkg *is* the artifact —
 // nothing better exists to compare it against, and the whole point is to
 // publish it.
 if (!adHoc && values['no-notarize'] && !values['no-upload']) {
@@ -129,8 +146,21 @@ if (!adHoc) {
     fail(
       `no '${identity}' certificate in the login keychain (security find-identity found none).\n` +
         '  Developer ID signing and notarization need a paid Apple Developer Program membership.\n' +
-        '  To publish without one, re-run with --ad-hoc — the DMG is then unnotarized, and macOS\n' +
-        '  tells whoever downloads it that Plectrify "is damaged" until they clear the quarantine flag.',
+        '  To publish without one, re-run with --ad-hoc — the pkg is then unsigned and unnotarized,\n' +
+        '  and macOS refuses to open it until whoever downloads it clears the quarantine flag.',
+    );
+  }
+  // The pkg's certificate is a different type from the bundles' — an Installer
+  // identity is not a codesigning identity, so it is asked for without that
+  // policy filter, and its absence has to be its own message or the first
+  // productbuild failure names neither certificate nor fix.
+  const installerIdentities = capture('security', ['find-identity', '-v']);
+  if (!installerIdentities.includes(installerIdentity)) {
+    fail(
+      `no '${installerIdentity}' certificate in the login keychain (security find-identity found none).\n` +
+        '  The installer pkg is signed with a Developer ID *Installer* certificate — a separate\n' +
+        '  certificate type from Developer ID Application, issued from the same paid membership.\n' +
+        '  To publish without one, re-run with --ad-hoc.',
     );
   }
 }
@@ -206,7 +236,7 @@ if (!values['no-upload']) {
   }
 
   // Once --promote has made a version the latest production release it is
-  // immutable: people may already hold that DMG and the checksum published
+  // immutable: people may already hold that pkg and the checksum published
   // beside it. The upload below passes --clobber, which would replace both in
   // place, so the answer has to be no here rather than after a full build and a
   // notarization round-trip.
@@ -398,7 +428,7 @@ ${sourceArchiveHash ? `\nSHA-256: ${sourceArchiveHash}\n` : ''}
 THIRD-PARTY PLUGINS
 
 This offer covers Plectrify itself — the standalone application and the
-Plectrify VST3 plug-in this disk image carries, which are two builds of the
+Plectrify VST3 plug-in this installer installs, which are two builds of the
 same AGPLv3 source in the archive above. (Both are built against Steinberg's
 VST3 SDK as bundled with JUCE, which Plectrify uses under the SDK's GPLv3
 option; see THIRD_PARTY_NOTICES.md.) Plectrify ships one third-party VST3
@@ -460,11 +490,12 @@ mkdirSync(outputDir, { recursive: true });
 // entitlements because this is a Ninja build — the plugin target's
 // HARDENED_RUNTIME_OPTIONS in CMakeLists.txt only take effect under the Xcode
 // generator — and the file's two entitlements are exactly that list.
-const dmgStage = join(outputDir, 'dmg-stage');
-rmSync(dmgStage, { recursive: true, force: true });
-mkdirSync(dmgStage, { recursive: true });
+const pkgStage = join(outputDir, 'pkg-stage');
+rmSync(pkgStage, { recursive: true, force: true });
+mkdirSync(join(pkgStage, 'vst3'), { recursive: true });
+mkdirSync(join(pkgStage, 'app'), { recursive: true });
 
-const vst3Stage = join(dmgStage, 'Plectrify.vst3');
+const vst3Stage = join(pkgStage, 'vst3', 'Plectrify.vst3');
 run('Staging Plectrify.vst3', 'ditto', [vst3Built, vst3Stage]);
 cpSync(join(uiDir, 'dist'), join(vst3Stage, 'Contents/Resources/ui'), { recursive: true });
 stageBundledPlugins(join(vst3Stage, 'Contents/Resources/plugins'));
@@ -475,51 +506,121 @@ run('Codesigning Plectrify.vst3', 'codesign', [
 ]);
 run('Verifying the plugin signature', 'codesign', ['--verify', '--strict', '--verbose=2', vst3Stage]);
 
-// --- The DMG: app + plugin + where the plugin goes ---------------------------
-// The app keeps the drag-install model; the plugin gets the plugin-DMG
-// convention, a symlink to the machine-wide /Library/Audio/Plug-Ins/VST3
-// (every host scans it; dropping the bundle there costs one Finder auth
-// prompt, not an elevated installer). The per-user
-// ~/Library/Audio/Plug-Ins/VST3 the catalogue installer writes to cannot be
-// offered here: a symlink's target is a literal path, never tilde-expanded,
-// and every account's home is a different literal.
-run('Staging Plectrify.app', 'ditto', [app, join(dmgStage, 'Plectrify.app')]);
-symlinkSync('/Applications', join(dmgStage, 'Applications'));
-symlinkSync('/Library/Audio/Plug-Ins/VST3', join(dmgStage, 'VST3'));
+// --- The installer: one pkg, both builds, no choices -------------------------
+// A component plist per bundle, because pkgbuild's defaults are wrong for
+// this: without one every bundle is marked relocatable, and Installer will
+// happily "upgrade" a stray copy it finds elsewhere — on a dev machine, the
+// one inside build-macos-release — instead of the install location. Not
+// relocatable, not version-checked: an install always lands whole at its
+// destination, replacing whatever version sits there, so rerunning the
+// installer is a repair.
+run('Staging Plectrify.app', 'ditto', [app, join(pkgStage, 'app', 'Plectrify.app')]);
 
-const dmgName = `Plectrify-${version}-macos-arm64.dmg`;
-const dmgPath = join(outputDir, dmgName);
-rmSync(dmgPath, { force: true });
-
-// Plain hdiutil rather than a DMG-decorating dependency: the artifact is the
-// staged folder; a background image is not worth a supply-chain edge.
-run('Building the DMG', 'hdiutil', [
-  'create', '-volname', `Plectrify ${version}`,
-  '-srcfolder', dmgStage, '-format', 'UDZO', '-ov', dmgPath,
-]);
-// The DMG's own signature exists to be notarized; ad-hoc has nothing to submit
-// it to, and an ad-hoc seal over a disk image tells a downloader nothing that
-// the published SHA-256 does not already tell them. So it is signed in the
-// Developer ID path only — the app inside is sealed either way.
-if (!adHoc) {
-  run('Codesigning the DMG', 'codesign', ['--force', '--timestamp', '--sign', identity, dmgPath]);
+function componentPlist(bundleName: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+  <dict>
+    <key>RootRelativeBundlePath</key><string>${bundleName}</string>
+    <key>BundleIsRelocatable</key><false/>
+    <key>BundleIsVersionChecked</key><false/>
+    <key>BundleOverwriteAction</key><string>upgrade</string>
+    <key>BundleHasStrictIdentifier</key><true/>
+  </dict>
+</array>
+</plist>
+`;
 }
+writeFileSync(join(pkgStage, 'app.plist'), componentPlist('Plectrify.app'));
+writeFileSync(join(pkgStage, 'vst3.plist'), componentPlist('Plectrify.vst3'));
+
+// The components are left unsigned — the signature that counts is the
+// product's, below — and carry no scripts, so notarization has nothing to
+// object to and the payload is pure bundle copy.
+run('Packaging the app component', 'pkgbuild', [
+  '--root', join(pkgStage, 'app'),
+  '--component-plist', join(pkgStage, 'app.plist'),
+  '--identifier', 'io.github.patrickiel.plectrify.pkg.app',
+  '--version', version,
+  '--install-location', '/Applications',
+  join(pkgStage, 'PlectrifyApp.pkg'),
+]);
+run('Packaging the VST3 component', 'pkgbuild', [
+  '--root', join(pkgStage, 'vst3'),
+  '--component-plist', join(pkgStage, 'vst3.plist'),
+  '--identifier', 'io.github.patrickiel.plectrify.pkg.vst3',
+  '--version', version,
+  '--install-location', '/Library/Audio/Plug-Ins/VST3',
+  join(pkgStage, 'PlectrifyVst3.pkg'),
+]);
+
+// customize="never": both components install, always — an app/plugin version
+// skew is unrepresentable, the promise the Windows installer makes with
+// [InstallDelete]. It also means Installer creates
+// /Library/Audio/Plug-Ins/VST3 itself, which is the reason this is a pkg and
+// not a DMG: that folder does not exist on a Mac that never had a VST3
+// installed, so a disk image's drag target dangles on exactly the machines a
+// first install meets.
+writeFileSync(
+  join(pkgStage, 'distribution.xml'),
+  `<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Plectrify ${version}</title>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
+    <domains enable_localSystem="true"/>
+    <volume-check>
+        <allowed-os-versions><os-version min="13.3"/></allowed-os-versions>
+    </volume-check>
+    <choices-outline>
+        <line choice="default">
+            <line choice="app"/>
+            <line choice="vst3"/>
+        </line>
+    </choices-outline>
+    <choice id="default" title="Plectrify"/>
+    <choice id="app" visible="false">
+        <pkg-ref id="io.github.patrickiel.plectrify.pkg.app"/>
+    </choice>
+    <choice id="vst3" visible="false">
+        <pkg-ref id="io.github.patrickiel.plectrify.pkg.vst3"/>
+    </choice>
+    <pkg-ref id="io.github.patrickiel.plectrify.pkg.app" version="${version}">PlectrifyApp.pkg</pkg-ref>
+    <pkg-ref id="io.github.patrickiel.plectrify.pkg.vst3" version="${version}">PlectrifyVst3.pkg</pkg-ref>
+</installer-gui-script>
+`,
+);
+
+const pkgName = `Plectrify-${version}-macos-arm64.pkg`;
+const pkgPath = join(outputDir, pkgName);
+rmSync(pkgPath, { force: true });
+
+// Signed at product level with the Installer certificate — a different type
+// from the Application one sealing the bundles. Ad-hoc has no counterpart for
+// installer products, so that mode ships the pkg unsigned; the bundles inside
+// carry their ad-hoc seals either way.
+run('Building the installer pkg', 'productbuild', [
+  '--distribution', join(pkgStage, 'distribution.xml'),
+  '--package-path', pkgStage,
+  ...(adHoc ? [] : ['--sign', installerIdentity, '--timestamp']),
+  pkgPath,
+]);
 
 if (notarize) {
   run('Notarizing (this waits on Apple)', 'xcrun', [
-    'notarytool', 'submit', dmgPath,
+    'notarytool', 'submit', pkgPath,
     '--keychain-profile', values['keychain-profile']!,
     '--wait',
   ]);
-  run('Stapling the ticket', 'xcrun', ['stapler', 'staple', dmgPath]);
-  run('Validating the staple', 'xcrun', ['stapler', 'validate', dmgPath]);
+  run('Stapling the ticket', 'xcrun', ['stapler', 'staple', pkgPath]);
+  run('Validating the staple', 'xcrun', ['stapler', 'validate', pkgPath]);
   // The end-to-end answer: would Gatekeeper accept this download?
-  run('Gatekeeper assessment', 'spctl', ['-a', '-t', 'open', '--context', 'context:primary-signature', '-v', dmgPath]);
+  run('Gatekeeper assessment', 'spctl', ['-a', '-vv', '-t', 'install', pkgPath]);
 }
 
-const dmgHash = createHash('sha256').update(readFileSync(dmgPath)).digest('hex');
-const checksumPath = join(outputDir, `${dmgName}.sha256`);
-writeFileSync(checksumPath, `${dmgHash}  ${dmgName}\n`, 'ascii');
+const pkgHash = createHash('sha256').update(readFileSync(pkgPath)).digest('hex');
+const checksumPath = join(outputDir, `${pkgName}.sha256`);
+writeFileSync(checksumPath, `${pkgHash}  ${pkgName}\n`, 'ascii');
 
 const manifestPath = join(outputDir, 'release-manifest-macos.json');
 writeFileSync(
@@ -534,11 +635,12 @@ writeFileSync(
       jucePatches: JUCE_PATCHES.map(({ patch }) => patch),
       binaryLicense: 'AGPL-3.0-only',
       platform: 'macos-arm64',
-      installer: dmgName,
-      sha256: dmgHash,
+      installer: pkgName,
+      sha256: pkgHash,
       sourceArchive: sourceArchiveName,
       sourceSha256: sourceArchiveHash,
-      // Two facts rather than one: an ad-hoc build IS signed, and that is
+      // Two facts rather than one: an ad-hoc build IS signed (its bundles
+      // carry ad-hoc seals; the pkg around them is unsigned), and that is
       // precisely what Gatekeeper will not accept. Collapsing them into
       // `signed` made a provenance record that could not describe this mode.
       signature: adHoc ? 'ad-hoc' : 'developer-id',
@@ -550,8 +652,8 @@ writeFileSync(
 );
 
 if (values['no-upload']) {
-  console.log(`\nRelease rehearsal ready: ${dmgPath}`);
-  console.log('Not uploaded (--no-upload). The real run produces a different DMG (signing timestamps), so never upload a rehearsal by hand.');
+  console.log(`\nRelease rehearsal ready: ${pkgPath}`);
+  console.log('Not uploaded (--no-upload). The real run produces a different pkg (signing timestamps), so never upload a rehearsal by hand.');
   process.exit(0);
 }
 
@@ -561,14 +663,14 @@ if (values['no-upload']) {
 // above refuses a version that has been promoted.
 run(`Uploading to the ${tag} release`, 'gh', [
   'release', 'upload', tag,
-  dmgPath, checksumPath, manifestPath,
+  pkgPath, checksumPath, manifestPath,
   '--repo', repoSlug, '--clobber',
 ]);
-console.log(`\nPublished ${dmgName} on https://github.com/${repoSlug}/releases/tag/${tag}`);
+console.log(`\nPublished ${pkgName} on https://github.com/${repoSlug}/releases/tag/${tag}`);
 if (adHoc) {
   console.log(
-    '\nThis DMG is ad-hoc signed and NOT notarized. Downloaded through a browser it is\n' +
-      'quarantined, and macOS reports "Plectrify is damaged and can\'t be opened" — check the\n' +
+    '\nThis pkg is unsigned (its bundles are ad-hoc signed) and NOT notarized. Downloaded\n' +
+      'through a browser it is quarantined and macOS refuses to open it — check the\n' +
       'release notes and the site\'s download page still carry the Open Anyway instructions.',
   );
 }
