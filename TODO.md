@@ -73,9 +73,16 @@ it is empty.
       trademark line included); both SOURCE_OFFER texts updated; the
       corresponding-source archive already covers `Source/plugin/` (git
       archive HEAD).
-  - [ ] Register as a VST3 developer with Steinberg (manual; their form) and
-        skim the current trademark/logo guidelines before the first public
-        release that carries the plugin.
+  - [x] Steinberg registration: none exists anymore. The VST3 SDK went MIT
+        in October 2025 — no agreement, no fee, and their portal calls the
+        usage guidelines "best practice, but optional"; even the old dual
+        licence never required registration on the GPLv3 path Plectrify
+        elected. The notices keep that GPLv3 election because JUCE 8.0.14
+        bundles a pre-relicensing SDK copy whose headers still say so;
+        simplify them to MIT when a JUCE bump brings the MIT-licensed SDK.
+        "VST" stays a Steinberg trademark — the attribution line already in
+        THIRD_PARTY_NOTICES.md covers it, and the VST-compatible logo (the
+        one thing that was ever tied to signed paperwork) is not used.
 
 ## Later
 
