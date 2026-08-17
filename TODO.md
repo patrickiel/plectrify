@@ -33,8 +33,10 @@ it is empty.
       pluginval strictness 5 passes on Debug and on the staged Release
       bundle, which also found the hidden-editor host-kind bug the
       initialisation-data commit fixes).
-  - [ ] The DAW checklist above, on the Mac, in a real host (needs a DAW
-        installed; none on this machine).
+  - [x] Verified in Ableton Live on the Mac: the installed Release plugin
+        loads and plays. The finer checklist items (project save/reload, two
+        instances, offline render, MIDI learn, PDC null test) had their full
+        pass on Windows; spot-check them on the Mac as they come up in use.
 
 ## Release plumbing
 
@@ -62,9 +64,10 @@ it is empty.
   - [ ] Notarize for real once the Developer ID certificates exist (this
         machine's keychain has neither Application nor Installer; the
         notarytool flow is unchanged and covers the pkg's payload).
-  - [ ] Run the built pkg once on a clean-ish Mac: both destinations land,
-        `/Library/Audio/Plug-Ins/VST3` is created where absent, and a DAW
-        loads the installed Release plugin.
+  - [x] Ran the built pkg on a Mac with no `/Library/Audio/Plug-Ins/VST3`:
+        both destinations landed, Installer created the folder, the installed
+        standalone runs, and Ableton Live loads and plays the installed
+        Release plugin (the no-fallback resource path, exercised for real).
 - [x] Licensing notices: `## Steinberg VST3 SDK` section in
       `THIRD_PARTY_NOTICES.md` electing GPLv3 (ASIO-notice pattern, VST
       trademark line included); both SOURCE_OFFER texts updated; the
