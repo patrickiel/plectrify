@@ -263,6 +263,7 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         .withEventListener ("standbyCommand",   [this] (juce::var v) { if (host.capabilities().autoStandby) handleStandbyCommand (v); })
         .withEventListener ("startWindowResize",onActivity ([this] (juce::var v) { host.handleStartWindowResize (v); }))
         .withEventListener ("setWindowTheme",   [this] (juce::var v) { host.handleSetWindowTheme (v); })
+        .withEventListener ("setEditorSize",    [this] (juce::var v) { host.handleSetEditorSize (v); })
         .withEventListener ("scanPlugins",      onActivity ([this] (juce::var)   { scanForPlugins(); }))
         // Reads a list the scan thread owns while it runs, so it is answered
         // from the message thread like requestPlugins; the retry itself refuses

@@ -732,7 +732,14 @@ effect (`aufx`, not JUCE's default `aumf`) because Logic files
 "MIDI-controlled Effects" outside the Audio FX menu on audio tracks, the one
 place a guitar rig must appear, and an aufx receives no MIDI there.
 Discoverability wins; the trade is documented at the `AU_MAIN_TYPE` line in
-`CMakeLists.txt`, and auval warns about the pairing and passes. The plugin's
+`CMakeLists.txt`, and auval warns about the pairing and passes. Editor
+resizing splits by format the same way: a VST3 window resizes by its host
+frame (`IPlugView::canResize` is a real contract), but AUv2 gives a host no
+way to learn a view is resizable, so no AU host offers the drag — and JUCE's
+own corner grip sits beneath the native web view. The page therefore draws
+its own grip in plugin mode (`EditorResizeGrip` → `setEditorSize` →
+`HostServices::handleSetEditorSize` → the editor's `setSize`), the
+plugin-initiated resize every host honours, GarageBand included. The plugin's
 WebView2 profile is `WebView2-Plugin`, never the app's — two processes must
 not share a profile lock. `moduleResourceDir()` in `AppPaths.h` is what lets
 `provideUiResource` and the bundled-plugin directory resolve inside either the

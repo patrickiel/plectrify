@@ -42,6 +42,7 @@
   import PersistenceNotice from './features/status/PersistenceNotice.svelte';
   import StandbyOverlay from './features/status/StandbyOverlay.svelte';
   import StatusBar from './features/status/StatusBar.svelte';
+  import EditorResizeGrip from './features/window/EditorResizeGrip.svelte';
   import WindowResizeHandles from './features/window/WindowResizeHandles.svelte';
   import TooltipLayer from './lib/components/TooltipLayer.svelte';
   import { exportCurrentView } from './lib/exportView';
@@ -517,6 +518,11 @@
 <!-- Also capability-gated: the DAW owns the plugin window's frame. -->
 {#if nativeHost && caps.windowChrome}
   <WindowResizeHandles {engine} />
+{:else if nativeHost}
+  <!-- The mirror case: the DAW owns the frame but cannot be told the view is
+       resizable (AUv2 has no such contract), so the page carries the grip
+       and drives the editor size over the bridge. -->
+  <EditorResizeGrip {engine} />
 {/if}
 
 <TooltipLayer />

@@ -2296,6 +2296,10 @@ export class JuceEngine implements EngineBridge {
     backend()?.emitEvent('startWindowResize', { edge });
   }
 
+  setEditorSize(width: number, height: number): void {
+    backend()?.emitEvent('setEditorSize', { width, height });
+  }
+
   setAppSettings(settings: Partial<AppSettings>): void {
     const cleanupChanged =
       settings.looperSessionAutoCleanup !== undefined ||

@@ -88,6 +88,11 @@ public:
     /** Flushes host MIDI collected by processBlock to the page's midiEvents
         stream — the plugin's stand-in for MidiInputManager's flush. */
     void onEngineTick() override;
+    /** The page's resize grip. No AU host offers frame dragging (AUv2 has no
+        way to declare a view resizable), so the size arrives from the page
+        and the editor pushes it out through the wrapper, which every host
+        honours. */
+    void handleSetEditorSize (const juce::var& payload) override;
 
 private:
     std::unique_ptr<PlectrifyEngine> engine;

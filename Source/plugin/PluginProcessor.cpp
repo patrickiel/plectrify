@@ -202,6 +202,21 @@ void PlectrifyAudioProcessor::engineSettingsChanged()
     updateHostDisplay();
 }
 
+void PlectrifyAudioProcessor::handleSetEditorSize (const juce::var& payload)
+{
+    // Same clamps as the host-state restore of editor.width/height: the
+    // page's grip already limits itself, but a size that authorises window
+    // geometry is validated where it is applied, not where it was typed.
+    const auto width  = juce::jlimit (760, 32768, static_cast<int> (payload.getProperty ("width",  0)));
+    const auto height = juce::jlimit (480, 32768, static_cast<int> (payload.getProperty ("height", 0)));
+
+    // Bridge events arrive on the message thread; the wrapper turns setSize
+    // into a host-window resize (resizeHostWindow in the AU client, onSize in
+    // the VST3's), and resized() writes the result back onto the engine.
+    if (auto* editor = getActiveEditor())
+        editor->setSize (width, height);
+}
+
 void PlectrifyAudioProcessor::onEngineTick()
 {
     // Drain and coalesce exactly as MidiInputManager::handleIncomingMidiMessage

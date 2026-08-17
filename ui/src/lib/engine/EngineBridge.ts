@@ -511,6 +511,14 @@ export interface EngineBridge {
       takes over the drag from there. */
   startWindowResize(edge: WindowResizeEdge): void;
 
+  /** Ask the plugin editor to become this size, in CSS pixels (which are the
+      editor's own points — the page fills it). The plugin-host counterpart of
+      startWindowResize: a DAW owns the plugin window's frame, but AUv2 gives
+      it no way to learn the view is resizable, so no AU host offers frame
+      dragging — the page draws its own grip instead and drives the size
+      through here. A no-op everywhere else. */
+  setEditorSize(width: number, height: number): void;
+
   /** Update application preferences. These are persisted independently of
       rigs and the working session. */
   setAppSettings(settings: Partial<AppSettings>): void;

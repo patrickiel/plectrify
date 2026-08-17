@@ -2865,6 +2865,12 @@ export class MockEngine implements EngineBridge {
     console.info('[mock] startWindowResize', edge);
   }
 
+  setEditorSize(width: number, height: number): void {
+    // No plugin editor exists in a browser tab; the log is what lets the
+    // grip be exercised under ?host=plugin in pnpm dev.
+    console.info('[mock] setEditorSize', width, height);
+  }
+
   setAppSettings(settings: Partial<AppSettings>): void {
     const cleanupChanged =
       settings.looperSessionAutoCleanup !== undefined ||
