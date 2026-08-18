@@ -1885,20 +1885,24 @@
   /* Style variants: how strongly the card wears its colour. Subtle is the
      default rules above (no class). Scoped under .module-tinted — a variant
      with no colour has nothing to vary — and expressed through --module-tint,
-     so both themes' lightness clamps keep working with no extra rules. */
-  .module-tinted.variant-bold {
+     so both themes' lightness clamps keep working with no extra rules.
+     Guarded off a bypassed card: these rules sit later in the file than the
+     bypassed overrides and would out-cascade them, leaving a bold card fully
+     lit while switched off. Off is one look — the subtle ghost — whatever
+     strength the card wears its colour at when running. */
+  .module-tinted.variant-bold:not(.module-bypassed) {
     background-color: color-mix(in srgb, var(--module-tint) 26%, var(--color-panel));
     border-color: color-mix(in srgb, var(--module-tint) 85%, transparent);
   }
-  .module-tinted.variant-bold .module-header {
+  .module-tinted.variant-bold:not(.module-bypassed) .module-header {
     background-color: color-mix(in srgb, var(--module-tint) 42%, transparent);
     border-bottom-color: color-mix(in srgb, var(--module-tint) 55%, transparent);
   }
-  .module-tinted.variant-outline {
+  .module-tinted.variant-outline:not(.module-bypassed) {
     background-color: var(--color-panel);
     border-color: color-mix(in srgb, var(--module-tint) 90%, transparent);
   }
-  .module-tinted.variant-outline .module-header {
+  .module-tinted.variant-outline:not(.module-bypassed) .module-header {
     background-color: color-mix(in srgb, var(--module-tint) 10%, transparent);
     border-bottom-color: color-mix(in srgb, var(--module-tint) 60%, transparent);
   }
