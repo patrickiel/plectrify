@@ -401,6 +401,8 @@ export class JuceEngine implements EngineBridge {
   private audioDeviceListeners = new Set<(state: AudioDevicesState) => void>();
   private inputLevelListeners = new Set<(peaks: number[]) => void>();
   private appSettingsRevision = 0;
+  /** Serializes this page's own settings.json rewrites; see persistAppSettings. */
+  private appSettingsChain: Promise<void> = Promise.resolve();
   private appSettingsLoaded: Promise<void> = Promise.resolve();
 
   // The user's own patches. Mapping only — a patch's tone stays on disk and
@@ -442,6 +444,8 @@ export class JuceEngine implements EngineBridge {
   // the rig list, names and working-session logic are owned here.
   private rigEntries: RigEntry[] = [];
   private rigListeners = new Set<(r: Rig[]) => void>();
+  /** Serializes this page's own index rewrites; see mutateRigIndex. */
+  private rigIndexChain: Promise<void> = Promise.resolve();
 
   // Looper session archive: C++ writes the WAVs and announces each save;
   // the index (names, order, kept flags) is owned here, rigs-style.
@@ -1504,6 +1508,42 @@ export class JuceEngine implements EngineBridge {
     };
   }
 
+  /** Rewrite the rig index by applying an operation to what is *on disk*, not
+      to the list this page read at boot.
+
+      The per-user data root is shared by construction, so the standalone and
+      every plugin instance write this one file. Rewriting a stale snapshot
+      silently drops whatever another Plectrify saved since — the entry goes,
+      and its `.rig` file is orphaned with nothing left pointing at it. Each
+      caller therefore passes the *operation* (append, patch by id, filter by
+      id, reorder) rather than a finished list, so a concurrent add survives and
+      a delete still deletes. The chain keeps this page's own edits from
+      interleaving their read-modify-writes.
+
+      Only the file is reconciled. This page's list takes the operation straight
+      away — a save that returns an id the caller may rename in the next breath
+      cannot wait on a disk round-trip — and is never written back from the
+      merge, which would let a queued edit's older read flicker a just-deleted
+      rig back into the list. Picking up another instance's rigs live is a
+      different feature; the list is read once, at boot, as it always was. */
+  private mutateRigIndex(apply: (entries: RigEntry[]) => RigEntry[]): void {
+    this.rigEntries = apply(this.rigEntries);
+    this.emitRigs();
+
+    this.rigIndexChain = this.rigIndexChain
+      .then(async () => {
+        const { ok, text } = await this.readFile(RIG_INDEX);
+        const parsed = ok ? safeParse<unknown>(text) : null;
+        // No index yet (the first save) or a corrupt one: this page's own list
+        // is the best answer there is.
+        const merged = isRigEntryArray(parsed) ? apply(parsed) : this.rigEntries;
+        await this.writeFile(RIG_INDEX, JSON.stringify(merged, null, 2));
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to update the rig index', error);
+      });
+  }
+
   /** The stored half of a rig — everything but its identity, which the caller
       supplies. Null if the rack cannot be captured right now, in which case no
       file may be touched. */
@@ -1536,9 +1576,7 @@ export class JuceEngine implements EngineBridge {
     if (!(await this.writeFile(file, JSON.stringify({ id, name: clean, ...body }, null, 2))))
       return null;
     this.clearToneDirty(toneEpoch);
-    this.rigEntries = [...this.rigEntries, { id, name: clean, file }];
-    void this.writeFile(RIG_INDEX, JSON.stringify(this.rigEntries, null, 2));
-    this.emitRigs();
+    this.mutateRigIndex((onDisk) => [...onDisk, { id, name: clean, file }]);
     return id;
   }
 
@@ -1567,10 +1605,9 @@ export class JuceEngine implements EngineBridge {
     if (!entry) return;
     // The rig's on-disk file keeps its path; only the display name changes, so
     // just rewrite the index. The name inside the .rig file is cosmetic.
-    entry.name = clean;
-    this.rigEntries = [...this.rigEntries];
-    void this.writeFile(RIG_INDEX, JSON.stringify(this.rigEntries, null, 2));
-    this.emitRigs();
+    this.mutateRigIndex((onDisk) =>
+      onDisk.map((e) => (e.id === rigId ? { ...e, name: clean } : e)),
+    );
   }
 
   async loadRig(rigId: string): Promise<boolean> {
@@ -1641,9 +1678,7 @@ export class JuceEngine implements EngineBridge {
     const entry = this.rigEntries.find((e) => e.id === rigId);
     if (!entry) return;
     backend()?.emitEvent('deleteFile', { path: entry.file });
-    this.rigEntries = this.rigEntries.filter((e) => e.id !== rigId);
-    void this.writeFile(RIG_INDEX, JSON.stringify(this.rigEntries, null, 2));
-    this.emitRigs();
+    this.mutateRigIndex((onDisk) => onDisk.filter((e) => e.id !== rigId));
   }
 
   moveRig(rigId: string, toIndex: number): void {
@@ -1652,9 +1687,16 @@ export class JuceEngine implements EngineBridge {
     // The index file *is* the order: the .rig files are untouched.
     const entries = [...this.rigEntries];
     entries.splice(toIndex, 0, ...entries.splice(from, 1));
-    this.rigEntries = entries;
-    void this.writeFile(RIG_INDEX, JSON.stringify(this.rigEntries, null, 2));
-    this.emitRigs();
+    const order = entries.map((e) => e.id);
+    this.mutateRigIndex((onDisk) => {
+      // The dragged order, over the entries that still exist — taking the
+      // on-disk objects so a concurrent rename is not undone by the drag.
+      // Anything this page has never seen keeps its place after them.
+      const byId = new Map(onDisk.map((e) => [e.id, e]));
+      const dragged = order.map((id) => byId.get(id)).filter((e) => e !== undefined);
+      const known = new Set(order);
+      return [...dragged, ...onDisk.filter((e) => !known.has(e.id))];
+    });
   }
 
   subscribeRigs(listener: (r: Rig[]) => void): () => void {
@@ -2232,7 +2274,17 @@ export class JuceEngine implements EngineBridge {
     await this.appSettingsLoaded;
     if (this.starterChecked) return;
 
-    const decision = decideStarterAutoInstall(this.catalogue, this.appSettings);
+    // Re-read rather than trust the boot-time copy: this decision turns on one
+    // stored flag, the file is shared with every other Plectrify on the machine,
+    // and a second instance started minutes later would otherwise still be
+    // holding the settings from before the first one wrote the flag.
+    const stored = await this.readFile(SETTINGS_FILE);
+    const settings = stored.ok
+      ? normalizeAppSettings(safeParse<unknown>(stored.text))
+      : this.appSettings;
+    if (this.starterChecked) return;
+
+    const decision = decideStarterAutoInstall(this.catalogue, settings);
     if (!decision.markAttempted) return;
 
     this.starterChecked = true;
@@ -2306,11 +2358,37 @@ export class JuceEngine implements EngineBridge {
       settings.looperSessionAutoCleanupLimit !== undefined;
     this.appSettingsRevision += 1;
     this.appSettings = normalizeAppSettings({ ...this.appSettings, ...settings });
-    void this.writeFile(SETTINGS_FILE, JSON.stringify(this.appSettings, null, 2));
+    this.persistAppSettings(settings);
     this.pushStandbyConfig();
     this.pushWindowTheme();
     this.emitAppSettings();
     if (cleanupChanged) this.pruneAndPersistLooperSessions();
+  }
+
+  /** Write settings.json by laying the changed keys over what is on disk, in
+      call order.
+
+      The file is shared with every other Plectrify on this machine (see
+      mutateRigIndex) and this page's copy has been in memory since boot, so
+      writing it whole would revert a preference another instance changed since
+      — `starterInstallAttempted` included, which is how two fresh pages both
+      decide to install the starter bundle. Only the file is reconciled: what
+      this page *shows* stays the optimistic value set above, since nothing here
+      has ever re-read another instance's settings. */
+  private persistAppSettings(changed: Partial<AppSettings>): void {
+    this.appSettingsChain = this.appSettingsChain
+      .then(async () => {
+        const { ok, text } = await this.readFile(SETTINGS_FILE);
+        const stored = ok ? safeParse<unknown>(text) : null;
+        const merged = normalizeAppSettings({
+          ...(stored !== null && typeof stored === 'object' ? stored : {}),
+          ...changed,
+        });
+        await this.writeFile(SETTINGS_FILE, JSON.stringify(merged, null, 2));
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to write the app settings', error);
+      });
   }
 
   settingsReady(): Promise<void> {
@@ -3471,8 +3549,10 @@ export class JuceEngine implements EngineBridge {
     let failed = false;
     this.sessionSaveChain = this.sessionSaveChain
       .then(async () => {
-        if (await this.writeWorkingSession(JSON.stringify(await this.captureStoredRack(), null, 2)))
-          return;
+        const session = this.isPluginHost()
+          ? this.capturePluginSession()
+          : await this.captureStoredRack();
+        if (await this.writeWorkingSession(JSON.stringify(session, null, 2))) return;
         failed = true;
         this.sessionDirty = true;
       })
@@ -3511,6 +3591,45 @@ export class JuceEngine implements EngineBridge {
     const modules = await this.captureModules();
     return {
       modules,
+      routing: structuredClone(this.routing),
+      scenes: structuredClone(this.scenes),
+    };
+  }
+
+  /** The plugin's working session: the page's own metadata and nothing else.
+
+      No `captureRig` round-trip, because every plugin's tone is already in the
+      host-saved document's `entries` — the engine puts this blob in the *same*
+      document, so capturing it here wrote each NAM capture into the DAW project
+      twice, the second copy JSON-escaped inside a string and therefore the
+      larger of the two, and dragged megabytes across the bridge on every
+      autosave to do it. It was never read back either: the plugin restores
+      through adoptStoredMetadata, which takes the names, colours, knob
+      mappings, scenes and lanes and rebuilds the rack from `entries`.
+
+      `description` and `state` are written empty only because isStoredRack
+      requires the keys — the standalone's working-rack.json, which does need
+      the tone, shares this shape. */
+  private capturePluginSession(): StoredRack {
+    return {
+      modules: this.nodes.map((node) => {
+        const meta = this.meta.get(node.id) ?? { knobs: [] };
+        return {
+          clientId: node.id,
+          displayName: meta.displayName,
+          color: meta.color,
+          styleVariant: meta.styleVariant,
+          icon: meta.icon,
+          texture: meta.texture,
+          midi: meta.midi,
+          tone3000: meta.tone3000,
+          laneId: node.laneId,
+          knobs: meta.knobs,
+          description: '',
+          state: '',
+          bypassed: node.bypassed,
+        };
+      }),
       routing: structuredClone(this.routing),
       scenes: structuredClone(this.scenes),
     };

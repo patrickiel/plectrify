@@ -99,7 +99,13 @@
   // Absence means standalone (which has everything): the field postdates the
   // engines that lacked it, so the page never flashes a degraded layout
   // before the push lands.
-  const caps = $derived(appInfo.capabilities ?? STANDALONE_CAPABILITIES);
+  //
+  // Merged per key rather than taken whole, and that is the load-bearing part:
+  // a missing key is `undefined`, which is falsy, so an engine that does not
+  // know a capability would hide the feature everywhere instead of offering it.
+  // The rule is the same at both granularities — what the engine does not
+  // mention, the standalone answers for.
+  const caps = $derived({ ...STANDALONE_CAPABILITIES, ...appInfo.capabilities });
   let pluginScan = $state<PluginScanState>({ status: 'idle', pluginCount: 0 });
   let blacklistedPlugins = $state<BlacklistedPlugin[]>([]);
   // The catalogue is owned here for the rack's module drawer, which files
@@ -477,6 +483,7 @@
     onSetStatus={(next) => engine.setStatus(next)}
     {appSettings}
     onSetAppSettings={(settings) => engine.setAppSettings(settings)}
+    capabilities={caps}
     otherLearnActive={rackMidiLearning ||
       looperMidiLearning ||
       metronomeMidiLearning ||

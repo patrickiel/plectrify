@@ -34,11 +34,20 @@ public:
 
     PlectrifyEngine& getEngine() noexcept { return *engine; }
 
+    /** The editor's remembered size moved: it rides the host-saved document,
+        so the state cache has to be re-captured and the project marked. */
+    void editorSizeChanged();
+
     // --- juce::AudioProcessor ---------------------------------------------
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override;
+
+    /** Both forwarded to the rack's graph, which is a separate AudioProcessor
+        the host never sees and therefore never configures itself. */
+    void setPlayHead (juce::AudioPlayHead* newPlayHead) override;
+    void setNonRealtime (bool isNonRealtime) noexcept override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override                     { return true; }
@@ -95,6 +104,11 @@ public:
     void handleSetEditorSize (const juce::var& payload) override;
 
 private:
+    /** Mark the engine's state cache stale and tell the host its project moved.
+        The flag matters: only withNonParameterStateChanged reaches the VST3
+        wrapper's setDirty. */
+    void markProjectDirty();
+
     std::unique_ptr<PlectrifyEngine> engine;
 
     std::atomic<double> preparedSampleRate { 0.0 };

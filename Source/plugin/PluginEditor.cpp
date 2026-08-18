@@ -36,8 +36,15 @@ void PlectrifyAudioProcessorEditor::resized()
     // Remembered on the engine so the next open comes back at this size; the
     // editor itself will not live to see it.
     auto& engine = processor.getEngine();
+    if (engine.editorWidth == getWidth() && engine.editorHeight == getHeight())
+        return;
+
     engine.editorWidth  = getWidth();
     engine.editorHeight = getHeight();
+
+    // Only on a real change: the page's grip streams a resize per animation
+    // frame, and every one of these lands in the host.
+    processor.editorSizeChanged();
 }
 
 void PlectrifyAudioProcessorEditor::parentHierarchyChanged()

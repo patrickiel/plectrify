@@ -126,6 +126,13 @@ public:
     void prepareToPlay (double rate, int blockSize) override;
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override;
 
+    /** Whether this host offers the looper at all. Set once before the graph is
+        prepared (see RackProcessor::setToolAvailability); false skips the loop
+        buffers entirely, so the commands and getters below stay callable but
+        answer for an empty looper that is also out of the chain. */
+    void setAvailable (bool isAvailable) noexcept { available = isAvailable; }
+    bool isAvailable() const noexcept { return available; }
+
     /** Message thread. Auto-arm off makes toggle record immediately. */
     void setArmEnabled (bool enabled) noexcept { armEnabled.store (enabled, std::memory_order_relaxed); }
     bool isArmEnabled() const noexcept { return armEnabled.load (std::memory_order_relaxed); }
@@ -208,6 +215,7 @@ private:
     std::atomic<int> stagedState { stagedIdle };
 
     // --- audio-thread-only --------------------------------------------------
+    bool available = true;                       // see setAvailable
     juce::AudioBuffer<float> bufferA, bufferB;   // sized in prepareToPlay
     bool loopIsA = true;                         // which buffer is the loop (other is undo)
     double sampleRate = 0.0;

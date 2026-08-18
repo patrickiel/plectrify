@@ -719,8 +719,24 @@ const MOCK_APP_INFO: AppInfo = {
   host: mockHostMode(),
   capabilities:
     mockHostMode() === 'plugin'
-      ? { audioDevices: false, midiDevices: false, windowChrome: false, autoStandby: false }
-      : { audioDevices: true, midiDevices: true, windowChrome: true, autoStandby: true },
+      ? {
+          audioDevices: false,
+          midiDevices: false,
+          windowChrome: false,
+          autoStandby: false,
+          looper: false,
+          metronome: false,
+          feedbackGuard: false,
+        }
+      : {
+          audioDevices: true,
+          midiDevices: true,
+          windowChrome: true,
+          autoStandby: true,
+          looper: true,
+          metronome: true,
+          feedbackGuard: true,
+        },
   juceVersion: '—',
   buildInfo: {
     commit: '',

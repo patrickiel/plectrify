@@ -761,9 +761,33 @@ applying. The page's session metadata rides the same document instead of
 fought over by two instances and dies with no one to read it when the DAW
 project moves machines. On restore the plugin's page **adopts** the session's
 metadata without re-applying the rack — the engine's rack is already live, and
-rebuilding it on every editor open would cut audio. Auto Standby is never
-driven in the plugin (offline render and freeze are the host's business); the
-feedback guard, tuner, looper and metronome all remain.
+rebuilding it on every editor open would cut audio.
+
+**Four things the plugin does not offer**, each declined through
+`HostCapabilities` so the page hides the surface and the engine drops the work.
+Auto Standby, because offline render and freeze are the host's business. The
+**metronome**, because the DAW has one locked to the project tempo and this one
+is not — host-tempo sync is unbuilt, so all it could add is a second click
+drifting against the host's. The **looper**, because the DAW records to the
+timeline where the player actually wants the audio, while this one writes a WAV
+into the shared data root the project cannot carry — and because it preallocates
+~46 MB of loop buffer per instance, the largest thing the plugin does with
+memory on a session with a Plectrify per guitar track. And the **feedback
+guard**: the acoustic loop is real when tracking live through a DAW, but
+sustained program material reads as "audible and not falling" and nothing ever
+releases the latch by design, so a trip during an offline bounce silently mutes
+the rest of the render with the clearing pill possibly behind a closed editor.
+The tuner remains.
+
+Declining a tool takes its **node out of the chain**, not just its panel off the
+screen: `RackProcessor::setToolAvailability` is called from the engine's
+constructor, before anything prepares the graph, because `AudioProcessorGraph`
+prepares and renders every node it owns whether or not it is connected — so a
+looper that is merely unwired still pays for its buffers. What each tool's
+setters and getters *store* is untouched, and `buildHostStateJson` still writes
+and reads every key, so one host's document round-trips through the other
+unchanged. The MUTE pill is never gated with the guard above it: a hand mute is
+a panic control every host owes the player.
 
 Both release pipelines ship the plugin self-contained (`ui/` + the bundled NAM
 in `Contents/Resources`): the Windows installer behind a default-on task into
@@ -905,9 +929,14 @@ page hides the surface behind `HostCapabilities`).
   ⚠ These are header-inline functions, so **editing this header alone is not
   enough**: MSBuild will not recompile a `.cpp` whose headers changed, and the
   linker then folds in a stale object's copy of the old code. Symptoms are
-  bizarre — new tests exercising old logic, `printf`s that never appear. Touch
-  the `.cpp` files (`find Source Tests -name '*.cpp' -exec touch {} +`) or build
-  through `pnpm app`, which handles it.
+  bizarre — new tests exercising old logic, `printf`s that never appear, and,
+  when the header changed a class's *layout*, an access violation on the first
+  launch. Touch the `.cpp` files (`find Source Tests -name '*.cpp' -exec touch
+  {} +`) or run `pnpm app --clean`. **The plain dev loop does not handle this** —
+  `pnpm app --dist` builds incrementally and will happily link the mismatch;
+  only the release scripts wipe the `.dir` object directories first. The hazard
+  is not special to this header, either: any header that changes a type's layout
+  has it, `PlectrifyEngine.h` included.
 - `TunerDetector` (`Source/audio/`) — YIN pitch detection on a worker thread
   fed by a lock-free FIFO tapped off the input.
 - `InputProbe` (`Source/audio/`) — a **second `AudioIODeviceCallback`**, beside

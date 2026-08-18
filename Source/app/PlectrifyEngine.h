@@ -457,6 +457,14 @@ private:
 
     void openEditorFor (juce::AudioProcessorGraph::NodeID nodeID);
 
+    /** Names this engine's write-through temporaries apart from every other
+        engine's. The data root is shared by construction — the standalone and
+        each plugin instance write the same paths — so a fixed ".tmp" is a file
+        two writers fight over. Unique per instance and per process; the price
+        is that a crash between write and swap leaves one behind rather than
+        having it overwritten by the next write. */
+    const juce::String writerId { juce::Uuid().toDashedString().upToFirstOccurrenceOf ("-", false, false) };
+
     // --- Owned state ------------------------------------------------------
     PluginManager       pluginManager;
     CatalogueInstaller  catalogue;

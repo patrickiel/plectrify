@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
   import type { EngineBridge } from '../../lib/engine/EngineBridge';
-  import type { AppSettings, StatusState } from '../../lib/engine/types';
+  import type { AppSettings, HostCapabilities, StatusState } from '../../lib/engine/types';
   import { assignBinding, clearBinding, isPress, triggerOf } from '../../lib/engine/midi';
   import FeedbackPanel from './FeedbackPanel.svelte';
   import GainMeter from './GainMeter.svelte';
@@ -29,6 +29,10 @@
     ) => void;
     appSettings: AppSettings;
     onSetAppSettings: (settings: Partial<AppSettings>) => void;
+    /** Gates the feedback-guard slideout alone. The MUTE pill it sits above is
+        never gated — a hand mute is a panic control every host owes the
+        player. */
+    capabilities: HostCapabilities;
     /** True while the tuner's MIDI learn is armed. Bindable so App can hand it
         to the rack, whose live MIDI dispatch pauses during a learn — the press
         being captured must not also fire whatever it was bound to before. */
@@ -47,6 +51,7 @@
     onSetStatus,
     appSettings,
     onSetAppSettings,
+    capabilities,
     tunerMidiLearning = $bindable(false),
     muteMidiLearning = $bindable(false),
     otherLearnActive = false,
@@ -266,7 +271,7 @@
         onToggle={() => onSetStatus({ outputMuted: !status.outputMuted })}
         onClearFeedback={() => onSetStatus({ feedbackMuted: false, outputMuted: false })}
       />
-      {#if mutePanelOpen}
+      {#if mutePanelOpen && capabilities.feedbackGuard}
         <FeedbackPanel
           enabled={status.feedbackGuardEnabled}
           tripped={status.feedbackMuted}

@@ -2,6 +2,21 @@
 
 void LooperProcessor::prepareToPlay (double rate, int)
 {
+    // A host that does not offer the looper never allocates its buffers. The
+    // graph prepares every node it owns whether or not the node is connected,
+    // so leaving this out of the chain alone would still cost two stereo
+    // minutes of float — the largest single allocation in the engine, and one
+    // paid per plugin instance.
+    if (! available)
+    {
+        bufferA.setSize (0, 0);
+        bufferB.setSize (0, 0);
+        maxLoopSamples = 0;
+        sampleRate = rate;
+        resetToEmpty();
+        return;
+    }
+
     levelRampStep = (float) (1.0 / juce::jmax (1.0, rate * levelFadeSeconds));
     seamFadeSamples = juce::jmax (1, (int) (rate * seamFadeSeconds));
     minLoopSamples = juce::jmax (seamFadeSamples * 2, (int) (rate * minLoopSeconds));

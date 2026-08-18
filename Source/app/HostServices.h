@@ -30,6 +30,15 @@ struct HostCapabilities
     bool midiDevices  = true;   ///< MIDI device list (the event stream flows regardless)
     bool windowChrome = true;   ///< resize handles, window theme mirroring
     bool autoStandby  = true;   ///< the idle park/wake machinery
+
+    // The three practice tools. Each is a fixed graph node plus a panel, and
+    // each is declined by the plugin for a reason of its own — see
+    // PlectrifyAudioProcessor::capabilities(). Declining one drops the node from
+    // the chain as well as the surface: a looper that is merely hidden still
+    // costs its 46 MB of loop buffer per instance.
+    bool looper        = true;  ///< the loop recorder and its session archive
+    bool metronome     = true;  ///< the practice click
+    bool feedbackGuard = true;  ///< the acoustic-feedback detector and its latch
 };
 
 class HostServices
@@ -96,8 +105,11 @@ public:
         audio_settings.xml; the plugin marks its host-saved state dirty. */
     virtual void engineSettingsChanged() {}
 
-    /** One 15 Hz engine tick, after the status push. The standalone emits the
-        setup wizard's input meters here while they are armed. */
+    /** One 15 Hz engine tick. Called with no web view attached as well, so an
+        implementation that drains a queue keeps draining it — which is the
+        plugin's, flushing host MIDI. Anything emitted from here no-ops while
+        detached. The standalone emits the setup wizard's input meters here
+        while they are armed. */
     virtual void onEngineTick() {}
 
     // --- Bridge events only a host can answer ------------------------------

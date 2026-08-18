@@ -122,6 +122,24 @@ RackProcessor::RackProcessor()
     rebuildConnections();
 }
 
+void RackProcessor::setToolAvailability (ToolAvailability availability)
+{
+    tools = availability;
+
+    // The looper's buffers are the whole point of asking before prepare: a
+    // node left in the graph but out of the chain would still be prepared, and
+    // would still take its 46 MB.
+    looper->setAvailable (tools.looper);
+    outputLevel->setFeedbackGuardAvailable (tools.feedbackGuard);
+
+    // Same suspend/rebuild bracket every topology edit uses. In practice this
+    // runs at engine construction, before any device or host has prepared the
+    // graph, but it costs nothing to be correct if that ever changes.
+    graph.suspendProcessing (true);
+    rebuildConnections();
+    graph.suspendProcessing (false);
+}
+
 RackProcessor::~RackProcessor()
 {
     graph.clear();
@@ -1216,18 +1234,21 @@ void RackProcessor::rebuildConnections()
 
     // The looper is a fixed node either right after the input router (loop dry
     // guitar into the rig) or right before the master output (loop the full
-    // processed tone — the default).
+    // processed tone — the default). A host that declines either tool has it
+    // left out of the chain entirely rather than bypassed, so it renders
+    // nothing and costs nothing.
     if (groups.empty())
     {
         std::vector<NodeID> chain { audioInputNode->nodeID, inputRouterNode->nodeID };
-        if (! looperPostChain)
+        if (tools.looper && ! looperPostChain)
             chain.push_back (looperNode->nodeID);
         for (auto* slot : serial)
             if (passesAudio (slot->nodeID))
                 chain.push_back (slot->nodeID);
-        if (looperPostChain)
+        if (tools.looper && looperPostChain)
             chain.push_back (looperNode->nodeID);
-        chain.push_back (metronomeNode->nodeID);
+        if (tools.metronome)
+            chain.push_back (metronomeNode->nodeID);
         chain.push_back (outputLevelNode->nodeID);
         chain.push_back (audioOutputNode->nodeID);
         connectChain (chain);
@@ -1236,7 +1257,7 @@ void RackProcessor::rebuildConnections()
 
     std::vector<NodeID> sources { inputRouterNode->nodeID };
     connect (audioInputNode->nodeID, sources.front());
-    if (! looperPostChain)
+    if (tools.looper && ! looperPostChain)
     {
         connect (sources.front(), looperNode->nodeID);
         sources = { looperNode->nodeID };
@@ -1281,15 +1302,18 @@ void RackProcessor::rebuildConnections()
     }
 
     runSerialTo ((int) serial.size());
-    if (looperPostChain)
+    if (tools.looper && looperPostChain)
     {
         for (const auto source : sources)
             connect (source, looperNode->nodeID);
         sources = { looperNode->nodeID };
     }
-    for (const auto source : sources)
-        connect (source, metronomeNode->nodeID);
-    sources = { metronomeNode->nodeID };
+    if (tools.metronome)
+    {
+        for (const auto source : sources)
+            connect (source, metronomeNode->nodeID);
+        sources = { metronomeNode->nodeID };
+    }
     for (const auto source : sources)
         connect (source, outputLevelNode->nodeID);
     connect (outputLevelNode->nodeID, audioOutputNode->nodeID);

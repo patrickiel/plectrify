@@ -263,6 +263,23 @@ public:
         the graph nor bumps the revision. */
     void setStandbySuspended (bool shouldSuspend);
     bool isStandbySuspended() const noexcept { return standbySuspended; }
+
+    /** Which of the three built-in practice tools this host offers. Declining
+        one takes its node out of the chain and, for the looper, stops its loop
+        buffer being allocated at all — hiding a panel over a node that still
+        renders and still holds 46 MB would save nothing that matters.
+
+        Set once, from the host's capabilities, before the graph is ever
+        prepared; the setters and getters for a declined tool keep working and
+        keep their stored values, so the host-saved document still round-trips
+        every key whichever build wrote it. */
+    struct ToolAvailability
+    {
+        bool looper        = true;
+        bool metronome     = true;
+        bool feedbackGuard = true;
+    };
+    void setToolAvailability (ToolAvailability availability);
     /** Places the built-in looper after the whole chain (true, the default —
         loops carry the full processed tone) or right after the input router
         (false — loops feed dry guitar into the rig). A topology edit: suspends
@@ -364,6 +381,7 @@ private:
     OutputLevelProcessor* outputLevel = nullptr; // owned by outputLevelNode
     LooperProcessor* looper = nullptr;           // owned by looperNode
     MetronomeProcessor* metronome = nullptr;     // owned by metronomeNode
+    ToolAvailability tools;          // what this host offers; see setToolAvailability
     int inputSourceChannel = 0;      // persisted; which input pin carries the guitar
     bool looperPostChain = true;     // persisted placement preference
     bool tunerEnabled = true;        // persisted status-bar preference; never a mute request

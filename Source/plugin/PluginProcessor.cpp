@@ -52,6 +52,33 @@ void PlectrifyAudioProcessor::releaseResources()
     engine->getRack().getGraph().releaseResources();
 }
 
+void PlectrifyAudioProcessor::setPlayHead (juce::AudioPlayHead* newPlayHead)
+{
+    juce::AudioProcessor::setPlayHead (newPlayHead);
+
+    // The graph hands its *own* playhead to every node on each block, so
+    // leaving it unset does not merely withhold the host's transport — it
+    // overwrites each hosted plugin's with null, and a tempo-synced delay can
+    // never follow the DAW. AudioProcessorGraph does not override this, so the
+    // pointer is simply stored; forwarding here also carries the null the
+    // wrapper sends on teardown.
+    engine->getRack().getGraph().setPlayHead (newPlayHead);
+}
+
+void PlectrifyAudioProcessor::setNonRealtime (bool isProcessingNonRealtime) noexcept
+{
+    juce::AudioProcessor::setNonRealtime (isProcessingNonRealtime);
+
+    // The host only ever tells the outer processor. Without this the graph
+    // stays in realtime mode during an offline bounce and hands back silence
+    // rather than waiting when a render sequence is still being rebuilt — and
+    // the hosted plugins never learn they are rendering offline. The graph's
+    // override walks its node list, so this must stay off the audio thread,
+    // which is where JUCE calls it. Nodes added afterwards do not inherit the
+    // mode; a rack is not edited mid-bounce.
+    engine->getRack().getGraph().setNonRealtime (isProcessingNonRealtime);
+}
+
 bool PlectrifyAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     // A guitar track is mono or stereo; the rig always renders stereo (pan on
@@ -167,6 +194,29 @@ plectrify::HostCapabilities PlectrifyAudioProcessor::capabilities() const
     caps.midiDevices  = false;   // MIDI arrives from the host track
     caps.windowChrome = false;   // the DAW owns the window
     caps.autoStandby  = false;   // suspension is the host's business
+
+    // The metronome: the DAW has one, locked to the project tempo, and this one
+    // is not — host-tempo sync is unbuilt (see TODO.md), so all it could add
+    // here is a second click drifting against the host's.
+    caps.metronome = false;
+
+    // The looper: the DAW records to the timeline, which is where the player
+    // actually wants the audio — this one writes a WAV into the shared data
+    // root that the project knows nothing about and cannot carry with it. It is
+    // unsynced for the same reason the metronome is, and it preallocates ~46 MB
+    // of loop buffer per instance, which on a session with a Plectrify on every
+    // guitar track is the largest thing the plugin does with memory.
+    caps.looper = false;
+
+    // The feedback guard: the acoustic loop it watches for is real when
+    // tracking a live guitar through a DAW, but its failure mode here is not
+    // one it can have in the standalone. Sustained program material reads as
+    // "audible and not falling", and nothing ever releases the latch by design
+    // — so a trip during an offline bounce silently mutes the rest of the
+    // render, and with the editor closed the pill that clears it is out of
+    // reach. The host's own monitoring path is its business, as suspension is.
+    caps.feedbackGuard = false;
+
     return caps;
 }
 
@@ -196,10 +246,29 @@ void PlectrifyAudioProcessor::graphLatencyChanged (int totalLatencySamples)
 void PlectrifyAudioProcessor::engineSettingsChanged()
 {
     // A fixed-node setting (or the page's session document) moved: the DAW
-    // project now differs from the last saved state, and updateHostDisplay is
-    // how the host learns to mark it dirty.
+    // project now differs from the last saved state.
+    markProjectDirty();
+}
+
+void PlectrifyAudioProcessor::editorSizeChanged()
+{
+    // The remembered size is part of the saved document, so a resize is an
+    // edit like any other: without this the state cache — which only re-captures
+    // when dirty — keeps serving the old dimensions to an off-message-thread
+    // getStateInformation, and the host is never told the project moved.
+    markProjectDirty();
+}
+
+void PlectrifyAudioProcessor::markProjectDirty()
+{
     engine->markHostStateDirty();
-    updateHostDisplay();
+
+    // withNonParameterStateChanged is the only flag the VST3 wrapper turns into
+    // setDirty(true), which is what actually marks the project. The default
+    // flags say the opposite of what happened here — latency, parameter info
+    // and programs — asking for a full component restart from a plugin that
+    // exposes no parameters, while leaving the project clean.
+    updateHostDisplay (juce::AudioProcessor::ChangeDetails{}.withNonParameterStateChanged (true));
 }
 
 void PlectrifyAudioProcessor::handleSetEditorSize (const juce::var& payload)

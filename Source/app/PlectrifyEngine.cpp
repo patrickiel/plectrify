@@ -86,6 +86,11 @@ namespace
 PlectrifyEngine::PlectrifyEngine (plectrify::HostServices& hostServices)
     : host (hostServices)
 {
+    // Before anything can prepare the graph: the looper's buffers are allocated
+    // in prepareToPlay, so a host that does not offer it has to say so first.
+    const auto caps = host.capabilities();
+    rack.setToolAvailability ({ caps.looper, caps.metronome, caps.feedbackGuard });
+
     looperSessions = std::make_unique<LooperSessionStore> (appDataDir().getChildFile ("looper-sessions"));
 
     // Its first act may be to emit a session state; with no web view attached
@@ -163,7 +168,13 @@ PlectrifyEngine::~PlectrifyEngine()
     // A clean quit is not a crash: closing the app while a session restore is
     // still in flight must not quarantine that session on the next launch.
     // (Name matches RESTORE_SENTINEL in JuceEngine.ts.)
-    appDataDir().getChildFile ("restore_in_progress").deleteFile();
+    //
+    // The standalone's alone, though the data root is shared: the plugin never
+    // writes or reads it — its session rides the DAW project, whose crash story
+    // is the host's — so deleting it there would only disarm the standalone's
+    // quarantine, and a DAW closing a project mid-restore is exactly when.
+    if (! host.capturesHostState())
+        appDataDir().getChildFile ("restore_in_progress").deleteFile();
 }
 
 void PlectrifyEngine::emit (const juce::String& eventId, const juce::var& payload)
@@ -593,10 +604,16 @@ juce::var PlectrifyEngine::buildAppInfoState()
     info->setProperty ("host", host.hostKind());
     const auto caps = host.capabilities();
     auto* capabilities = new juce::DynamicObject();
+    // Every field, always: the page merges what arrives over the standalone
+    // defaults, so a key left out here does not read as "absent, assume
+    // standalone" — it reads as false and hides the feature in both builds.
     capabilities->setProperty ("audioDevices", caps.audioDevices);
     capabilities->setProperty ("midiDevices", caps.midiDevices);
     capabilities->setProperty ("windowChrome", caps.windowChrome);
     capabilities->setProperty ("autoStandby", caps.autoStandby);
+    capabilities->setProperty ("looper", caps.looper);
+    capabilities->setProperty ("metronome", caps.metronome);
+    capabilities->setProperty ("feedbackGuard", caps.feedbackGuard);
     info->setProperty ("capabilities", juce::var (capabilities));
     info->setProperty ("juceVersion", juce::SystemStats::getJUCEVersion());
 
@@ -1138,6 +1155,16 @@ void PlectrifyEngine::timerCallback()
     if (host.capabilities().autoStandby)
         standby.tick (standbyTick);
 
+    // Above the guard because the plugin's implementation is the *only* drain of
+    // its host-MIDI FIFO: left below, a closed editor lets the queue fill and
+    // then silently drop, and reopening hands the page a batch of presses the
+    // player made minutes ago. Draining regardless discards them where they are
+    // meant to be discarded — emit() no-ops with no view. (MIDI still acts on
+    // nothing while detached: the bindings are dispatched by the page. See the
+    // headless-MIDI item in TODO.md.) The standalone's implementation emits the
+    // setup wizard's input meters, which no-op the same way.
+    host.onEngineTick();
+
     if (webView == nullptr)
         return;
 
@@ -1152,10 +1179,6 @@ void PlectrifyEngine::timerCallback()
     }
 
     emitStatusChanged();
-
-    // The standalone emits the setup wizard's input meters here while its
-    // input step has them armed; nothing else ever asks.
-    host.onEngineTick();
 
     juce::Array<juce::var> modules;
     for (const auto& slot : rack.getSlots())
@@ -2635,7 +2658,12 @@ void PlectrifyEngine::handleWriteFile (const juce::var& payload)
 
         // Write through a sibling temporary file so a process crash cannot leave
         // the session JSON half-written. replaceFileIn performs the final swap.
-        const auto temporary = f.getSiblingFile (f.getFileName() + ".tmp");
+        //
+        // The name carries this engine's own id because the data root is shared:
+        // the standalone and every plugin instance write these same paths, and a
+        // fixed ".tmp" would have one writer delete another's half-written file
+        // and swap the remains into place.
+        const auto temporary = f.getSiblingFile (f.getFileName() + "." + writerId + ".tmp");
         temporary.deleteFile();
         if (temporary.replaceWithText (payload["text"].toString()))
             ok = f.existsAsFile() ? temporary.replaceFileIn (f) : temporary.moveFileTo (f);

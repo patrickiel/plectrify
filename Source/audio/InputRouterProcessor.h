@@ -130,6 +130,14 @@ public:
             feedbackTripped.store (false);
         feedbackGuardEnabled.store (shouldGuard);
     }
+
+    /** Message thread, once, before the graph is prepared. See the member. */
+    void setFeedbackGuardAvailable (bool isAvailable) noexcept
+    {
+        if (! isAvailable)
+            feedbackTripped.store (false);
+        feedbackGuardAvailable.store (isAvailable);
+    }
     bool isFeedbackGuardEnabled() const noexcept { return feedbackGuardEnabled.load(); }
 
     /** Message thread. The engine sets this; the user clears it. */
@@ -208,7 +216,11 @@ private:
         // there for a plainer reason: nothing is reaching the speaker, so there
         // is no acoustic loop to catch, and a latch tripped behind a mute would
         // only be found as a rig that stays silent after unmuting.
-        if (feedbackTripped.load() || ! feedbackGuardEnabled.load()
+        // A host that does not offer the guard never runs the detector, whatever
+        // the stored preference says — that value is kept and re-saved so the
+        // document round-trips between builds, but it arms nothing here.
+        if (! feedbackGuardAvailable.load()
+            || feedbackTripped.load() || ! feedbackGuardEnabled.load()
             || tunerMute.load() || loadMute.load() || standbyMute.load() || userMute.load())
         {
             feedbackHotSamples = 0;
@@ -277,6 +289,12 @@ private:
     // Off until the detector is out of beta: a guard that mutes a rig it should
     // not is worse than one the player turns on deliberately.
     std::atomic<bool> feedbackGuardEnabled { false };
+    /** Whether this host offers the guard at all — set once before the graph is
+        prepared (see RackProcessor::setToolAvailability), and never by the user.
+        Separate from `feedbackGuardEnabled` on purpose: that one is the player's
+        stored preference, which must survive a rig moving between the standalone
+        and a DAW untouched. */
+    std::atomic<bool> feedbackGuardAvailable { true };
     std::atomic<bool> feedbackTripped { false };
     std::atomic<bool> userMute { false };
     PeakMeter peak;

@@ -101,10 +101,26 @@
     stagedTool = $bindable(null),
   }: Props = $props();
 
+  // Two of the performance tools are host-owned concerns a DAW answers better
+  // (see HostCapabilities), so the rail simply does not offer them there.
+  function toolOffered(id: ToolId): boolean {
+    if (id === 'looper') return capabilities.looper;
+    if (id === 'metronome') return capabilities.metronome;
+    return true;
+  }
+  const railTools = $derived(TOOLS.filter((tool) => toolOffered(tool.id)));
+
   // Which tool's panel is open is a persisted workspace preference
   // (settings.json), so the sidebar comes back the way it was left — closed by
   // default. The stage view shows its tool regardless of that preference.
-  const shownTool = $derived(stagedTool ?? appSettings.activeTool);
+  //
+  // Filtered through what this host offers, because settings.json is shared
+  // with the standalone: leaving the looper open in the app would otherwise
+  // reopen it inside a DAW, on a panel driving a node that is not in the chain.
+  const shownTool = $derived.by(() => {
+    const tool = stagedTool ?? appSettings.activeTool;
+    return tool !== null && toolOffered(tool) ? tool : null;
+  });
   const shownDef = $derived([...TOOLS, ...UTILITY_TOOLS].find((tool) => tool.id === shownTool));
 
   // The Settings panel's sub-view. Session-only and reset on every rail press
@@ -589,7 +605,7 @@
         {/if}
       </IconButton>
     {/snippet}
-    {#each TOOLS as tool (tool.id)}
+    {#each railTools as tool (tool.id)}
       {@render railButton(tool)}
     {/each}
     <!-- Set-once panels live at the rail's foot, away from the performance

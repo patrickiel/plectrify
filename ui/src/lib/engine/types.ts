@@ -933,6 +933,14 @@ export interface HostCapabilities {
   windowChrome: boolean;
   /** The idle park/wake machinery. */
   autoStandby: boolean;
+  /** The loop recorder, its rail panel and its session archive. */
+  looper: boolean;
+  /** The practice metronome and its rail panel. */
+  metronome: boolean;
+  /** The acoustic-feedback detector — the slideout above the MUTE pill. The
+      pill itself is never gated: a hand mute is a panic control every host
+      owes the player. */
+  feedbackGuard: boolean;
 }
 
 /** What absence of the capabilities field means: the standalone, which has it
@@ -942,6 +950,9 @@ export const STANDALONE_CAPABILITIES: HostCapabilities = {
   midiDevices: true,
   windowChrome: true,
   autoStandby: true,
+  looper: true,
+  metronome: true,
+  feedbackGuard: true,
 };
 
 /** Facts about the running host only the engine knows — the About dialog and the
