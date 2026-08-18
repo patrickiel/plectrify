@@ -7,36 +7,11 @@
   "texture": "metal",
   "knobs": [
     {
-      "paramIndex": 2,
-      "label": "Dry",
-      "pos": 0
-    },
-    {
       "paramIndex": 3,
       "label": "Wet",
-      "pos": 1
-    },
-    {
-      "paramIndex": 7,
-      "label": "Decay",
-      "pos": 2
-    },
-    {
-      "paramIndex": 6,
-      "label": "Predelay",
-      "pos": 3
-    },
-    {
-      "paramIndex": 8,
-      "label": "Low Cut",
-      "pos": 4
-    },
-    {
-      "paramIndex": 10,
-      "label": "Dampen",
-      "pos": 5
+      "pos": 0
     }
   ],
   "pluginVersion": "3.2.10",
-  "state": "VkMyIbsBAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjI1NS5lOEVZdlkxV3lRV1h6VTFXaFUxWW80MVdlQS5ieFUxYmtRRy5Dd1ZZZ0lHSFB3Vlh6VUYuZThFWXZZMVd5UVdYelUxV2s0RlllOEUuZThFWXZZMVd2RWxiZzBWWXpVbGJ5OGtYa2NWWnQ4MFcuUGxiNDhFYWtZV1lyQS5Odi5QWWdJR2E0OEVha1lXWXJBZkx4LlBYcmMxYXhrRmNuMEYudy52Y29RRmNuQVBMdi5DLnZJV1lqVUZhZ2tHLndUaUt2LkNMdi5DTDRUeUwyLi5Za01WWDRBLkx0alNOdmpTTjRqU04xWGlNeC4uYXVjMldpVUdjLkRpTHYzQkx2LkNMdmJpTXhqQy5uazFZbjgwWDBRRy53WENMdi5DLmtFbGJyazJXakVWYXZBUEx3VENMdi52V2VRRmJsOEViZ0lXWHNVRmNrSTJiZVVsYWo4MFcuM08uPC9JQ29tcG9uZW50PjwvVlNUM1BsdWdpblN0YXRlPgA="
+  "state": "VkMyIboBAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjI1NC5lOEVZdlkxV3lRV1h6VTFXaFUxWW80MVdlQS5ieFUxYmtRRy5Dd1ZZZ0lHSFB3Vlh6VUYuZThFWXZZMVd5UVdYelUxV2s0RlllOEUuZThFWXZZMVd2RWxiZzBWWXpVbGJ5OGtYa2NWWnQ4MFcuUGxiNDhFYWtZV1lyQS5OdjNoTXZYU015WENOMVRpTC5UVlh4d1ZkZXdWWTFVRmEuTGlMdFhpTTJYaU15VHlNekhDLmd3MVl1SVdaemdWYS5EQy4ya0ZZemdGLncuQ0wuLm1ia1FWWXJFVmQuLkMualUxWGdrRy52M2hNdi5DTHYuQ0x4TENOekhDLnI4MWNlTVZjekFQTHYuQy5uazFZbjgwWDBRRy53TENMdi5DLmtFbGJyazJXakVWYXZBdk12LkNMLjcwV2pBbVllQVdYeEVWYWtRV1l4TTJXazRGWWU4RS45Qy48L0lDb21wb25lbnQ+PC9WU1QzUGx1Z2luU3RhdGU+AA=="
 }

@@ -1187,7 +1187,7 @@
         "Patches"
       ],
       "name": "Dragonfly Reverb patches",
-      "purpose": "One patch for each of the four reverbs - hall, room, plate and early reflections",
+      "purpose": "One patch each for the hall, room and plate reverbs",
       "version": "1",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
@@ -1207,7 +1207,7 @@
         }
       },
       "_macNote": "Dragonfly Reverb is offered on macOS and this pack is not, yet. A patch bakes its install root's absolute path into the saved tone, so each platform is authored separately, on that platform - hence content/<id>.macos-arm64/, saved out of a Mac. A pack with no folder for a platform is simply not offered there.",
-      "_shapeNote": "Four patches in one package, because dragonfly-reverb installs four plugins - Hall, Room, Plate and Early Reflections are separate VST3s, and a patch names one plugin. So the source folder holds no patch.json of its own: one <packageId>_<name> folder per patch instead, shipped as it stands rather than wrapped. The underscore is what files a pack patch under its package in the drawer (drawerGroups.isPatchOfPackage), so no other name will do."
+      "_shapeNote": "Several patches in one package, because dragonfly-reverb installs four plugins - Hall, Room, Plate and Early Reflections are separate VST3s, and a patch names one plugin. So the source folder holds no patch.json of its own: one <packageId>_<name> folder per patch instead, shipped as it stands rather than wrapped. The underscore is what files a pack patch under its package in the drawer (drawerGroups.isPatchOfPackage), so no other name will do. Not every plugin needs a patch of its own: Early Reflections shipped one and no longer does, which changes nothing about the package - the plugin still installs with the other three, and a patch is only ever an opinion about one of them."
     },
     {
       "id": "cloud-reverb",

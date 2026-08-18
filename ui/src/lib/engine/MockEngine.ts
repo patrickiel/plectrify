@@ -1851,11 +1851,9 @@ export class MockEngine implements EngineBridge {
     const mod = this.rack.find((m) => m.id === moduleId);
     if (!mod) return null;
     const id = uid('patch');
-    this.writePatch(id, {
-      ...storedFromModule(mod, name),
-      tone3000: mod.tone3000,
-      state: mockStateOf(mod),
-    });
+    const doc = { ...storedFromModule(mod, name), tone3000: mod.tone3000, state: mockStateOf(mod) };
+    this.writePatch(id, doc);
+    this.retitleModule(moduleId, doc.name);
     return id;
   }
 
@@ -1873,6 +1871,15 @@ export class MockEngine implements EngineBridge {
       tone3000: existing.tone3000,
       state: mockStateOf(mod),
     });
+    this.retitleModule(moduleId, existing.name);
+  }
+
+  /** A save names the module — JuceEngine's twin: the card must say the saved
+      name the moment the save lands, since the tile and the menu already do. */
+  private retitleModule(moduleId: string, title: string): void {
+    if (!this.rack.some((m) => m.id === moduleId && m.displayName !== title)) return;
+    this.rack = this.rack.map((m) => (m.id !== moduleId ? m : { ...m, displayName: title }));
+    this.emit();
   }
 
   loadPatch(moduleId: string, patchId: string): void {
@@ -1941,7 +1948,8 @@ export class MockEngine implements EngineBridge {
     const clean = name.trim();
     const existing = this.storedPatches[patchId];
     if (!clean || !existing) return;
-    this.writePatch(patchId, { ...existing, name: clean });
+    // The card title follows the name, as it does on save — JuceEngine's twin.
+    this.writePatch(patchId, { ...existing, name: clean, displayName: clean });
   }
 
   setPatchCategory(patchId: string, category: string): void {

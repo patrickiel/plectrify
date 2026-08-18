@@ -4,39 +4,28 @@
   "displayName": "Concert Hall",
   "color": "#8b5cf6",
   "icon": "reverb",
-  "texture": "carbon",
   "knobs": [
     {
       "paramIndex": 2,
-      "label": "Dry",
+      "label": "Dry Level",
       "pos": 0
     },
     {
-      "paramIndex": 4,
-      "label": "Late",
-      "pos": 1
-    },
-    {
-      "paramIndex": 5,
-      "label": "Size",
+      "paramIndex": 3,
+      "label": "Early Level",
       "pos": 2
     },
     {
-      "paramIndex": 17,
-      "label": "Decay",
-      "pos": 3
+      "paramIndex": 4,
+      "label": "Late Level",
+      "pos": 6
     },
     {
-      "paramIndex": 7,
-      "label": "Predelay",
+      "paramIndex": 18,
+      "label": "Early Send",
       "pos": 4
-    },
-    {
-      "paramIndex": 12,
-      "label": "High Cut",
-      "pos": 5
     }
   ],
   "pluginVersion": "3.2.10",
-  "state": "VkMyIUICAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjM1Ni5lOEVZdlkxV3lRV1h6VTFXaFUxWW80MVdlQS5ieFUxYmtRRy5TMFZYcndGSEN3VllnSUdISEVGYXJBdldlUUZibDgwYnpFRmNrOFVZdFExV2VBdldlUUZibDhFYmdJV1hzVUZja0kyYmVJVllta2xhZThFLmpJV2Rld1ZZMVVGYS5mQ0wuVFZYeHdWZGV3VlkxVUZhLkRpTC52Vlh6VTFXclVsY2t3Ri53ZkMueWtsZGtBZkwyM1JNLmJXWmpRR1ouRENMdi4uWWt3Vlg0QWZMdi4uWW9ZbFkwTVdZLmpDTC52MWEyODBYMFFHLnouLmF1YzJXMzhGLjAuQ0wudjFhMjhVYTB3RmMuRGlLeGpTTjRqU040VGlMeUhDLm5rMVluODBYMFFHLjIuQ0x2Li5ab2NGWmVnMmEuVFNNdi5DLm5rMVluOFVhMHdGYy4uaUswLnZidmtsYS5MaUt4alNONGpTTjRUaUx5SEMuMkVsYWpVbGIuRFNNLlBWWWlFVmQuSGlLdmJTTjRqU040SHlMMkRDLmtFbGJyazJXeVVsYWpBZkx2LlBhdVFWY3JFRmNvOGxhLkRTTS43MFdqQW1ZZUFXWHhFVmFrUVdZeE0yV2s0RlllOEUuOUMuPC9JQ29tcG9uZW50PjwvVlNUM1BsdWdpblN0YXRlPgA="
+  "state": "VkMyIXsCAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjM5OS5lOEVZdlkxV3lRV1h6VTFXaFUxWW80MVdlQS5ieFUxYmtRRy5NVUZZb1VXYWZMRGFrRWxiZmZUWHJ3Ri5lOEVZdlkxV3lRV1h6VTFXazRGWWU4RS5lOEVZdlkxV3ZFbGJnMFZZelVsYnk4a1hrY1ZadDgwVy5QbGI0OEVha1lXWXJBZk0wM1JOdlB5TTNUU0wwWGlMLlRWWHh3VmRld1ZZMVVGYS5EQ0x0LlNOMEh5THpmeU12akMuckVGY2s4RWFrWVdZckFmTHozQkw0VGlMd1BDTnpMQ04uTFdaNVVGLnkuQy4ya0ZZemdGLncuQ0wuUFZZckVWZC5mQy5qa2xZbFUyYmtBUE52Li5hdWMyV2lVR2MuUEMucjgxY2VnMmEuVENMdi4uYXVjMldzVUdhekFQTHRUQy5uazFZbjgwWDBRRy4yWENMdi4uWm9jRlplZzJhLlRTTXYuQy5uazFZbjhVYTB3RmMuLmlLMC52YnZrbGEuSGlLNC5DTHYuQ0x2alNNeWJDLjJFbGFqVWxiLkRTTS5QVllpRVZkLkRpSzIuQ0x2LkNMdlB5TTFmQy5rRWxicmsyV3lVbGFqQWZMdzNSTnZQQ054YlNMd2JTTi56MWFqVUdhZ1FXWnU0Ri53VGlLdi5DTHYuQ0w0VHlMMi52V2VRRmJsOEViZ0lXWHNVRmNrSTJiZVVsYWo4MFcuM08uPC9JQ29tcG9uZW50PjwvVlNUM1BsdWdpblN0YXRlPgA="
 }

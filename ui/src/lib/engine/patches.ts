@@ -43,13 +43,17 @@ const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 export interface StoredPatch {
   name: string;
   pluginName: string;
-  /** The module card's look at capture time — its title override, accent
-      colour, style variant, icon and texture. A patch is what gives a module
-      its identity, and half of that identity is what the card says and how it
-      looks, so they travel together. All are absent when the module was left
-      at its defaults, and absent means "leave the card alone" on load: patches
-      written before any of these fields carry none of them, and a pack may
-      ship a mapping with no look of its own. */
+  /** The card title the patch asks for, plus the card's look at capture time —
+      accent colour, style variant, icon and texture. A patch is what gives a
+      module its identity, and half of that identity is what the card says and
+      how it looks, so they travel together. Saving stamps `displayName` with
+      the patch's own name rather than whatever the card happened to be wearing
+      — that title is the *previous* patch's as often as the user's, and a
+      patch called "Repeats" whose tile and card keep saying "Dark Repeats" is
+      a patch that looks unsaved (see `storedFromModule`). The look fields are
+      absent when the module was left at its defaults, and absent means "leave
+      the card alone" on load: patches written before any of these fields carry
+      none of them, and a pack may ship a mapping with no look of its own. */
   displayName?: string;
   color?: string;
   styleVariant?: ModuleStyleVariant;
@@ -144,12 +148,19 @@ export function sharedPatchIdsFrom(dirs: string[]): string[] {
 /** Capture a module's current knob layout, ready to be written as a patch. An
     empty name falls back to the plugin name (patches match by plugin). The
     tone is added by the caller, which is the only side that can ask the engine
-    for it. */
+    for it.
+
+    The card title is the patch's own name, never the module's current one:
+    the module is titled by whatever patch was loaded last, so copying it
+    would bake the previous patch's name into this one — a patch saved as
+    "Repeats" off a card still saying "Dark Repeats" must not answer to
+    "Dark Repeats" for the rest of its life. */
 export function storedFromModule(module: RackModule, name: string): StoredPatch {
+  const resolved = name.trim() || module.name;
   return {
-    name: name.trim() || module.name,
+    name: resolved,
     pluginName: module.name,
-    displayName: module.displayName,
+    displayName: resolved,
     color: module.color,
     styleVariant: module.styleVariant,
     icon: module.icon,

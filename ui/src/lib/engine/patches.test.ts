@@ -84,7 +84,6 @@ describe('storedFromModule', () => {
   it('carries the card’s look, so a patch restores the module it was saved from', () => {
     const p = storedFromModule(
       module({
-        displayName: 'Lead Amp',
         color: '#c04a2b',
         styleVariant: 'bold',
         icon: 'amp',
@@ -92,17 +91,30 @@ describe('storedFromModule', () => {
       }),
       'x',
     );
-    expect(p.displayName).toBe('Lead Amp');
     expect(p.color).toBe('#c04a2b');
     expect(p.styleVariant).toBe('bold');
     expect(p.icon).toBe('amp');
     expect(p.texture).toBe('tolex');
   });
 
+  it('titles the card after the patch, never after the title the card was wearing', () => {
+    // The module's title is whatever patch was loaded last — saving "Repeats"
+    // off a card still saying "Dark Repeats" must not bake the old name in,
+    // or the drawer tile and the card keep answering to it forever.
+    const p = storedFromModule(module({ displayName: 'Dark Repeats' }), 'Repeats');
+    expect(p.name).toBe('Repeats');
+    expect(p.displayName).toBe('Repeats');
+    // The empty-name fallback stamps the same resolved name.
+    expect(storedFromModule(module({ displayName: 'Dark Repeats' }), '  ').displayName).toBe(
+      'Mock Amp',
+    );
+  });
+
   it('leaves the look unset for a module still at its defaults', () => {
-    // Unset means "leave the card alone" on load, not "clear it".
+    // Unset means "leave the card alone" on load, not "clear it" — except the
+    // title, which a saved patch always claims as its own name.
     const p = storedFromModule(module(), 'x');
-    expect(p.displayName).toBeUndefined();
+    expect(p.displayName).toBe('x');
     expect(p.color).toBeUndefined();
     expect(p.styleVariant).toBeUndefined();
     expect(p.icon).toBeUndefined();

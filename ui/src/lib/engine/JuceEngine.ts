@@ -1166,6 +1166,7 @@ export class JuceEngine implements EngineBridge {
     const doc: StoredPatch = { ...storedFromModule(mod, name), tone3000: mod.tone3000, ...tone };
     this.patches = [...this.patches, toPatch(id, doc)].sort(byName);
     this.writePatch(path, doc);
+    this.retitleModule(moduleId, doc.name);
     return id;
   }
 
@@ -1195,6 +1196,22 @@ export class JuceEngine implements EngineBridge {
     };
     this.patches = this.patches.map((p) => (p.id === patchId ? toPatch(patchId, doc) : p));
     this.writePatch(path, doc);
+    this.retitleModule(moduleId, doc.name);
+  }
+
+  /** A save names the module: the card, the drawer tile and the patch menu
+      must all say the saved name the moment the save lands, and the card is
+      the one of the three the save does not rewrite by itself. Loading the
+      patch back would retitle the card anyway (its stored displayName is its
+      name — see storedFromModule), so this only brings that forward. Guarded
+      on the module still existing: the capture round-trip was awaited, and
+      metaFor would resurrect a deleted module's meta. */
+  private retitleModule(moduleId: string, title: string): void {
+    if (!this.rack.some((m) => m.id === moduleId)) return;
+    const m = this.metaFor(moduleId);
+    if (m.displayName === title) return;
+    m.displayName = title;
+    this.afterMetaChange(moduleId, false);
   }
 
   loadPatch(moduleId: string, patchId: string): void {
@@ -1289,7 +1306,10 @@ export class JuceEngine implements EngineBridge {
     const clean = name.trim();
     const path = patchPath(patchId);
     if (!clean || !path || !this.isUserPatch(patchId)) return;
-    void this.rewritePatchDoc(patchId, path, { name: clean });
+    // The card title follows the name, as it does on save: a renamed patch
+    // whose stored displayName kept the old name would keep showing it on the
+    // drawer tile and stamping it onto every card it is loaded on.
+    void this.rewritePatchDoc(patchId, path, { name: clean, displayName: clean });
   }
 
   setPatchCategory(patchId: string, category: string): void {
@@ -1308,7 +1328,7 @@ export class JuceEngine implements EngineBridge {
   private async rewritePatchDoc(
     patchId: string,
     path: string,
-    change: Pick<Partial<StoredPatch>, 'name' | 'category'>,
+    change: Pick<Partial<StoredPatch>, 'name' | 'displayName' | 'category'>,
   ): Promise<void> {
     const doc = await this.readPatch(patchId);
     if (!doc) {
