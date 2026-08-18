@@ -15,6 +15,7 @@
   import type { CatalogueState } from '../../lib/engine/catalogue';
   import type { CategoryNode } from '../../lib/engine/catalogue';
   import {
+    DRAWER_UNCATEGORISED,
     flattenPatchGroups,
     groupPatches,
     groupPluginsByMaker,
@@ -315,12 +316,15 @@
   const pluginIdByName = $derived(new Map(plugins.map((p) => [p.name, p.id])));
 
   /** One accordion section: a patch category (heading path flattened into the
-      label, "Effects · Reverb") or one manufacturer's plugins. One list for
-      both because the drawer answers one question — "what can a module be
-      made from" — and two parallel lists would ask it twice. */
+      label, "Effects · Reverb") or the single Plugins section, whose maker
+      buckets render as fixed sub-headings inside it rather than as sections of
+      their own — a dozen collapsed vendor rows told nothing about what was
+      installed, where one open list under one heading shows all of it. One
+      list for both kinds because the drawer answers one question — "what can
+      a module be made from" — and two parallel lists would ask it twice. */
   type DrawerSection =
     | { kind: 'patches'; key: string; label: string; entries: DrawerPatch[] }
-    | { kind: 'plugins'; key: string; label: string; plugins: PluginInfo[] };
+    | { kind: 'plugins'; key: string; label: string; groups: [string, PluginInfo[]][] };
 
   function flattenPatchSections(nodes: CategoryNode<DrawerPatch>[]): DrawerSection[] {
     return flattenPatchGroups(nodes).map((group) => ({
@@ -335,7 +339,7 @@
   // or its heading; a plugin matches on its name or vendor (as the old picker
   // did — "neural" should find the Archetypes even though none of them carry
   // the maker's name in their own).
-  const sections = $derived.by(() => {
+  const grouped = $derived.by(() => {
     const q = filter.trim().toLowerCase();
 
     const shownPatches = q
@@ -353,10 +357,23 @@
       : plugins;
 
     const out = flattenPatchSections(groupPatches(shownPatches, catalogue.items, plugins));
-    for (const [maker, makerPlugins] of groupPluginsByMaker(shownPlugins))
-      out.push({ kind: 'plugins', key: `plugins:${maker}`, label: maker, plugins: makerPlugins });
+    const makers = groupPluginsByMaker(shownPlugins);
+    if (makers.length > 0)
+      out.push({ kind: 'plugins', key: 'plugins', label: 'Plugins', groups: makers });
     return out;
   });
+
+  /** The Uncategorised patches are the special case: no heading and no
+      accordion — their tiles sit resolved at the very top of the list, above
+      the sections, so a freshly saved patch is in sight rather than filed
+      under a label that only says it was not filed. Still a section object
+      underneath, so the reorder and refile gestures work on it unchanged. */
+  const UNCATEGORISED_KEY = `patches:${DRAWER_UNCATEGORISED}`;
+  type PatchSection = Extract<DrawerSection, { kind: 'patches' }>;
+  const uncategorised = $derived(
+    grouped.find((s): s is PatchSection => s.key === UNCATEGORISED_KEY),
+  );
+  const sections = $derived(grouped.filter((s) => s.key !== UNCATEGORISED_KEY));
 
   // Accordion state: at most one section open, resolved from the persisted
   // key. Clicking the open header closes it — NO_SECTION is that state's
@@ -499,7 +516,8 @@
       await tick();
       const wanted = new Set(ids);
       const hit = firstSectionWith(wanted);
-      if (hit && hit.key !== effectiveOpenKey) onSetOpenSection(hit.key);
+      if (hit && hit.key !== effectiveOpenKey && hit.key !== UNCATEGORISED_KEY)
+        onSetOpenSection(hit.key);
       revealedIds = wanted;
 
       // A section that was shut mounts its tiles behind a slide, and a drawer
@@ -524,12 +542,15 @@
 
   /** The first section holding one of these ids — the one the accordion
       opens for the reveal; a tile behind a collapsed heading is as good as
-      absent. */
+      absent. Searches the uncategorised row too: its tiles are always
+      visible, so a hit there needs no section opened at all. */
   function firstSectionWith(ids: ReadonlySet<string>): DrawerSection | undefined {
-    return sections.find((section) =>
+    return grouped.find((section) =>
       section.kind === 'patches'
         ? section.entries.some((entry) => ids.has(entry.patch.id))
-        : section.plugins.some((plugin) => ids.has(plugin.id)),
+        : section.groups.some(([, makerPlugins]) =>
+            makerPlugins.some((plugin) => ids.has(plugin.id)),
+          ),
     );
   }
 
@@ -571,7 +592,7 @@
   }
 
   function startReorder(sectionKey: string, patchId: string) {
-    const section = sections.find(
+    const section = grouped.find(
       (s): s is Extract<DrawerSection, { kind: 'patches' }> =>
         s.kind === 'patches' && s.key === sectionKey,
     );
@@ -810,6 +831,83 @@
        shelf stays. -->
   <div class="relative flex min-h-0 flex-1 flex-col">
     <div class="min-h-0 flex-1 overflow-y-auto pb-3" bind:this={listEl} inert={collapsed}>
+      <!-- One patch section's tiles, shared between the accordion sections and
+           the uncategorised row above them. -->
+      {#snippet patchEntries(section: PatchSection)}
+        {#each orderedEntries(section) as entry (entry.patch.id)}
+          <!-- The wrapper exists for animate:flip, which only rides the
+               immediate element child of a keyed each. It dims the tile in
+               hand so the preview clearly shows the slot the drop would
+               take. -->
+          <div
+            animate:flip={tileFlip}
+            role="presentation"
+            class={[
+              'flex-none',
+              reorder?.patchId === entry.patch.id && 'opacity-40 transition-opacity duration-120',
+            ]}
+          >
+            <PatchTile
+              patch={entry.patch}
+              pluginId={pluginIdByName.get(entry.patch.pluginName)}
+              revealed={revealedIds.has(entry.patch.id)}
+              onDragStart={(payload) => {
+                // A plain drag leaves for the rack, but stays armed for
+                // the mid-drag Shift conversion (see convertOnShift).
+                if (!filterActive) {
+                  armed = { sectionKey: section.key, patchId: entry.patch.id };
+                  window.addEventListener('dragover', convertOnShift);
+                }
+                onDragStart(payload);
+              }}
+              onDragEnd={() => {
+                window.removeEventListener('dragover', convertOnShift);
+                armed = null;
+                reorder = null;
+                refileKey = null;
+                onDragEnd();
+              }}
+              onReorderStart={filterActive
+                ? undefined
+                : () => startReorder(section.key, entry.patch.id)}
+              onReorderEnd={endReorder}
+              onRename={(name) => onRenamePatch(entry.patch.id, name)}
+              onSetCategory={(category) => onSetPatchCategory(entry.patch.id, category)}
+              onDelete={() => onDeletePatch(entry.patch.id)}
+              captureMissing={missingCaptures?.has(entry.patch.id) ?? false}
+              onRepair={() => onRepairPatch?.(entry.patch.id)}
+              onOpenTone={entry.patch.tone3000?.url && onOpenToneUrl
+                ? () => onOpenToneUrl(entry.patch.tone3000!.url!)
+                : undefined}
+              onShowPackage={packageIdOf(entry.patch) && onShowPackage
+                ? () => onShowPackage(packageIdOf(entry.patch)!)
+                : undefined}
+            />
+          </div>
+        {/each}
+      {/snippet}
+
+      <!-- The uncategorised patches, resolved in place: no heading, no
+           accordion, always visible above the sections. The container still
+           carries the section's reorder/refile handlers, so dragging within
+           the row reorders it and a reorder drag from a section dropped here
+           re-files the patch as uncategorised. -->
+      {#if uncategorised}
+        {@const section = uncategorised}
+        <div
+          class={[
+            'flex flex-wrap items-start gap-2 border-b border-[var(--edge-hair)] px-3 pt-2.5 pb-2.5',
+            refileKey === section.key && 'refile-target',
+          ]}
+          role="list"
+          ondragover={(e) => reorderOver(e, section)}
+          ondragleave={() => refileLeave(section)}
+          ondrop={(e) => reorderDrop(e, section)}
+        >
+          {@render patchEntries(section)}
+        </div>
+      {/if}
+
       {#each sections as section (section.key)}
         {@const open = isOpen(section)}
         <section class="border-t border-[var(--edge-hair)] first:border-t-0">
@@ -836,122 +934,89 @@
                 ]}
               />
               <span class="truncate">{section.label}</span>
-              {#if section.kind === 'plugins'}
-                <span class="font-medium tracking-normal normal-case opacity-60">plugins</span>
-              {/if}
               <span class="ml-auto pl-2 font-medium tracking-normal tabular-nums opacity-75"
                 >{section.kind === 'patches'
                   ? section.entries.length
-                  : section.plugins.length}</span
+                  : section.groups.reduce(
+                      (n, [, makerPlugins]) => n + makerPlugins.length,
+                      0,
+                    )}</span
               >
             </button>
           </h4>
           {#if open}
             <div
-              class="flex flex-wrap items-start gap-2 px-3 pt-0.5 pb-2"
-              role="list"
+              class={[
+                'px-3 pt-0.5 pb-2',
+                section.kind === 'patches' ? 'flex flex-wrap items-start gap-2' : 'flex flex-col',
+              ]}
+              role={section.kind === 'patches' ? 'list' : undefined}
               transition:slide={sectionSlide}
               ondragover={section.kind === 'patches' ? (e) => reorderOver(e, section) : undefined}
               ondragleave={section.kind === 'patches' ? () => refileLeave(section) : undefined}
               ondrop={section.kind === 'patches' ? (e) => reorderDrop(e, section) : undefined}
             >
               {#if section.kind === 'patches'}
-                {#each orderedEntries(section) as entry (entry.patch.id)}
-                  <!-- The wrapper exists for animate:flip, which only rides
-                       the immediate element child of a keyed each. It dims
-                       the tile in hand so the preview clearly shows the slot
-                       the drop would take. -->
-                  <div
-                    animate:flip={tileFlip}
-                    role="presentation"
-                    class={[
-                      'flex-none',
-                      reorder?.patchId === entry.patch.id &&
-                        'opacity-40 transition-opacity duration-120',
-                    ]}
-                  >
-                    <PatchTile
-                      patch={entry.patch}
-                      pluginId={pluginIdByName.get(entry.patch.pluginName)}
-                      revealed={revealedIds.has(entry.patch.id)}
-                      onDragStart={(payload) => {
-                        // A plain drag leaves for the rack, but stays armed for
-                        // the mid-drag Shift conversion (see convertOnShift).
-                        if (!filterActive) {
-                          armed = { sectionKey: section.key, patchId: entry.patch.id };
-                          window.addEventListener('dragover', convertOnShift);
-                        }
-                        onDragStart(payload);
-                      }}
-                      onDragEnd={() => {
-                        window.removeEventListener('dragover', convertOnShift);
-                        armed = null;
-                        reorder = null;
-                        refileKey = null;
-                        onDragEnd();
-                      }}
-                      onReorderStart={filterActive
-                        ? undefined
-                        : () => startReorder(section.key, entry.patch.id)}
-                      onReorderEnd={endReorder}
-                      onRename={(name) => onRenamePatch(entry.patch.id, name)}
-                      onSetCategory={(category) => onSetPatchCategory(entry.patch.id, category)}
-                      onDelete={() => onDeletePatch(entry.patch.id)}
-                      captureMissing={missingCaptures?.has(entry.patch.id) ?? false}
-                      onRepair={() => onRepairPatch?.(entry.patch.id)}
-                      onOpenTone={entry.patch.tone3000?.url && onOpenToneUrl
-                        ? () => onOpenToneUrl(entry.patch.tone3000!.url!)
-                        : undefined}
-                      onShowPackage={packageIdOf(entry.patch) && onShowPackage
-                        ? () => onShowPackage(packageIdOf(entry.patch)!)
-                        : undefined}
-                    />
-                  </div>
-                {/each}
+                {@render patchEntries(section)}
               {:else}
-                {#each section.plugins as plugin (plugin.id)}
-                  <span
-                    class={[
-                      'plugin-chip group flex cursor-grab items-center gap-1 rounded-lg border border-ink/20 bg-panel py-1 pr-2 pl-1 text-[length:var(--drawer-font-title)] text-ink/85 select-none hover:border-accent/60 hover:text-ink',
-                      revealedIds.has(plugin.id) && 'animate-reveal-pulse',
-                    ]}
-                    data-reveal-id={plugin.id}
-                    role="listitem"
-                    draggable="true"
-                    ondragstart={(e) => startPluginDrag(e, plugin)}
-                    ondragend={onDragEnd}
-                    {@attach tooltip(
-                      'Drag onto a gap to add a module, or onto a module to replace it',
-                    )}
+                <!-- The maker buckets as fixed sub-headings — the level the
+                     accordion used to spend a section per vendor on. Plain
+                     headings, not controls: the one Plugins section opens and
+                     closes as a whole. -->
+                {#each section.groups as [maker, makerPlugins] (maker)}
+                  <h5
+                    class="pt-2 pb-1.5 text-[length:var(--drawer-font-label)] font-semibold tracking-[.06em] text-muted/80 uppercase first:pt-1"
                   >
-                    <!-- The same grip every draggable thing in the drawer
-                         carries (see BrowseTone3000Tile, PatchTile): one mark
-                         that means "take hold of this". -->
-                    <DotsSixVerticalIcon
-                      size={14}
-                      weight="bold"
-                      class="flex-none text-muted opacity-60 transition-opacity group-hover:opacity-100"
-                      aria-hidden="true"
-                    />
-                    {plugin.name}
-                  </span>
+                    {maker}
+                  </h5>
+                  <div class="flex flex-wrap items-start gap-2" role="list">
+                    {#each makerPlugins as plugin (plugin.id)}
+                      <span
+                        class={[
+                          'plugin-chip group flex cursor-grab items-center gap-1 rounded-lg border border-ink/20 bg-panel py-1 pr-2 pl-1 text-[length:var(--drawer-font-title)] text-ink/85 select-none hover:border-accent/60 hover:text-ink',
+                          revealedIds.has(plugin.id) && 'animate-reveal-pulse',
+                        ]}
+                        data-reveal-id={plugin.id}
+                        role="listitem"
+                        draggable="true"
+                        ondragstart={(e) => startPluginDrag(e, plugin)}
+                        ondragend={onDragEnd}
+                        {@attach tooltip(
+                          'Drag onto a gap to add a module, or onto a module to replace it',
+                        )}
+                      >
+                        <!-- The same grip every draggable thing in the drawer
+                             carries (see BrowseTone3000Tile, PatchTile): one
+                             mark that means "take hold of this". -->
+                        <DotsSixVerticalIcon
+                          size={14}
+                          weight="bold"
+                          class="flex-none text-muted opacity-60 transition-opacity group-hover:opacity-100"
+                          aria-hidden="true"
+                        />
+                        {plugin.name}
+                      </span>
+                    {/each}
+                  </div>
                 {/each}
               {/if}
             </div>
           {/if}
         </section>
       {:else}
-        <p class="px-3 py-4 text-xs text-muted">
-          {#if filterActive}
-            No matches.
-          {:else if plugins.length === 0}
-            No VST3 plugins found. Scan for plugins, or install a starter set from the Packages
-            panel.
-          {:else}
-            Nothing here yet. Save a patch from a module's patch menu, or install one from the
-            Packages panel.
-          {/if}
-        </p>
+        {#if !uncategorised}
+          <p class="px-3 py-4 text-xs text-muted">
+            {#if filterActive}
+              No matches.
+            {:else if plugins.length === 0}
+              No VST3 plugins found. Scan for plugins, or install a starter set from the Packages
+              panel.
+            {:else}
+              Nothing here yet. Save a patch from a module's patch menu, or install one from the
+              Packages panel.
+            {/if}
+          </p>
+        {/if}
       {/each}
     </div>
   </div>
@@ -1103,9 +1168,11 @@
 
   /* The section a reorder drag would re-file into if released now: the same
      accent language as every drop zone, on the header so a closed section
-     answers as well as an open one. Element+class so it outranks the
-     header's own text-colour utilities without an !important. */
-  button.refile-target {
+     answers as well as an open one — and on the uncategorised row itself,
+     which has no header. Element+class so it outranks the header's own
+     text-colour utilities without an !important. */
+  button.refile-target,
+  div.refile-target {
     color: var(--color-accent);
     background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   }

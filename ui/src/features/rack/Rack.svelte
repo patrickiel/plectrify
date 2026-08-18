@@ -69,7 +69,7 @@
   import ModuleCard from '../module/ModuleCard.svelte';
   import ModuleDrawer from '../drawer/ModuleDrawer.svelte';
   import { revealPackageInPanel } from '../plugins/reveal';
-  import { revealBrowseInDrawer } from '../drawer/reveal';
+  import { revealBrowseInDrawer, revealPatchInDrawer } from '../drawer/reveal';
   import LaneSwitchButton from './LaneSwitchButton.svelte';
   import BlacklistDialog from './BlacklistDialog.svelte';
   import MixStrip from './MixStrip.svelte';
@@ -1603,8 +1603,18 @@
                   toggleContentLearn({ kind: 'module', moduleId: m.id })}
                 onModuleMidiClear={() => engine.setModuleMidi(m.id, null)}
                 patchSections={patchSectionsByPlugin.get(m.name) ?? []}
-                onSavePatch={(name) => engine.savePatch(m.id, name)}
-                onUpdatePatch={(patchId) => engine.updatePatch(patchId, m.id)}
+                onSavePatch={async (name) => {
+                  // Show the freshly saved patch where it landed: the drawer
+                  // scrolls to the tile and pulses it (same reveal a TONE3000
+                  // download asks for).
+                  const patchId = await engine.savePatch(m.id, name);
+                  if (patchId) revealPatchInDrawer(patchId);
+                  return patchId;
+                }}
+                onUpdatePatch={async (patchId) => {
+                  await engine.updatePatch(patchId, m.id);
+                  revealPatchInDrawer(patchId);
+                }}
                 onLoadPatch={(patchId) => engine.loadPatch(m.id, patchId)}
                 onPreviewPatch={(patchId) => engine.previewPatch(m.id, patchId)}
                 onCancelPatchPreview={() => engine.cancelPatchPreview(m.id)}
