@@ -151,6 +151,11 @@
   }
 
   async function commitSave(raw: string) {
+    // A capture reads the module, so any preview still applied must be put
+    // back first — reaching Save with the pointer ends it on the way, but a
+    // keyboard focus starts a preview nothing else ends. The engine settles it
+    // again on its side; this also keeps the row highlight honest.
+    endPreview();
     // Enter always accepts, exactly like a scene or rig name: leaving the field
     // empty takes the placeholder (the plugin name), which is what the engine
     // would fall back to anyway.
@@ -166,6 +171,7 @@
     // Keyed by id, not name: patches may share a display name, and saving one
     // must never write over another (or silently append a duplicate).
     if (!activePatch) return;
+    endPreview(); // same reasoning as commitSave — never recapture a try-on
     void onUpdate(activePatch.id);
     open = false;
   }
@@ -329,6 +335,10 @@
         type="button"
         class="flex w-full items-center gap-1.5 rounded px-3 py-1.5 text-left text-xs text-ink/80 hover:bg-ink/10"
         onclick={() => {
+          // The template is captured from the module's params on the page
+          // side, so the preview must be settled before the callback reads
+          // them — the engine's own guard never sees this path.
+          endPreview();
           onSetToneTemplate();
           open = false;
         }}

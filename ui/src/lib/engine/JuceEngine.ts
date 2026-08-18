@@ -1151,6 +1151,11 @@ export class JuceEngine implements EngineBridge {
   }
 
   async savePatch(moduleId: string, name: string): Promise<string | null> {
+    // A preview must never be captured: "current" is the module's own mapping,
+    // not the patch the pointer happened to be trying on when the save was
+    // clicked. Settled before the module is read — this is what once let a
+    // hover over the menu write another patch's knob layout into this one.
+    this.settlePreview(moduleId);
     const mod = this.rack.find((m) => m.id === moduleId);
     const id = uid('patch');
     const path = patchPath(id);
@@ -1171,6 +1176,9 @@ export class JuceEngine implements EngineBridge {
   }
 
   async updatePatch(patchId: string, moduleId: string): Promise<void> {
+    // Same rule as savePatch: the recapture reads the module, so a preview
+    // still applied would overwrite this patch with another patch's mapping.
+    this.settlePreview(moduleId);
     const mod = this.rack.find((m) => m.id === moduleId);
     const existing = this.patches.find((p) => p.id === patchId);
     const path = patchPath(patchId);
@@ -1287,6 +1295,15 @@ export class JuceEngine implements EngineBridge {
   cancelPatchPreview(moduleId: string): void {
     if (this.patchPreview?.moduleId !== moduleId) return;
     this.restorePreview();
+  }
+
+  /** End any preview running on `moduleId` by putting the module back as it
+      was. Every capture path (savePatch, updatePatch) calls this before
+      reading the module: what is captured must be the module's own state,
+      never the try-on. A preview on some other module is left alone — it is
+      not what is being read. */
+  private settlePreview(moduleId: string): void {
+    if (this.patchPreview?.moduleId === moduleId) this.restorePreview();
   }
 
   /** Put the previewed module's own mapping and look back, and end the run. */

@@ -180,6 +180,50 @@ describe('patch identity', () => {
     expect(patches.find((p) => p.id === patchId)?.displayName).toBe('Crunch');
   });
 
+  it('updating a patch never captures a preview’s mapping', async () => {
+    engine.insertModule('Neural Amp Modeler', { serialPosition: 0 });
+    let rack: RackModule[] = [];
+    const stop = engine.subscribeRack((next) => (rack = next));
+    const moduleId = rack[0].id;
+
+    // A mapped module, saved, then rearranged: the module's own layout now
+    // differs from both the saved patch and the pack patch.
+    engine.loadPatch(moduleId, 'amalgam-jtm45');
+    const patchId = await engine.savePatch(moduleId, 'Mine');
+    const movedId = rack[0].params[0].knobId;
+    engine.moveKnob(moduleId, movedId, 9);
+
+    // The pointer rests on the pack's row on the way to "Update" — the try-on
+    // replaces the module's knobs — and the update lands while it is applied.
+    engine.previewPatch(moduleId, 'amalgam-jtm45');
+    await engine.updatePatch(patchId!, moduleId);
+    stop();
+
+    // The capture is the module's own layout, and the try-on is settled.
+    expect(rack[0].params.find((p) => p.knobId === movedId)?.pos).toBe(9);
+    let patches: Patch[] = [];
+    engine.subscribePatches((next) => (patches = next))();
+    expect(patches.find((p) => p.id === patchId)?.knobs.some((k) => k.pos === 9)).toBe(true);
+  });
+
+  it('saving as a new patch never captures a preview’s mapping either', async () => {
+    engine.insertModule('Neural Amp Modeler', { serialPosition: 0 });
+    let rack: RackModule[] = [];
+    const stop = engine.subscribeRack((next) => (rack = next));
+    const moduleId = rack[0].id;
+
+    engine.loadPatch(moduleId, 'amalgam-jtm45');
+    engine.moveKnob(moduleId, rack[0].params[0].knobId, 9);
+
+    engine.previewPatch(moduleId, 'amalgam-jtm45');
+    const patchId = await engine.savePatch(moduleId, 'Mine');
+    stop();
+
+    let patches: Patch[] = [];
+    engine.subscribePatches((next) => (patches = next))();
+    expect(patches.find((p) => p.id === patchId)?.knobs.some((k) => k.pos === 9)).toBe(true);
+  });
+
   it('renaming a patch renames its stored title with it', async () => {
     engine.insertModule('Mock Amp', { serialPosition: 0 });
     let rack: RackModule[] = [];
