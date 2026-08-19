@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import { DotsSixVerticalIcon, PencilSimpleIcon, TagIcon, TrashIcon } from 'phosphor-svelte';
   import type { Patch } from '../../lib/engine/types';
   import ModuleGlyph from '../../lib/components/icons/ModuleGlyph.svelte';
@@ -56,9 +55,11 @@
         not in the catalogue this build fetched) leaves the badge a plain
         label, which is what it always was. */
     onShowPackage?: () => void;
-    /** A Shift-drag left this tile: the drawer's own reorder gesture,
-        never a rack drag — the drawer owns the in-flight state and the drop.
-        Absent, the modifier changes nothing. */
+    /** A drag left this tile that can only ever be the drawer's own reorder,
+        never a rack drag — which is a dimmed tile's, since it has no plugin
+        to build a module from. An installed tile's drag leaves as the rack's
+        and is converted, if at all, by the drawer. Absent, a dimmed tile is
+        not draggable at all. */
     onReorderStart?: () => void;
     /** That reorder drag ended (dropped or not); the plain drag's end still
         reports through onDragEnd. */
@@ -119,36 +120,6 @@
       drag, so dragend reports to the right owner. */
   let reorderDrag = false;
 
-  /** Whether Shift is down right now, watched from pointerdown until the
-      gesture resolves. dragstart's own `shiftKey` only answers for the moment
-      that event fires, and the natural version of the gesture is just as
-      often "take hold of the tile, then reach for Shift" — so the key is
-      tracked live and either source of truth counts. Listeners are scoped to
-      the gesture rather than the tile's life: dozens of tiles each watching
-      the window forever would be noise. */
-  let shiftHeld = false;
-
-  function watchShift(e: KeyboardEvent) {
-    if (e.key === 'Shift') shiftHeld = e.type === 'keydown';
-  }
-
-  function armShiftWatch(e: PointerEvent) {
-    shiftHeld = e.shiftKey;
-    window.addEventListener('keydown', watchShift);
-    window.addEventListener('keyup', watchShift);
-  }
-
-  /** pointerup covers a click that never became a drag; a real drag swallows
-      pointerup, so endDrag disarms too. Harmless to run twice. */
-  function disarmShiftWatch() {
-    window.removeEventListener('keydown', watchShift);
-    window.removeEventListener('keyup', watchShift);
-  }
-
-  // A tile can be unmounted with a gesture in flight (its patch deleted, the
-  // section filtered away); the window must not keep its listeners.
-  onDestroy(disarmShiftWatch);
-
   /** The tile element, so the whole tile is always what follows the cursor —
       see startDrag. */
   let tileEl = $state<HTMLElement>();
@@ -170,11 +141,16 @@
 
   function startDrag(e: DragEvent) {
     if (!draggable || !e.dataTransfer) return;
-    // Shift held: reorder inside the drawer instead of dragging out. Shift
-    // alone, on both OSes — Ctrl is the native drag-and-drop "copy" modifier
-    // on Windows, where the browser claims it before the page sees the drag.
-    // A distinct payload type keeps the rack's drop zones from ever seeing it.
-    if ((e.shiftKey || shiftHeld) && onReorderStart) {
+    if (pluginId === undefined) {
+      // A dimmed tile has no plugin to build a module from, so its drag can
+      // only ever be the drawer's own reorder — and a distinct payload type
+      // keeps the rack's drop zones from seeing it at all. Every other tile
+      // leaves as a rack drag and becomes a reorder only by being carried
+      // back over the drawer (see drawerDrag.svelte.ts).
+      if (!onReorderStart) {
+        e.preventDefault();
+        return;
+      }
       reorderDrag = true;
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('application/x-plectrify-drawer-reorder', patch.id);
@@ -186,15 +162,9 @@
       onReorderStart();
       return;
     }
-    if (pluginId === undefined) {
-      // Dimmed tile, no modifier: draggable only for the reorder's sake, so a
-      // plain drag has nowhere to go and is cancelled outright.
-      e.preventDefault();
-      return;
-    }
     reorderDrag = false;
     // copyMove, not copy, wherever the mid-drag reorder conversion is on the
-    // table: Shift forces the platform drop effect to `move`, and a drag
+    // table: the converted drag sets its drop effect to `move`, and a drag
     // whose effectAllowed excludes it has its drop refused — the reorder
     // would preview and then snap back on release.
     e.dataTransfer.effectAllowed = onReorderStart ? 'copyMove' : 'copy';
@@ -217,7 +187,6 @@
   }
 
   function endDrag() {
-    disarmShiftWatch();
     if (reorderDrag) onReorderEnd?.();
     else onDragEnd?.();
     reorderDrag = false;
@@ -270,9 +239,6 @@
   data-reveal-id={patch.id}
   bind:this={tileEl}
   {draggable}
-  onpointerdown={armShiftWatch}
-  onpointerup={disarmShiftWatch}
-  onpointercancel={disarmShiftWatch}
   ondragstart={startDrag}
   ondragend={endDrag}
   role="listitem"
@@ -280,7 +246,7 @@
     pluginId === undefined
       ? `${patch.pluginName} is not installed`
       : onReorderStart
-        ? 'Drag onto the rack — hold Shift to reorder inside the drawer'
+        ? 'Drag onto the rack, or back into the drawer to reorder'
         : undefined,
   )}
 >
