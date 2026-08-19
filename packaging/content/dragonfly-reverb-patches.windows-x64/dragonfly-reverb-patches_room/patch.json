@@ -2,6 +2,7 @@
   "name": "Small Room",
   "pluginName": "Dragonfly Room Reverb",
   "displayName": "Small Room",
+  "category": "Effects",
   "color": "#22c55e",
   "icon": "reverb",
   "knobs": [

@@ -2,6 +2,7 @@
   "name": "Concert Hall",
   "pluginName": "Dragonfly Hall Reverb",
   "displayName": "Concert Hall",
+  "category": "Effects",
   "color": "#8b5cf6",
   "icon": "reverb",
   "knobs": [

@@ -1,30 +1,30 @@
 {
-  "name": "Wide Shimmer",
+  "name": "Chorus",
   "pluginName": "Lupex Chorus",
-  "displayName": "Wide Shimmer",
-  "color": "#14b8a6",
-  "icon": "mod",
-  "texture": "tolex",
+  "displayName": "Chorus",
+  "category": "Effects",
+  "color": "#1497b8",
   "knobs": [
     {
-      "paramIndex": 0,
-      "label": "Rate",
+      "paramIndex": 3,
+      "label": "Low",
       "pos": 0
-    },
-    {
-      "paramIndex": 1,
-      "label": "Depth",
-      "pos": 1
     },
     {
       "paramIndex": 2,
       "label": "Level",
-      "pos": 2
+      "isMeter": false,
+      "pos": 1
     },
     {
-      "paramIndex": 3,
-      "label": "Low",
+      "paramIndex": 0,
+      "label": "Rate",
       "pos": 3
+    },
+    {
+      "paramIndex": 1,
+      "label": "Depth",
+      "pos": 5
     },
     {
       "paramIndex": 4,
@@ -33,5 +33,5 @@
     }
   ],
   "pluginVersion": "0.1.0",
-  "state": "VkMyISkCAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjMzNy5WTWpMZ3ZQLi4uLk8rZldhckFoY2tJMmJvOGxhOEhSTHQuaUhmVGxhaThGWW80MVk4SFJVVFlUSzNIeE85LkJPQ2cxYXhVMmJTUVdYelVsTzcuVVBSRVRTZmpGWThIaFg0QVdYeU1tSGZYV1hyVVdZOEhCTHQuaUh1M0NPUEVqVEEwREhvUVZPaFBWWXZRR1poLmhjZ3dWY2swaUh5VGlLdkh4Szl2Q1RBSVVQTUFSWmowaUhuazFZbklCSDFFRmEwVVZPaFhDTHQuaUh1M0NPUEVqVEEwREhvUVZPaHZWWTFVRmFoLmhjZ3dWY2swaUh6VGlLdkh4Szl2Q1RBSVVQTUFSWmowaUhyODFjaC5oY2d3VmNrMGlIMC5pS3ZIeEs5dkNUQUlVUE1BUlpqMGlIeEVGY2tJQkgxRUZhMFVWT2guaUsxZlNONGpTTjRqeU0xRFNNM0RDTXhIeEs5dnlLQ2cxYXhVMmJTUVdYelVsTy4uLi4uLi4uLi4uLkpVMFBFQWtib1lXWHpVRlFnUVdYLkRQLkJrR2JnTTJiLkRQLkMuUEcuLi4uLi4uLi5uVFVDVURUeGtsY2dRV1lERUZjZ0E8L0lDb21wb25lbnQ+PC9WU1QzUGx1Z2luU3RhdGU+AA=="
+  "state": "VkMyIRUCAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjMyMi5WTWpMZ3pPLi4uLk8rZldhckFoY2tJMmJvOGxhOEhSTHQuaUhmVGxhaThGWW80MVk4SFJVVFlUSzNIeE85LkJPQ2cxYXhVMmJTUVdYelVsTzcuVVBSRVRTZmpGWThIaFg0QVdYeU1tSGZYV1hyVVdZOEhCTHQuaUh1M0NPUEVqVEEwREhvUVZPaFBWWXZRR1poLmhjZ3dWY2swaUgwLmlLdkh4Szl2Q1RBSVVQTUFSWmowaUhuazFZbklCSDFFRmEwVVZPaFRDTHQuaUh1M0NPUEVqVEEwREhvUVZPaHZWWTFVRmFoLmhjZ3dWY2swaUgwLmlLdkh4Szl2Q1RBSVVQTUFSWmowaUhyODFjaC5oY2d3VmNrMGlIMC5pS3ZIeEs5dkNUQUlVUE1BUlpqMGlIeEVGY2tJQkgxRUZhMFVWT2hEaUt2SHhLOXZ5S0NnMWF4VTJiU1FXWHpVbE8uLi4uLi4uLi4uLi5KVTBQRUFrYm9ZV1h6VUZRZ1FXWC5EUC5Ca0diZ00yYi5EUC5DLlBHLi4uLi4uLi4ublRVQ1VEVHhrbGNnUVdZREVGY2dBPC9JQ29tcG9uZW50PjwvVlNUM1BsdWdpblN0YXRlPgA="
 }

@@ -172,7 +172,7 @@
     "by 'the other platform'."
   ],
   "schemaVersion": 4,
-  "revision": 15,
+  "revision": 17,
   "_noticesComment": [
     "Licence disclosure travels WITH the catalogue rather than shipping in the",
     "installer. If the offered plugins change, the notices change with them - no new",
@@ -362,17 +362,15 @@
       "_capturesNote": "Neural Amp Modeler is no longer here, and not because it stopped mattering: it ships inside Plectrify now (packaging/bundled-plugins.json). Every TONE3000 tone is a capture that loads into it, so a catalogue of captures with nothing to play them in is not a product - and a plugin the app assumes is present has no business being one the user might not have installed. Nothing in the catalogue is responsible for making the app audible any more; this bundle is effects and nothing else.",
       "packageIds": [
         "peakeater",
-        "peakeater-patches",
         "lupex-chorus",
         "lupex-chorus-patches",
         "lupex-delay",
-        "lupex-delay-patches",
         "qdelay",
         "qdelay-patches",
         "dragonfly-reverb",
         "dragonfly-reverb-patches"
       ],
-      "_patchesNote": "EACH PEDAL SHIPS WITH A PATCH, listed beside it rather than appended, so the ids still read in signal-chain order. The patch packs are Windows-only because three of the five plugins are, and because a patch bakes its install root into the saved tone and has only been authored against the Windows root so far - so macOS gets qdelay and dragonfly-reverb alone, exactly as it did before. Listing a patch here is belt and braces: each names its plugin in dependsOn, so installing the pack alone would pull the plugin in anyway."
+      "_patchesNote": "THREE OF THE FIVE PEDALS SHIP WITH A PATCH, listed beside the plugin rather than appended, so the ids still read in signal-chain order. PeakEater and Lupex Delay are the two without, and that changes nothing about either plugin - a patch is only ever an opinion about one of them, and a pack left with no patch (Soft Clip and Dark Repeats were its whole contents) was dropped rather than shipped empty. The patch packs are Windows-only because three of the five plugins are, and because a patch bakes its install root into the saved tone and has only been authored against the Windows root so far - so macOS gets qdelay and dragonfly-reverb alone, exactly as it did before. Listing a patch here is belt and braces: each names its plugin in dependsOn, so installing the pack alone would pull the plugin in anyway."
     }
   ],
   "_packagesComment": [
@@ -425,42 +423,6 @@
       "_dataPathNote": "UNVERIFIED IN A REAL INSTALL - test this one through the Packages panel before publishing. Surge normally gets a factory data folder from its own setup.exe; the pluginsonly zip pinned here contains no such folder, only the plugin bundles. On Windows SurgeStorage walks up from the loaded binary looking for a 'SurgeXTData' directory and then falls back to the shared library path, so an install that places only the .vst3 leaves it with neither. The effects rack needs none of the wavetables or patches that folder holds, and configuration.xml is compiled into the binary, so it is expected to run - but expected is not tested. If it turns out to need the folder, note that the walk-up passes through %PROGRAMDATA%/Plectrify, which a kind:'content' package with installDir 'SurgeXTData' would land in; that would be a second entry, not a change to this one."
     },
     {
-      "id": "uhhyou-comb-distortion",
-      "kind": "plugin",
-      "category": [
-        "Effects",
-        "Drive & distortion"
-      ],
-      "tags": [
-        "Distortion"
-      ],
-      "name": "CombDistortion",
-      "purpose": "Distortion using a self-modulating comb filter",
-      "version": "0.1.7",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
-      "projectUrl": "https://github.com/ryukau/VSTPlugins",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/CombDistortion_0.1.7_macOS.zip",
-          "sha256": "27ceaadebfe54d155af2e527b78b4d2f17eae8be3515c1927876c11c927a3833",
-          "downloadBytes": 1069972
-        },
-        "windows-x64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/CombDistortion_0.1.7.zip",
-          "sha256": "7db35a3351425d2584d0d390509f80665c348644dc4f4ef07282f02fe7086115",
-          "downloadBytes": 2373629
-        }
-      },
-      "_macNote": "THIS NOTE COVERS ALL SEVEN `uhhyou-` ENTRIES. Every one of them pins the project's separate <Plugin>_<version>_macOS.zip for macos-arm64 rather than the plain zip windows-x64 uses. The plain zip does contain a mac binary - the bundle carries Contents/MacOS beside Contents/x86_64-win and x86_64-linux, and the mac binary in it is byte-identical to the one in the macOS zip - so either would work. The macOS zip is pinned because it is half the size, because its _CodeSignature seals exactly the mac file set rather than a tree with two other platforms added to it, and because it is what the project publishes for mac users. All seven mac binaries are universal (x86_64 + arm64) and signed, so they load into the arm64-only Plectrify process. Both zips also carry a `presets` folder of .vstpreset files, which the include patterns drop: Plectrify maps knobs itself and does not read VST3 presets.",
-      "_projectNote": "THIS NOTE AND THE ONE BELOW COVER ALL SEVEN `uhhyou-` ENTRIES, not just this one - they used to be seven adjacent rows and are now spread across the Effects subsections by what each does, so read them as being about the id prefix rather than about the neighbours. They are all Uhhyou Plugins (ryukau/VSTPlugins), listed one by one rather than as the project's 108 MB everything-bundle: that bundle is 39 plugins of which two thirds are synths and drum machines, and a guitar rig has no use for ClangCymbal. Each per-plugin zip is ~2.5 MB and unpacks to a plain .vst3 bundle carrying Windows, macOS and Linux binaries plus the plugin's own manual and licence text. The repository is maintenance-only upstream - new Uhhyou plugins now go to a separate JUCE repository - so expect these versions to move rarely.",
-      "_versionNote": "VERSIONS ARE PER PLUGIN, THE RELEASE TAG IS NOT. Every `uhhyou-` zip lives under the single release tag 'UhhyouPlugins0.70.0' while carrying its own version in the filename (CombDistortion_0.1.7.zip). So `version` here is the plugin's, and it will never equal the tag. A consequence for check-updates, which compares by asset URL: when the project cuts its next collection release, EVERY `uhhyou-` entry reports as behind even where the plugin itself did not change, because the tag in the URL moved. Confirm against the individual version in the new asset's filename before touching a hash. Old release URLs stay live, so a pin that is 'behind' in that sense is not broken."
-    },
-    {
       "id": "peakeater",
       "kind": "plugin",
       "category": [
@@ -491,39 +453,6 @@
       "_includeNote": "The archive is a peakeater_artefacts/Release/ tree holding CLAP and LV2 builds beside the VST3 - roughly two thirds of it. The include patterns match only .vst3 paths, so both are dropped at extraction; that, not a truncated download, is why the installed plugin is about a third of what came down. The bundle itself is nested at Release/VST3/peakeater.vst3/, which '**/' handles, so no per-platform include is needed.",
       "_licenceNote": "LICENSE.md is the bare GPLv3 text with no 'or any later version' offer from the project itself, so GPL-3.0-only - the same reading as dragonfly-reverb, reev-r and open-spatial-delay. selfHosted is false, so the project conveys its own binary and section 6 rests with it.",
       "_rotNote": "UPSTREAM IS DORMANT: v0.8.2 was cut in August 2023 and nothing has been pushed since. That is not a reason to drop the entry - the pin is an immutable release tag and the plugin works - but expect check-updates to report it current forever, and do not read a long-unchanged version as a stale pin here."
-    },
-    {
-      "id": "peakeater-patches",
-      "kind": "content",
-      "category": [
-        "Effects",
-        "Drive & distortion"
-      ],
-      "tags": [
-        "Distortion",
-        "Patches"
-      ],
-      "name": "PeakEater patches",
-      "purpose": "Soft Clip - a cubic clipper set up as a guitar drive, six knobs mapped",
-      "version": "1",
-      "licenseId": "CC0-1.0",
-      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
-      "projectUrl": "https://plectrify.com",
-      "installDir": "patches",
-      "preserveStructure": true,
-      "dependsOn": "peakeater",
-      "include": [
-        "**/patch.json"
-      ],
-      "assets": {
-        "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/peakeater-patches/plectrify-peakeater-patches-1-windows-x64.zip",
-          "sha256": "2a39c0b5f347ae330a444501b14f2aad34cf4470d07f9b79ba5c71ac42ce5418",
-          "downloadBytes": 1391,
-          "selfHosted": true
-        }
-      },
-      "_macNote": "Windows-only because PeakEater is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not."
     },
     {
       "id": "fire",
@@ -709,8 +638,8 @@
         "Patches"
       ],
       "name": "Lupex Chorus patches",
-      "purpose": "Wide Shimmer - a slow, shallow BBD chorus, five knobs mapped",
-      "version": "1",
+      "purpose": "Chorus - a BBD chorus with rate, depth, level and shelf tone mapped",
+      "version": "3",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -722,80 +651,13 @@
       ],
       "assets": {
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-1-windows-x64.zip",
-          "sha256": "5e1bf9e503f61de8aeb460cb52dacd2ec0a7e4123cc33237fef2c6bcdeac9364",
-          "downloadBytes": 1291,
+          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-3-windows-x64.zip",
+          "sha256": "884b27d357685c9e34cec526c91c0ab0bc685da2c2adc8d54815c163a9af83f0",
+          "downloadBytes": 1245,
           "selfHosted": true
         }
       },
       "_macNote": "Windows-only because Lupex Chorus is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not."
-    },
-    {
-      "id": "uhhyou-ordinary-phaser",
-      "kind": "plugin",
-      "category": [
-        "Effects",
-        "Modulation"
-      ],
-      "tags": [
-        "Modulation"
-      ],
-      "name": "OrdinaryPhaser",
-      "purpose": "Phaser with a delay in the feedback path",
-      "version": "0.1.7",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
-      "projectUrl": "https://github.com/ryukau/VSTPlugins",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/OrdinaryPhaser_0.1.7_macOS.zip",
-          "sha256": "18425ea86d54722eb02c08868408d35745bf99e20cb699525f69918d15e7c337",
-          "downloadBytes": 1153200
-        },
-        "windows-x64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/OrdinaryPhaser_0.1.7.zip",
-          "sha256": "07d35855f1a34d859d161b724d2ca1641b704143d3e892cc20e119344a4c9b0e",
-          "downloadBytes": 2557806
-        }
-      }
-    },
-    {
-      "id": "uhhyou-parallel-detune",
-      "kind": "plugin",
-      "category": [
-        "Effects",
-        "Modulation"
-      ],
-      "tags": [
-        "Modulation",
-        "Pitch"
-      ],
-      "name": "ParallelDetune",
-      "purpose": "Detune and chorus - 8 pitch shifters in parallel",
-      "version": "0.1.7",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
-      "projectUrl": "https://github.com/ryukau/VSTPlugins",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/ParallelDetune_0.1.7_macOS.zip",
-          "sha256": "1eb08a207959575dd7af1006c877bad7496f77fff5c782370391e6b0908227da",
-          "downloadBytes": 1204476
-        },
-        "windows-x64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/ParallelDetune_0.1.7.zip",
-          "sha256": "ed1ee666c3af255fa52a1d29b2e17b1e8332f4b2aaa6389086f82a8ac02f5211",
-          "downloadBytes": 2640060
-        }
-      }
     },
     {
       "id": "lupex-delay",
@@ -827,39 +689,6 @@
       "_macNote": "NO macOS BUILD EXISTS TO PIN - Windows and Linux only, on both this and lupex-chorus. See that entry's note; the reasoning is the same for both and applies to whichever of them gets a mac release first.",
       "_licenceNote": "THE LICENCE URL POINTS AT A README HEADING, NOT A LICENCE FILE, and that is the whole of what this project publishes: both Lupex repositories say '## License / MIT' in README.md and carry no LICENSE or COPYING file, which is why GitHub reports no licence for either. It is the author's own statement of terms, so it is recorded as MIT rather than treated as unlicensed - the opposite of the Gateway case on neural-amp-modeler, where a copyright was asserted with no licence beside it at all. Two caveats to keep in view. MIT asks that its notice travel with copies, and there is no notice here to travel. And these are JUCE builds - the submodule is juce-framework/JUCE - so a binary distributed under MIT rather than AGPLv3 implies a commercial JUCE licence. Both are the author's compliance questions and not ours only because selfHosted is false: the download goes from the project to the user and Plectrify conveys nothing. Do not flip either Lupex entry to selfHosted:true without resolving them first.",
       "_versionNote": "The asset filename carries no version - every tag ships 'Lupex-Windows-VST3.zip' - so only the tag in the URL path distinguishes releases. That is still immutable per tag, and check-updates compares by asset URL, so a new tag reads as a new URL correctly. It does mean a downloaded file tells you nothing about which release it is; take the version from the tag."
-    },
-    {
-      "id": "lupex-delay-patches",
-      "kind": "content",
-      "category": [
-        "Effects",
-        "Delay"
-      ],
-      "tags": [
-        "Delay",
-        "Patches"
-      ],
-      "name": "Lupex Delay patches",
-      "purpose": "Dark Repeats - a 400 ms analog delay that sits behind the note, five knobs mapped",
-      "version": "1",
-      "licenseId": "CC0-1.0",
-      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
-      "projectUrl": "https://plectrify.com",
-      "installDir": "patches",
-      "preserveStructure": true,
-      "dependsOn": "lupex-delay",
-      "include": [
-        "**/patch.json"
-      ],
-      "assets": {
-        "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-delay-patches/plectrify-lupex-delay-patches-1-windows-x64.zip",
-          "sha256": "26e39d388cfb2e89346f0a74653ee7421146c3680daef02414b04d971afcfe09",
-          "downloadBytes": 1269,
-          "selfHosted": true
-        }
-      },
-      "_macNote": "Windows-only because Lupex Delay is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not."
     },
     {
       "id": "qdelay",
@@ -906,8 +735,8 @@
         "Patches"
       ],
       "name": "QDelay patches",
-      "purpose": "Dotted Eighth - a dotted-eighth dual delay with diffusion and movement, six knobs mapped",
-      "version": "1",
+      "purpose": "Delay - a dual delay with time, feedback, mode and mix mapped",
+      "version": "3",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -919,9 +748,9 @@
       ],
       "assets": {
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-1-windows-x64.zip",
-          "sha256": "1ac03c02976a8b1e0d6d9c1fe2b037909c86f4280de965acabf3c693ee3c4f1d",
-          "downloadBytes": 3415,
+          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-3-windows-x64.zip",
+          "sha256": "42e84a39a066897a13ce9f0c61f3fd84c3e070987ac9019df4078a6b30b5520a",
+          "downloadBytes": 3390,
           "selfHosted": true
         }
       },
@@ -957,74 +786,6 @@
           "url": "https://github.com/tiagolr/sirial/releases/download/v1.1.1/sirial-win-v1.1.1.zip",
           "sha256": "6b3f2b96511269ad1f5c3176d999ba3bd30f236fa98ac3dae537df12e3097997",
           "downloadBytes": 2766466
-        }
-      }
-    },
-    {
-      "id": "uhhyou-seven-delay",
-      "kind": "plugin",
-      "category": [
-        "Effects",
-        "Delay"
-      ],
-      "tags": [
-        "Delay",
-        "Modulation"
-      ],
-      "name": "SevenDelay",
-      "purpose": "Stereo delay with modulated fractional delay time",
-      "version": "0.1.32",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
-      "projectUrl": "https://github.com/ryukau/VSTPlugins",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/SevenDelay_0.1.32_macOS.zip",
-          "sha256": "8553e639eca0b99431de5ffd2e76865993024169790f69f120ab35c8d8e13d22",
-          "downloadBytes": 1108477
-        },
-        "windows-x64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/SevenDelay_0.1.32.zip",
-          "sha256": "527ad28572d70eecaefee94a0f4a5c48c5af7876ddd5fc8c07e2363a589f8c67",
-          "downloadBytes": 2469035
-        }
-      }
-    },
-    {
-      "id": "uhhyou-pitch-shift-delay",
-      "kind": "plugin",
-      "category": [
-        "Effects",
-        "Delay"
-      ],
-      "tags": [
-        "Delay",
-        "Pitch"
-      ],
-      "name": "PitchShiftDelay",
-      "purpose": "Pitch-shifting delay - octaves, detune and shimmer",
-      "version": "0.2.13",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
-      "projectUrl": "https://github.com/ryukau/VSTPlugins",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/PitchShiftDelay_0.2.13_macOS.zip",
-          "sha256": "0c400c2fdf5dcb60ceeba788b4826acc9b1c3336ab9bf9ecd7e4f58407ae6e50",
-          "downloadBytes": 1164840
-        },
-        "windows-x64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/PitchShiftDelay_0.2.13.zip",
-          "sha256": "d0728b266c955bcb8dae1104352623018a175ea72a4474a7f16cd8c46b8050d9",
-          "downloadBytes": 2592634
         }
       }
     },
@@ -1150,7 +911,7 @@
       ],
       "name": "Dragonfly Reverb patches",
       "purpose": "One patch each for the hall, room and plate reverbs",
-      "version": "1",
+      "version": "3",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -1162,9 +923,9 @@
       ],
       "assets": {
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-1-windows-x64.zip",
-          "sha256": "d6b16363c7ecb69093df8e8179f23354398a617e0b6e63db90dcbef44082648b",
-          "downloadBytes": 4048,
+          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-3-windows-x64.zip",
+          "sha256": "765be46ced8ed72edb7b8f6c7d6ec931e54b8c56b01abece1ba019eb022e4627",
+          "downloadBytes": 3283,
           "selfHosted": true
         }
       },
@@ -1204,72 +965,6 @@
         }
       },
       "_portNote": "THIS IS THE PORT, NOT THE ORIGINAL, and that is deliberate - do not 'correct' it to ValdemarOrn/CloudSeed. The original CloudSeed is unusable here on two counts at once: it ships a VST2 .dll (Plectrify builds with VST3 hosting only) and it is a C#/.NET plugin whose bare CloudSeed.dll sits beside a folder of sibling assemblies - AudioLib, Newtonsoft.Json, SharpSoundDevice - which the installer would leave behind, the same two failures that keep Stompbox in the links list. Its last release was 2018 and the repo's own head is tagged 'Legacy'. CloudReverb is Valdemar Erlingsson's algorithm rewritten in JUCE by xunil-cloud, still maintained, and it ships a real VST3 bundle. The rewrite is GPL-3.0 even though the original is MIT, which is the licence recorded here: what a user downloads is the port."
-    },
-    {
-      "id": "uhhyou-lattice-reverb",
-      "kind": "plugin",
-      "category": [
-        "Effects",
-        "Reverb"
-      ],
-      "tags": [
-        "Reverb"
-      ],
-      "name": "LatticeReverb",
-      "purpose": "Reverb built on a lattice allpass structure",
-      "version": "0.1.26",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
-      "projectUrl": "https://github.com/ryukau/VSTPlugins",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/LatticeReverb_0.1.26_macOS.zip",
-          "sha256": "6b3b00dc67dd789649cf03428ab29cccca25def49160960df871d62caf998586",
-          "downloadBytes": 1166130
-        },
-        "windows-x64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/LatticeReverb_0.1.26.zip",
-          "sha256": "a2eab356520edc96cf19741cbe21a87a6bda79f8ddff348ed34125d0fbd8539d",
-          "downloadBytes": 2638577
-        }
-      }
-    },
-    {
-      "id": "uhhyou-fdn64-reverb",
-      "kind": "plugin",
-      "category": [
-        "Effects",
-        "Reverb"
-      ],
-      "tags": [
-        "Reverb"
-      ],
-      "name": "FDN64Reverb",
-      "purpose": "Feedback-delay-network reverb, 64 delays",
-      "version": "0.1.19",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/ryukau/VSTPlugins/UhhyouPlugins0.70.0/LICENSE.txt",
-      "projectUrl": "https://github.com/ryukau/VSTPlugins",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/FDN64Reverb_0.1.19_macOS.zip",
-          "sha256": "0cf44262e9154f5219343aa13d8782574e8957051618566450c2065a73e3d6e9",
-          "downloadBytes": 1203407
-        },
-        "windows-x64": {
-          "url": "https://github.com/ryukau/VSTPlugins/releases/download/UhhyouPlugins0.70.0/FDN64Reverb_0.1.19.zip",
-          "sha256": "698a356185bdce90ddf085408be90346a7718535de957244c2a7daf50ad083e5",
-          "downloadBytes": 2667651
-        }
-      }
     }
   ],
   "_linksComment": [

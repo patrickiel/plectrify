@@ -246,7 +246,7 @@
     pluginId === undefined
       ? `${patch.pluginName} is not installed`
       : onReorderStart
-        ? 'Drag onto the rack, or back into the drawer to reorder'
+        ? 'Drag to the rack · reorder within the drawer'
         : undefined,
   )}
 >

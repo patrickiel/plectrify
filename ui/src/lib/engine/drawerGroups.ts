@@ -138,35 +138,33 @@ function packageForPatch(
 
 /** The heading path a patch files under. First answer wins:
 
-    1. The category the user set on the patch itself.
+    1. The category written on the patch itself.
     2. A TONE3000 patch's gear, under a TONE3000 heading — a downloaded tone
        arrives with no category and no package of its own, and filing twenty of
        them under "Uncategorised" would bury them. The two-level path costs no
        UI: the drawer already renders category paths as a tree.
-    3. A pack patch's own package — the pack was authored under that heading.
-    4. `DRAWER_UNCATEGORISED`.
+    3. `DRAWER_UNCATEGORISED`.
 
-    Deliberately *not* the package the patch's plugin came from: a patch the
-    user saves is theirs, and it lands in the uncategorised row at the top of
-    the drawer — in sight, ready to be filed by hand — rather than under
-    whatever heading the catalogue happened to file its plugin.
+    Nothing is inherited — not from the package a pack patch was installed by,
+    and not from the one its plugin came from. A patch says where it files or
+    it lands in the uncategorised row at the top of the drawer, in sight and
+    ready to be filed by hand. That is the whole rule, and it reads the same
+    for a patch the user saved and one a pack shipped: a pack that wants a
+    heading writes `category` into its `patch.json` like anyone else, which is
+    one visible field in the document instead of an answer assembled from the
+    catalogue at read time.
 
-    Never returns an empty path: a package with no category of its own falls
-    through to the next answer rather than producing a heading with no name. */
-export function patchCategory(patch: Patch, packages: readonly CataloguePackage[]): string[] {
+    Never returns an empty path: a category of nothing but separators falls
+    through rather than producing a heading with no name. */
+export function patchCategory(patch: Patch): string[] {
   const own = patch.category?.trim();
   if (own) {
     const path = splitCategoryPath(own);
     if (path.length > 0) return path;
   }
 
-  // After the user's own choice, so refiling a downloaded tone still wins.
+  // After the patch's own choice, so refiling a downloaded tone still wins.
   if (patch.tone3000) return tone3000Category(patch.tone3000);
-
-  if (patch.readOnly) {
-    const pack = packageForPatch(patch, packages);
-    if (pack && pack.category.length > 0) return [...pack.category];
-  }
 
   return [DRAWER_UNCATEGORISED];
 }
@@ -188,7 +186,7 @@ export function groupPatches(
 ): CategoryNode<DrawerPatch>[] {
   const entries = patches.map((patch) => ({
     patch,
-    category: patchCategory(patch, packages),
+    category: patchCategory(patch),
   }));
   // Case-folded like the grouping itself: a hand-typed "effects" heading is
   // the Effects section, pinned where Effects is pinned.

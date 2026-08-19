@@ -2,6 +2,7 @@
   "name": "Bright Plate",
   "pluginName": "Dragonfly Plate Reverb",
   "displayName": "Bright Plate",
+  "category": "Effects",
   "color": "#f59e0b",
   "icon": "reverb",
   "texture": "metal",
