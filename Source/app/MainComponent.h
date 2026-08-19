@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "BackupArchive.h"
 #include "HostServices.h"
 #include "InputProbe.h"
 #include "MidiInputManager.h"
@@ -72,8 +73,19 @@ public:
     // (title bar, window controls, border) — the one part of the app the page's
     // CSS cannot reach.
     void handleSetWindowTheme (const juce::var& payload) override;
+    // The user's rigs, patches, session and settings in and out of one archive
+    // (Source/backup/BackupArchive.h). Standalone-only: the plugin declines
+    // HostCapabilities::backup, so the page hides the rows and the engine drops
+    // the events. Both open a native file dialog, do the work when it returns,
+    // and report the outcome on the backupState stream.
+    void handleCreateBackup (const juce::var& payload) override;
+    void handleRestoreBackup (const juce::var& payload) override;
 
 private:
+    /** One backupState push. `phase` is one of the BackupPhase strings the page
+        reduces over (see ui/src/lib/engine/backup.ts). */
+    void emitBackupState (const juce::String& action, const juce::String& phase,
+                          const plectrify::backup::Result& result);
     // The device manager broadcasts a change when the audio setup is edited
     // (buffer size, driver, device); the About block would otherwise keep
     // reporting the device that was open at boot.
@@ -144,6 +156,13 @@ private:
     // --- Web view ---------------------------------------------------------
     std::unique_ptr<juce::WebBrowserComponent> webView;
     bool navigationScheduled = false;
+
+    // --- File dialogs -----------------------------------------------------
+    // launchAsync returns immediately and calls back later, so the chooser has
+    // to outlive the call that made it. One member rather than one per
+    // operation: only one dialog is ever open, and replacing it here is what
+    // releases the last one.
+    std::unique_ptr<juce::FileChooser> fileChooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

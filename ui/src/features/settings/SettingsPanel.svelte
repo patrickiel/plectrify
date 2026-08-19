@@ -1,5 +1,7 @@
 <script lang="ts">
   import {
+    ArchiveIcon,
+    ArrowCounterClockwiseIcon,
     CaretLeftIcon,
     MinusIcon,
     PianoKeysIcon,
@@ -7,6 +9,7 @@
     PlusIcon,
     SlidersHorizontalIcon,
   } from 'phosphor-svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import type { EngineBridge } from '../../lib/engine/EngineBridge';
   import type {
@@ -26,9 +29,18 @@
     STANDBY_THRESHOLDS,
     UI_SCALE_STEP,
   } from '../../lib/engine/appSettings';
+  import {
+    backupFileName,
+    describeBackupError,
+    describeRestoreOutcome,
+    IDLE_BACKUP,
+    platformSlug,
+    type BackupState,
+  } from '../../lib/engine/backup';
   import { createReveal } from '../../lib/components/reveal.svelte';
   import Card from '../../lib/components/Card.svelte';
   import CardRow from '../../lib/components/CardRow.svelte';
+  import InlineConfirmRow from '../../lib/components/InlineConfirmRow.svelte';
   import MenuCheckbox from '../../lib/components/MenuCheckbox.svelte';
   import RowButton from '../../lib/components/RowButton.svelte';
   import Select from '../../lib/components/Select.svelte';
@@ -42,8 +54,12 @@
     appSettings: AppSettings;
     onSetAppSettings: (settings: Partial<AppSettings>) => void;
     /** Which host-owned facilities exist — standalone-only rows (audio setup,
-        Auto Standby) hide where a DAW owns those concerns. */
+        Auto Standby, backup) hide where a DAW owns those concerns. */
     capabilities: HostCapabilities;
+    /** Which OS this build runs on, for the restore dialog's note about an
+        archive made on the other one. Absent on an engine older than the
+        field, which simply means the note is not offered. */
+    platform?: 'windows' | 'macos';
     /** Which view the panel shows: the settings list, or the MIDI learn
         table it links to. Owned by ToolSidebar so it can reset to 'main'
         whenever the panel closes. */
@@ -63,6 +79,7 @@
     appSettings,
     onSetAppSettings,
     capabilities,
+    platform,
     view,
     onShowMidi,
     onOpenSetup,
@@ -97,9 +114,67 @@
   }));
   const deepEnabled = $derived(appSettings.standbyDeepAfterMinutes > 0);
 
+  /** How long a finished restore's line stays up before the page reloads. Long
+      enough to read one sentence, short enough that nobody wonders whether the
+      app has hung. */
+  const RESTORE_READ_MS = 1600;
+
   // Auto standby's rows appear and disappear with one checkbox — the same
   // progressive disclosure the tool panels use, so it borrows their motion.
   const reveal = createReveal();
+
+  // Backup and restore. The engine owns the file dialog, the archive and the
+  // replacement; this reads one state stream and decides what to put on screen.
+  //
+  // Everything happens in this card — the confirm, the progress and the result.
+  // No dialog: the whole interaction is two rows and a line of text, and a
+  // modal over the entire app for that is a scrim, a scrim animation and a trip
+  // to the middle of the screen to answer a question that was asked in the
+  // corner. The rest of the app stays visible and usable, which is also the
+  // honest picture: nothing is blocked until the OS file dialog opens.
+  let backup = $state<BackupState>({ ...IDLE_BACKUP });
+  let confirmRestore = $state(false);
+  onMount(() =>
+    engine.subscribeBackup((state) => {
+      backup = state;
+      // A restored machine has to reload: the engine has replaced
+      // working-rack.json and settings.json under this page, and JuceEngine's
+      // boot is what reads them. Owed from the moment the files land rather
+      // than from a click — until it happens the page shows the rack and the
+      // preferences of the installation the archive replaced, and its own
+      // writes are suppressed. So it is taken automatically, after just long
+      // enough to read the line saying what arrived.
+      if (state.action === 'restore' && state.phase === 'done')
+        setTimeout(() => location.reload(), RESTORE_READ_MS);
+    }),
+  );
+
+  // A file dialog is open or an archive is being read: both rows go quiet
+  // rather than queueing a second run behind the first.
+  const busy = $derived(backup.phase === 'choosing' || backup.phase === 'working');
+  const restored = $derived(backup.action === 'restore' && backup.phase === 'done');
+
+  /** The one line under the rows. It is the card's whole feedback channel, so
+      it carries the standing description as well as every outcome — one line
+      that changes rather than a line that appears, which would make the card
+      grow and shrink under the pointer. */
+  const statusLine = $derived.by(() => {
+    if (backup.phase === 'choosing')
+      return backup.action === 'backup' ? 'Choose where to save it…' : 'Choose a backup…';
+    if (backup.phase === 'working')
+      return backup.action === 'backup' ? 'Writing the backup…' : 'Restoring…';
+    if (backup.phase === 'failed') return describeBackupError(backup.error);
+    if (restored) return describeRestoreOutcome(backup, platformSlug(platform)) + ' Reloading…';
+    if (backup.action === 'backup' && backup.phase === 'done')
+      return `Saved as ${backupFileName(backup.path)}`;
+    return 'Rigs, patches, songs and settings, in one file. Plugins and downloaded captures are not included.';
+  });
+
+  // And taken at once if the panel closes before that pause is up, rather than
+  // leaving the app running against a disk it no longer matches.
+  onDestroy(() => {
+    if (backup.action === 'restore' && backup.phase === 'done') location.reload();
+  });
 
   const setTheme = (theme: ThemeName) => onSetAppSettings({ theme });
   const setBindings = (settings: { midiBindings: Record<string, MidiTrigger> }) =>
@@ -322,6 +397,65 @@
             {/if}
           </div>
         {/if}
+      </Card>
+    {/if}
+    <!-- Backup. Last, because it is the one card nobody opens Settings to
+         reach until the day they need it — and the only one whose second row
+         can undo everything above it.
+
+         Gated away in a DAW: a session's rack rides the project document, so
+         an archive of the *global* rigs and settings is not what that session
+         owns, and a restore would replace them under every other instance at
+         once. -->
+    {#if capabilities.backup}
+      <Card>
+        <p
+          class="px-[.6rem] py-[.35rem] text-[.625rem] font-semibold tracking-[.14em] text-muted uppercase"
+        >
+          Backup
+        </p>
+        <RowButton
+          class="gap-2 rounded-none text-[.8rem]"
+          disabled={busy}
+          onclick={() => engine.createBackup()}
+        >
+          <ArchiveIcon size={15} aria-hidden="true" />
+          Back up…
+        </RowButton>
+        <!-- The confirm takes over the row it belongs to, so what is about to
+             be replaced stays on screen above it and the row's own action
+             cannot be hit mid-confirm. Same component the rig menu's Discard
+             and every delete row in the app use. -->
+        {#if confirmRestore}
+          <InlineConfirmRow
+            stacked
+            message="Replace your rigs, patches, songs and settings with a backup's? A copy of what is here now is saved first."
+            confirmLabel="Replace…"
+            onConfirm={() => {
+              confirmRestore = false;
+              engine.restoreBackup();
+            }}
+            onCancel={() => (confirmRestore = false)}
+          />
+        {:else}
+          <RowButton
+            class="gap-2 rounded-none text-[.8rem]"
+            disabled={busy}
+            onclick={() => (confirmRestore = true)}
+          >
+            <ArrowCounterClockwiseIcon size={15} aria-hidden="true" />
+            Restore…
+          </RowButton>
+        {/if}
+        <p
+          class="px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] {backup.phase === 'failed'
+            ? 'text-warn'
+            : 'text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]'}"
+          role="status"
+          title={backup.path || undefined}
+        >
+          {statusLine}
+        </p>
       </Card>
     {/if}
   </div>

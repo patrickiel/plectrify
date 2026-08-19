@@ -320,6 +320,98 @@ void MainComponent::handleSetWindowTheme (const juce::var& payload)
         onWindowThemeChanged (payload["theme"].toString() == "light");
 }
 
+void MainComponent::emitBackupState (const juce::String& action, const juce::String& phase,
+                                     const plectrify::backup::Result& result)
+{
+    auto* state = new juce::DynamicObject();
+    state->setProperty ("action", action);
+    state->setProperty ("phase", phase);
+    state->setProperty ("path", result.path.getFullPathName());
+    state->setProperty ("platform", result.platform);
+    state->setProperty ("error", result.error);
+
+    auto* counts = new juce::DynamicObject();
+    counts->setProperty ("rigs", result.rigs);
+    counts->setProperty ("patches", result.patches);
+    state->setProperty ("counts", juce::var (counts));
+
+    engine->emit ("backupState", juce::var (state));
+}
+
+void MainComponent::handleCreateBackup (const juce::var&)
+{
+    emitBackupState ("backup", "choosing", {});
+
+    fileChooser = std::make_unique<juce::FileChooser> (
+        "Save a Plectrify backup",
+        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+            .getChildFile (plectrify::backup::defaultBackupFileName (juce::Time::getCurrentTime())),
+        plectrify::backup::fileWildcard);
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
+                                  | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [this] (const juce::FileChooser& chooser)
+    {
+        const auto destination = chooser.getResult();
+
+        // An empty result is the user pressing Cancel, which is not a failure
+        // and must not raise an error line on the page.
+        if (destination == juce::File())
+        {
+            emitBackupState ("backup", "cancelled", {});
+            return;
+        }
+
+        emitBackupState ("backup", "working", {});
+
+        const auto result = plectrify::backup::writeArchive (
+            destination.withFileExtension (plectrify::backup::fileExtension),
+            plectrify::appDataDir(), JUCE_APPLICATION_VERSION_STRING);
+
+        emitBackupState ("backup", result.ok ? "done" : "failed", result);
+    });
+}
+
+void MainComponent::handleRestoreBackup (const juce::var&)
+{
+    emitBackupState ("restore", "choosing", {});
+
+    fileChooser = std::make_unique<juce::FileChooser> (
+        "Restore a Plectrify backup",
+        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+        plectrify::backup::fileWildcard);
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::openMode
+                                  | juce::FileBrowserComponent::canSelectFiles,
+                              [this] (const juce::FileChooser& chooser)
+    {
+        const auto source = chooser.getResult();
+
+        if (source == juce::File())
+        {
+            emitBackupState ("restore", "cancelled", {});
+            return;
+        }
+
+        emitBackupState ("restore", "working", {});
+
+        // One level of undo, written before anything is deleted and overwritten
+        // by the next restore. A restore replaces the user's whole library on
+        // their say-so; this is what makes saying so recoverable. Its own
+        // failure is not fatal — a data root with nothing in it yet has nothing
+        // to snapshot, and refusing the restore over that would be absurd.
+        const auto undo = plectrify::appDataDir()
+                              .getChildFile ("backup-before-restore" + juce::String (plectrify::backup::fileExtension));
+        plectrify::backup::writeArchive (undo, plectrify::appDataDir(),
+                                         JUCE_APPLICATION_VERSION_STRING);
+
+        const auto result = plectrify::backup::readArchive (source, plectrify::appDataDir());
+
+        emitBackupState ("restore", result.ok ? "done" : "failed", result);
+    });
+}
+
 void MainComponent::handleStartWindowResize (const juce::var& payload)
 {
    #if JUCE_WINDOWS

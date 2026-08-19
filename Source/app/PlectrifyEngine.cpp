@@ -300,6 +300,12 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         .withEventListener ("cancelInstall",  onActivity ([this] (juce::var v) { handleCancelInstall (v); }))
         .withEventListener ("uninstallPackages", onActivity ([this] (juce::var v) { handleUninstallPackages (v); }))
         .withEventListener ("openAudioSettings",onActivity ([this] (juce::var)   { host.handleOpenAudioSettings(); }))
+        // Backing up and restoring the data root. An activity event because a
+        // file dialog is the user standing at the machine, and gated on the
+        // capability like setStandby so the plugin drops the work as well as
+        // hiding the surface — the standalone shell owns the chooser.
+        .withEventListener ("createBackup",  onActivity ([this] (juce::var v) { if (host.capabilities().backup) host.handleCreateBackup (v); }))
+        .withEventListener ("restoreBackup", onActivity ([this] (juce::var v) { if (host.capabilities().backup) host.handleRestoreBackup (v); }))
         // The setup wizard's own view of the audio stack. Asked for when it
         // opens and by its Refresh button; `rescan` re-enumerates the driver
         // families, which loads every ASIO driver on the machine and is far too
@@ -603,6 +609,7 @@ juce::var PlectrifyEngine::buildCapabilitiesState() const
     capabilities->setProperty ("looper", caps.looper);
     capabilities->setProperty ("metronome", caps.metronome);
     capabilities->setProperty ("feedbackGuard", caps.feedbackGuard);
+    capabilities->setProperty ("backup", caps.backup);
     return juce::var (capabilities);
 }
 

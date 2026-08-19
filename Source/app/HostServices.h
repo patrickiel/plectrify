@@ -31,6 +31,12 @@ struct HostCapabilities
     bool windowChrome = true;   ///< resize handles, window theme mirroring
     bool autoStandby  = true;   ///< the idle park/wake machinery
 
+    // Backup and restore of the per-user data root. Declined by the plugin:
+    // what a DAW session owns rides its project document, so a panel there
+    // would offer to archive rigs and settings the session is not using and to
+    // replace them under every other instance at once.
+    bool backup = true;         ///< the Settings panel's backup/restore rows
+
     // The three practice tools. Each is a fixed graph node plus a panel, and
     // each is declined by the plugin for a reason of its own — see
     // PlectrifyAudioProcessor::capabilities(). Declining one drops the node from
@@ -121,6 +127,13 @@ public:
     virtual void handleSetAudioDevice (const juce::var&) {}
     virtual void handleWatchInputLevels (const juce::var&) {}
     virtual void handleStartWindowResize (const juce::var&) {}
+    // Both open a native file dialog and then do the work on the message
+    // thread — see Source/backup/BackupArchive.h. The page names no path in
+    // either direction: it asks, the user picks in an OS dialog, so
+    // PlectrifyEngine::resolveAppFile's promise that nothing the web page asks
+    // for reaches outside the data root is untouched.
+    virtual void handleCreateBackup (const juce::var&) {}
+    virtual void handleRestoreBackup (const juce::var&) {}
     virtual void handleSetWindowTheme (const juce::var&) {}
     // The inverse gate of the two above: served by the plugin, no-op in the
     // standalone (whose window the OS resizes). AUv2 gives a host no way to

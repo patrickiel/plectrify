@@ -547,6 +547,7 @@
               {appSettings}
               {onSetAppSettings}
               {capabilities}
+              platform={appInfo.platform}
               view={settingsView}
               onShowMidi={openMidiView}
               {onOpenSetup}

@@ -48,6 +48,7 @@ import {
   type StoredPatch,
 } from './patches';
 import { resolveInstallIds } from './catalogue';
+import { IDLE_BACKUP, type BackupState } from './backup';
 import { decideStarterAutoInstall, STARTER_BUNDLE_ID } from './starterBundle';
 import type {
   InstallFinished,
@@ -699,6 +700,7 @@ const MOCK_APP_INFO: AppInfo = {
           looper: false,
           metronome: false,
           feedbackGuard: false,
+          backup: false,
         }
       : {
           audioDevices: true,
@@ -708,6 +710,7 @@ const MOCK_APP_INFO: AppInfo = {
           looper: true,
           metronome: true,
           feedbackGuard: true,
+          backup: true,
         },
   juceVersion: '—',
   buildInfo: {
@@ -1304,6 +1307,121 @@ export class MockEngine implements EngineBridge {
 
   revealLooperSessions(): void {
     // Nothing to reveal in the browser.
+  }
+
+  // --- Backup and restore -------------------------------------------------
+  // A real round trip, so the whole flow — the confirm, the task dialog, the
+  // result line, the reload — is drivable in `pnpm dev` with no native build.
+  //
+  // The archive here is plain JSON of the four localStorage keys, NOT the zip
+  // the app writes, and the two are deliberately not interchangeable: this
+  // engine's "disk" is localStorage, so it never could produce the same file.
+  // The browser has no file dialog either, which is why a download and a
+  // hidden file input stand in for the native chooser — the same technique
+  // exportView.ts uses.
+  private backup: BackupState = { ...IDLE_BACKUP };
+  private backupListeners = new Set<(state: BackupState) => void>();
+
+  private setBackupState(next: Partial<BackupState>): void {
+    this.backup = { ...this.backup, ...next };
+    for (const listener of this.backupListeners) listener(this.backup);
+
+    // Same as JuceEngine: a restore that failed or was cancelled is delivered
+    // and then forgotten, so reopening the panel does not reopen its dialog.
+    if (
+      this.backup.action === 'restore' &&
+      (this.backup.phase === 'cancelled' || this.backup.phase === 'failed')
+    )
+      this.backup = { ...IDLE_BACKUP };
+  }
+
+  subscribeBackup(listener: (state: BackupState) => void): () => void {
+    this.backupListeners.add(listener);
+    listener(this.backup);
+    return () => this.backupListeners.delete(listener);
+  }
+
+  createBackup(): void {
+    this.setBackupState({ action: 'backup', phase: 'choosing', error: undefined });
+
+    const name = `Plectrify backup ${new Date().toISOString().slice(0, 10)}.plectrifybackup`;
+    const document_ = {
+      format: 'plectrify-backup-mock',
+      rigs: this.rigs,
+      patches: this.storedPatches,
+      workingRack: this.snapshot(),
+      settings: this.appSettings,
+    };
+
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(document_, null, 2)], { type: 'application/json' }),
+    );
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    this.setBackupState({
+      phase: 'done',
+      path: name,
+      platform: 'mock',
+      counts: { rigs: this.rigs.length, patches: Object.keys(this.storedPatches).length },
+    });
+  }
+
+  restoreBackup(): void {
+    this.setBackupState({ action: 'restore', phase: 'choosing', error: undefined });
+
+    const input = window.document.createElement('input');
+    input.type = 'file';
+    input.accept = '.plectrifybackup,application/json';
+    // A file input fires no event at all when the picker is dismissed, so
+    // 'cancelled' rides the window regaining focus. Without it the panel would
+    // sit on 'choosing' for the rest of the session.
+    window.addEventListener(
+      'focus',
+      () => {
+        setTimeout(() => {
+          if (this.backup.phase === 'choosing') this.setBackupState({ phase: 'cancelled' });
+        }, 400);
+      },
+      { once: true },
+    );
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      this.setBackupState({ phase: 'working', path: file.name });
+
+      try {
+        const document_ = JSON.parse(await file.text()) as Record<string, unknown>;
+        if (document_.format !== 'plectrify-backup-mock') throw new Error('notBackup');
+
+        this.rigs = (document_.rigs ?? []) as StoredRig[];
+        this.storedPatches = (document_.patches ?? {}) as Record<string, StoredPatch>;
+        this.appSettings = normalizeAppSettings(document_.settings);
+
+        this.persist(RIGS_KEY, this.rigs);
+        this.persist(PATCHES_KEY, this.storedPatches);
+        this.persist(WORKING_KEY, document_.workingRack);
+        this.persist(SETTINGS_KEY, this.appSettings);
+
+        this.setBackupState({
+          phase: 'done',
+          platform: 'mock',
+          counts: { rigs: this.rigs.length, patches: Object.keys(this.storedPatches).length },
+        });
+      } catch (error: unknown) {
+        this.setBackupState({
+          phase: 'failed',
+          error: error instanceof Error && error.message === 'notBackup' ? 'notBackup' : 'damaged',
+        });
+      }
+    };
+
+    input.click();
   }
 
   standbyCommand(action: 'wake' | 'sleep' | 'activity'): void {

@@ -59,6 +59,7 @@ scripts/              # root dev/release tooling — every entry point `pnpm` ru
   uninstall.ts        # `pnpm purge` — remove every install and trace, both OSes in one file
   shared.ts           # helpers: OS-neutral (shared.ts) and per-OS (windows.ts, macos.ts)
 Source/               # C++ — vertical slices, each folder is on the include path
+  backup/             # BackupArchive (the *.plectrifybackup zip; standalone-only)
   app/                # Main.cpp (app entry), MainComponent (standalone shell),
                       #   PlectrifyEngine (everything shared with the VST3 build),
                       #   HostServices.h (the engine's abstract host), EngineWebView
@@ -787,7 +788,7 @@ project moves machines. On restore the plugin's page **adopts** the session's
 metadata without re-applying the rack — the engine's rack is already live, and
 rebuilding it on every editor open would cut audio.
 
-**Four things the plugin does not offer**, each declined through
+**Five things the plugin does not offer**, each declined through
 `HostCapabilities` so the page hides the surface and the engine drops the work.
 Auto Standby, because offline render and freeze are the host's business. The
 **metronome**, because the DAW has one locked to the project tempo and this one
@@ -801,7 +802,12 @@ guard**: the acoustic loop is real when tracking live through a DAW, but
 sustained program material reads as "audible and not falling" and nothing ever
 releases the latch by design, so a trip during an offline bounce silently mutes
 the rest of the render with the clearing pill possibly behind a closed editor.
-The tuner remains.
+And **backup and restore**, because the archive is the *global* data root while
+a DAW session's rack rides its project document instead — so Back up would
+archive rigs and settings this instance is not playing, and Restore would
+replace them under every other Plectrify in the session at once, mid-render,
+with no way to tell the other editors what happened. It belongs where there is
+one instance and one session. The tuner remains.
 
 Declining a tool takes its **node out of the chain**, not just its panel off the
 screen: `RackProcessor::setToolAvailability` is called from the engine's
@@ -1128,6 +1134,8 @@ OSes.
   and the browser window's size, position, monitor, page and scroll offset.
   **The one path `resolveAppFile` refuses to hand the web page**: everything else
   under this root is the page's own, and a bearer token is not. See *TONE3000*.
+- `backup-before-restore.plectrifybackup` — the one level of undo a restore
+  leaves behind; see *Backup and restore* below.
 
 Outside the per-user root, under the machine-wide content root —
 `%PROGRAMDATA%/Plectrify/` on Windows, `/Users/Shared/Plectrify/` on macOS
@@ -1144,6 +1152,74 @@ at `.plectrify-installed/`:
   data and never loaded as code.
 - `patches/` — installed **patches**. The one content folder the app reads
   itself, so it has rules of its own; see below.
+
+### Backup and restore
+
+The per-user root above is the user's whole body of work, and until Settings
+grew a **Backup** card it had no way out: no export, no import and no file
+dialog anywhere in the app. `Source/backup/BackupArchive.{h,cpp}` is the whole feature
+— a plain zip named `*.plectrifybackup` holding `settings.json`,
+`working-rack.json`, `rigs/` and `patches/`, plus a `plectrify-backup.json`
+manifest recording the format version, the writing app version and platform, and
+the counts. Any zip tool opens one.
+
+**`writeArchive` names its four sources rather than walking the root**, so a
+backup can never grow a file because one appeared beside them. What is left out
+is left out for a reason: `tone3000/credentials.json` is a bearer token,
+`known_plugins.xml` names this machine's plugin paths, `looper-sessions/` is
+bulk, and **`audio_settings.xml` is device state, not work** — restoring another
+machine's copy points the app at hardware that is not there, and its mere
+presence is what tells `chooseFirstRunAudioDevice` this is not a first run, so a
+restored machine would skip the ASIO-preferring choice and land on shared-mode
+WASAPI on the built-in microphone. Installed plugins and downloaded captures are
+absent too: those are payload the Packages panel and TONE3000 fetch again, not
+something Plectrify may put in a file the user carries around.
+
+**The page names no path, in either direction.** It emits `createBackup` /
+`restoreBackup` with no payload; `MainComponent` (the standalone shell, since
+the plugin declines `HostCapabilities::backup`) opens a `juce::FileChooser` and
+the *user* names the file. So `resolveAppFile`'s promise — that nothing the web
+page asks for reaches outside the data root — is untouched by a feature that
+writes anywhere on the disk. Neither call is a `request()`: someone can sit in a
+save dialog for minutes, far past the 15 s deadline, so the outcome arrives on a
+`backupState` stream, the `installPackages` shape. `Result::error` is a short
+token and the wording lives in `ui/src/lib/engine/backup.ts`, as
+`describeInstallError`'s does.
+
+**A restore is total, and gated three ways.** `readArchive` reads and accepts
+the manifest *before* deleting anything, so a file that is not a backup — or is
+one a newer build wrote — costs nothing; `isBackupEntryName` allow-lists what may
+be unpacked (the manifest, the two files, one level under `rigs/` or `patches/`,
+nothing else), building on `isSafeArchiveEntryName` rather than restating it;
+and the engine writes `backup-before-restore.plectrifybackup` into the data root
+before the first delete, which is the only way back. It also clears
+`restore_in_progress` and `working-rack.quarantine.json`: a stale sentinel means
+"the last launch died applying the working rack" and would quarantine the
+session that just arrived beside it.
+
+**The page reloads afterwards**, by itself, a beat after the line saying what
+arrived — and at once if the panel closes first. That is what re-runs
+`restorePreviousSession()` against the restored session and re-reads the
+restored settings, and it is owed from the moment the files land rather than
+from a click: until it happens the page shows the rack and preferences of the
+installation the archive replaced. From the moment a restore is asked for,
+`JuceEngine.restoringBackup` suppresses `writeWorkingSession` and
+`persistAppSettings`, or the page's in-memory copy of that *previous*
+installation would be written straight back over what was just restored.
+
+**The whole interaction is one card and no dialog**: the confirm takes over the
+Restore row (`InlineConfirmRow`, as every delete row in the app does), and the
+progress, the outcome and the standing description are one line under the rows
+that changes rather than appears — so the card never grows or shrinks under the
+pointer. A modal for this would put a scrim over the whole app and send the
+answer to the middle of the screen for a question asked in a corner, while
+blocking nothing that is actually blocked: until the OS file dialog opens, the
+rest of the app is usable.
+
+`MockEngine` implements the flow against `localStorage` with a browser download
+and a file input, so the confirm, the progress and the result line are all
+drivable in `pnpm dev`. Its archive is plain JSON and is **not** interchangeable
+with the app's zip — its "disk" is `localStorage`, so it never could be.
 
 ### Installed patches
 
@@ -1602,6 +1678,9 @@ as the signed-in user, with their token, against their own rate limit.
 
 - **Native**: two console-app CTest targets under `Tests/` —
   `Plectrify.TunerDetector` (tuner DSP on synthetic tones),
+  `Plectrify.Backup` (which zip entries a restore may write into the data root,
+  the manifest's version ceiling, and a full archive round trip over two
+  temporary trees),
   `Plectrify.NamStateCodec` / `Plectrify.Tone3000Auth` / `Plectrify.Tone3000Library`
   (the TONE3000 slice's pure rules — state rewriting, PKCE, download paths,
   which model gets picked, where the browser window reopens) and

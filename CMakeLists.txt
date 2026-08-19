@@ -212,11 +212,15 @@ set(PLECTRIFY_ENGINE_SOURCES
     Source/tone3000/Tone3000Service.cpp
     Source/tone3000/Tone3000WindowState.cpp)
 
+# Deliberately not in PLECTRIFY_ENGINE_SOURCES: backing up the per-user data
+# root is a standalone-only feature (HostCapabilities::backup), so the plugin
+# neither offers it nor compiles it.
 target_sources(Plectrify PRIVATE
     ${PLECTRIFY_ENGINE_SOURCES}
     Source/app/Main.cpp
     Source/app/MainComponent.cpp
-    Source/app/WindowLookAndFeel.cpp)
+    Source/app/WindowLookAndFeel.cpp
+    Source/backup/BackupArchive.cpp)
 
 # ---------------------------------------------------------------------------
 # Build provenance for the About dialog's diagnostics: commit, dirty flag and
@@ -321,6 +325,7 @@ function(plectrify_configure_target target)
     target_include_directories(${target} PRIVATE
         Source/app
         Source/audio
+        Source/backup
         Source/plugins
         Source/rackui
         Source/tone3000
@@ -606,6 +611,30 @@ if (BUILD_TESTING)
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
     add_test(NAME Plectrify.Catalogue COMMAND PlectrifyCatalogueTests)
+
+    # Backup and restore: which zip entries may be written into the data root,
+    # the manifest's version ceiling, and a full write/read round trip over two
+    # temporary trees. The entry allow-list is a trust boundary of the same kind
+    # as the catalogue's — the destination is the web page's file sandbox — so
+    # it is compiled with Catalogue.cpp, whose isSafeArchiveEntryName it builds
+    # on rather than restating.
+    juce_add_console_app(PlectrifyBackupTests PRODUCT_NAME "Plectrify Backup Tests")
+    juce_generate_juce_header(PlectrifyBackupTests)
+    target_sources(PlectrifyBackupTests PRIVATE
+        Source/backup/BackupArchive.cpp
+        Source/plugins/Catalogue.cpp
+        Tests/backup/BackupArchiveTests.cpp)
+    target_include_directories(PlectrifyBackupTests PRIVATE Source/backup Source/plugins)
+    target_compile_definitions(PlectrifyBackupTests PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0
+        JUCE_PLUGINHOST_VST3=0)
+    target_link_libraries(PlectrifyBackupTests PRIVATE
+        juce::juce_cryptography
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    add_test(NAME Plectrify.Backup COMMAND PlectrifyBackupTests)
 
     # The TONE3000 integration's one piece of surgery on an opaque plugin
     # state: repointing Neural Amp Modeler at a downloaded capture. Pure

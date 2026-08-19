@@ -68,6 +68,11 @@ export const DOC_NAV: DocSection[] = [
     heading: 'Reference',
     links: [
       {
+        href: '/docs/backup',
+        label: 'Backing up your work',
+        blurb: 'Save every rig, patch and setting to one file, and put it back on any machine.',
+      },
+      {
         href: '/docs/troubleshooting',
         label: 'Troubleshooting',
         blurb: 'No sound, a plugin that will not scan, and other common walls.',

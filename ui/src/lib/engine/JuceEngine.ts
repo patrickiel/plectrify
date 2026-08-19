@@ -49,6 +49,7 @@ import {
   STANDALONE_CAPABILITIES,
 } from './types';
 import { normalizeAudioDevices } from './audioDevices';
+import { IDLE_BACKUP, reduceBackupState, type BackupState } from './backup';
 import { DEFAULT_APP_SETTINGS, normalizeAppSettings } from './appSettings';
 import { firstFreePos, moveKnobToPos, normalizePositions } from './knobLayout';
 import { laneName, makeLane, nextLaneName, normalizeRoutingState } from './routing';
@@ -437,6 +438,16 @@ export class JuceEngine implements EngineBridge {
   private audioDevices: AudioDevicesState = { ...EMPTY_AUDIO_DEVICES };
   private audioDeviceListeners = new Set<(state: AudioDevicesState) => void>();
   private inputLevelListeners = new Set<(peaks: number[]) => void>();
+  // Backup and restore. One stream for both, since a modal file dialog means
+  // only one can be in flight; the last state replays to a late subscriber so
+  // reopening the Settings panel still shows where the last backup went.
+  private backup: BackupState = { ...IDLE_BACKUP };
+  private backupListeners = new Set<(state: BackupState) => void>();
+  /** Set the moment a restore is asked for and never cleared: from here on the
+      files under this page belong to the archive, and everything it holds in
+      memory is the *previous* installation. Both persistence paths check it. */
+  private restoringBackup = false;
+
   private appSettingsRevision = 0;
   /** Serializes this page's own settings.json rewrites; see persistAppSettings. */
   private appSettingsChain: Promise<void> = Promise.resolve();
@@ -724,6 +735,7 @@ export class JuceEngine implements EngineBridge {
     b?.addEventListener('fileWritten', (data) => this.resolvePending(data));
     b?.addEventListener('sessionRead', (data) => this.resolvePending(data));
     b?.addEventListener('sessionWritten', (data) => this.resolvePending(data));
+    b?.addEventListener('backupState', (data) => this.onBackupState(data));
     b?.addEventListener('looperSessionSaved', (data) => this.onLooperSessionSaved(data));
     b?.addEventListener('looperSessionLoaded', (data) => this.resolvePending(data));
     b?.addEventListener('tone3000State', (data) => this.onTone3000State(data));
@@ -2429,6 +2441,48 @@ export class JuceEngine implements EngineBridge {
     backend()?.emitEvent('openExternalUrl', { url });
   }
 
+  createBackup(): void {
+    // Flush the working session first, so the archive is not one autosave
+    // debounce behind the rack on screen. The engine reads the file, not this
+    // page's memory, so the write has to have landed before it looks.
+    void this.flushSessionSave().then(() => backend()?.emitEvent('createBackup', {}));
+  }
+
+  restoreBackup(): void {
+    // Before the emit, not after: the engine may finish the whole restore
+    // before the next line of this page runs, and an autosave in between would
+    // put the old session straight back.
+    this.restoringBackup = true;
+    backend()?.emitEvent('restoreBackup', {});
+  }
+
+  subscribeBackup(listener: (state: BackupState) => void): () => void {
+    this.backupListeners.add(listener);
+    listener(this.backup);
+    return () => this.backupListeners.delete(listener);
+  }
+
+  private onBackupState(data: unknown): void {
+    this.backup = reduceBackupState(this.backup, data);
+
+    // A restore the user backed out of, or one that refused the file: the page
+    // is still the authority on what is on disk, so autosaving may resume.
+    const restoreEndedBadly =
+      this.backup.action === 'restore' &&
+      (this.backup.phase === 'cancelled' || this.backup.phase === 'failed');
+    if (restoreEndedBadly) this.restoringBackup = false;
+
+    for (const listener of this.backupListeners) listener(this.backup);
+
+    // Delivered, then forgotten. Every other terminal state is worth replaying
+    // to a late subscriber — reopening Settings should still say where the last
+    // backup went, and a *successful* restore still owes a reload whoever asks.
+    // A restore that failed or was cancelled owes nothing and changed nothing,
+    // so replaying it would pop its dialog open again every time the panel is
+    // reopened, over a machine that was never touched.
+    if (restoreEndedBadly) this.backup = { ...IDLE_BACKUP };
+  }
+
   startWindowResize(edge: WindowResizeEdge): void {
     backend()?.emitEvent('startWindowResize', { edge });
   }
@@ -2461,6 +2515,9 @@ export class JuceEngine implements EngineBridge {
       this page *shows* stays the optimistic value set above, since nothing here
       has ever re-read another instance's settings. */
   private persistAppSettings(changed: Partial<AppSettings>): void {
+    // Same reasoning as writeWorkingSession: settings.json has been replaced
+    // under this page, and the merge below would lay stale keys back over it.
+    if (this.restoringBackup) return;
     this.appSettingsChain = this.appSettingsChain
       .then(async () => {
         const { ok, text } = await this.readFile(SETTINGS_FILE);
@@ -3679,6 +3736,10 @@ export class JuceEngine implements EngineBridge {
       of a global file two instances would fight over, and survives the page
       dying with every editor close. */
   private async writeWorkingSession(text: string): Promise<boolean> {
+    // A restore has replaced this file on disk and the page is about to reload
+    // against it. What is still in memory here is the *old* session, so writing
+    // it now would undo the restore in the seconds before the reload.
+    if (this.restoringBackup) return true;
     if (!this.isPluginHost()) return this.writeFile(WORKING_FILE, text);
 
     const ok = await this.request('writeSession', { text }).then(

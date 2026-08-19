@@ -217,6 +217,15 @@ plectrify::HostCapabilities PlectrifyAudioProcessor::capabilities() const
     // reach. The host's own monitoring path is its business, as suspension is.
     caps.feedbackGuard = false;
 
+    // Backup and restore: the archive is the *global* data root, and a DAW
+    // session's rack is not in it — the project document carries that
+    // (getStateInformation). So a Back up button here would archive rigs and
+    // settings this instance is not playing, and Restore would replace them
+    // under every other Plectrify in the session at once, mid-render, with no
+    // way to tell the other editors what happened. It belongs where there is
+    // one instance and one session: the standalone.
+    caps.backup = false;
+
     return caps;
 }
 

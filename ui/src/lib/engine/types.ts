@@ -956,6 +956,11 @@ export interface HostCapabilities {
       pill itself is never gated: a hand mute is a panic control every host
       owes the player. */
   feedbackGuard: boolean;
+  /** Backing the data root up to a file and restoring it. Declined by the
+      plugin: a DAW session's rack rides its project document, so an archive of
+      the *global* rigs and settings is not what that session owns, and a
+      restore would replace them under every other instance at once. */
+  backup: boolean;
 }
 
 /** What absence of the capabilities field means: the standalone, which has it
@@ -968,6 +973,7 @@ export const STANDALONE_CAPABILITIES: HostCapabilities = {
   looper: true,
   metronome: true,
   feedbackGuard: true,
+  backup: true,
 };
 
 /** Facts about the running host only the engine knows — the About dialog and the

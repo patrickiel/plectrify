@@ -17,6 +17,7 @@ import type {
   SceneState,
   StatusState,
 } from './types';
+import type { BackupState } from './backup';
 import type { InstallFinished, InstallProgress, CatalogueState } from './catalogue';
 import type { Tone3000InstallEvent, Tone3000State } from './tone3000';
 import type { ModuleIcon, ModuleStyleVariant, ModuleTexture } from './moduleAppearance';
@@ -518,6 +519,26 @@ export interface EngineBridge {
       dragging — the page draws its own grip instead and drives the size
       through here. A no-op everywhere else. */
   setEditorSize(width: number, height: number): void;
+
+  /** Write every rig, patch, the working session and the app's preferences to
+      one archive, at a path the user picks in a native save dialog.
+
+      Standalone only (HostCapabilities.backup) — a DAW session's rack rides its
+      project document, not this. Fire-and-forget rather than a promise: the
+      user may sit in a file dialog for minutes, far past the bridge's request
+      deadline, so the outcome arrives on subscribeBackup instead. */
+  createBackup(): void;
+  /** Replace this machine's rigs, patches, working session and preferences with
+      an archive's, chosen in a native open dialog.
+
+      Destructive and total — the engine writes a one-level undo snapshot beside
+      the data root first. Confirm before calling. The page must reload once the
+      state reports `done`: the engine has replaced the files under it, and the
+      reload is what re-reads them. */
+  restoreBackup(): void;
+  /** Subscribe to the progress and outcome of the two calls above. Returns an
+      unsubscribe function. */
+  subscribeBackup(listener: (state: BackupState) => void): () => void;
 
   /** Update application preferences. These are persisted independently of
       rigs and the working session. */
