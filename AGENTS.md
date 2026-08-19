@@ -56,6 +56,7 @@ scripts/              # root dev/release tooling — every entry point `pnpm` ru
   release.ts          # `pnpm release` — dispatches by platform; `pnpm release:promote` is step 3
   release.windows.ts  # Windows release pipeline (Inno Setup installer)
   release.macos.ts    # macOS release pipeline (signed/notarized installer pkg)
+  uninstall.ts        # `pnpm purge` — remove every install and trace, both OSes in one file
   shared.ts           # helpers: OS-neutral (shared.ts) and per-OS (windows.ts, macos.ts)
 Source/               # C++ — vertical slices, each folder is on the include path
   app/                # Main.cpp (app entry), MainComponent (standalone shell),
@@ -112,6 +113,20 @@ pnpm app --plugin    # build the Debug VST3 and install it for this user's DAWs
                      #   a Release .vst3 is staged and sealed by the release
                      #   pipeline, not the dev loop.
 ```
+
+### Removing an installation
+
+`pnpm purge` uninstalls Plectrify and clears every trace it left — the
+application, the VST3 and (on macOS) the AU, the per-user data root, the
+machine-wide content root, the Windows Add/Remove Programs entry and the macOS
+installer receipts. Unlike the rest of `scripts/`, it is **one file for both
+OSes** (`scripts/uninstall.ts`): a purge is a list of paths, not a build, so the
+two halves differ in nothing but the paths. It prints what it would remove and
+deletes nothing without `--yes`; `--keep-user-data` spares rigs and patches and
+`--keep-packages` spares plugins installed from the Packages panel, which is
+what the shipped uninstallers already do. On macOS the managed plugin directory
+is shared with every other VST3 vendor, so only the files the install markers
+name are removed there — never the folder.
 
 Platform notes: Windows builds into `build/` (VS generator, multi-config) and
 carries two hazards the script owns — the MSBuild `.tlog` interrupted-build

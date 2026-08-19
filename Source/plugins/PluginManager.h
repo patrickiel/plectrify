@@ -111,7 +111,13 @@ public:
     int unblacklistPlugins (const juce::StringArray& files);
 
     /** Asynchronously creates an instance. The callback receives the instance
-        (moved) or nullptr plus an error string, always on the message thread. */
+        (moved) or nullptr plus an error string, always on the message thread.
+
+        A description whose file no longer exists is re-resolved against the
+        scan cache by plugin identity before instantiation: a saved rig bakes
+        the absolute path it was loaded from, which may belong to another
+        build's copy of the same plugin (the bundled plugin's path is per-build
+        by construction). */
     void createInstanceAsync (
         const juce::PluginDescription& desc,
         double sampleRate,

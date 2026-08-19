@@ -172,8 +172,38 @@ void PluginManager::createInstanceAsync (
     int blockSize,
     std::function<void (std::unique_ptr<juce::AudioPluginInstance>, const juce::String&)> callback)
 {
+    // A description out of a saved document (rig, working rack, host-saved
+    // state) bakes the absolute path the plugin was loaded from, and that path
+    // can rot while the plugin itself is still on the machine: the bundled
+    // plugin lives at a different path per build (installed app, dev tree,
+    // plugin bundle), and an uninstall or reinstall moves it. JUCE answers a
+    // dead path with the misleading "no compatible plug-in format exists", so
+    // when the named file is gone, fall back to the scan cache's entry for the
+    // same plugin — matched by format and uid, never by path (deliberately not
+    // matchesIdentifierString, which hashes the file path into the identity:
+    // the moved path is exactly the part that must not count). Only a live
+    // file is substituted: the cache prunes at scan time, not continuously.
+    // The next capture writes the loaded instance's real path, so the document
+    // heals itself on the following save.
+    auto resolved = desc;
+    if (! juce::File::createFileWithoutCheckingPath (desc.fileOrIdentifier).exists())
+    {
+        const auto sameId = [] (int known, int stored) { return stored != 0 && known == stored; };
+        for (const auto& known : knownPlugins.getTypes())
+        {
+            if (known.pluginFormatName == desc.pluginFormatName
+                && (sameId (known.uniqueId, desc.uniqueId)
+                    || sameId (known.deprecatedUid, desc.deprecatedUid))
+                && juce::File::createFileWithoutCheckingPath (known.fileOrIdentifier).exists())
+            {
+                resolved = known;
+                break;
+            }
+        }
+    }
+
     formatManager.createPluginInstanceAsync (
-        desc, sampleRate, blockSize,
+        resolved, sampleRate, blockSize,
         [cb = std::move (callback)] (std::unique_ptr<juce::AudioPluginInstance> instance,
                                      const juce::String& error)
         {

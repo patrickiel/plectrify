@@ -9,6 +9,7 @@
     "release:promote": "tsx scripts/release.windows.ts --promote",
     "release:windows": "tsx scripts/release.windows.ts",
     "release:macos": "tsx scripts/release.macos.ts",
+    "purge": "tsx scripts/uninstall.ts",
     "check": "tsc --noEmit"
   },
   "devDependencies": {
