@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   EngineBridge,
   ModuleInsertTarget,
   ModuleMoveTarget,
@@ -72,16 +72,16 @@ import { uid } from './ids';
 /** One localStorage key stands in for JuceEngine's patches directory: patch
     id -> the whole stored patch, mapping and tone together, exactly as one
     file holds them there. A mock plugin has no serialised state, so the tone
-    is the module's parameter values — opaque to everything downstream, like
+    is the module's parameter values â€” opaque to everything downstream, like
     the real base64 blob, and enough to make a patch load audibly change the
     rack in browser development. */
 const PATCHES_KEY = 'plectrify.patches';
 
 /** Stands in for a patch pack installed under the shared package root, which
     the browser has no equivalent of. Fixed rather than stored: a pack is not
-    the user's to change, so `pnpm dev` exercises the read-only path — the badge
-    and the disabled rename/delete — without a real install. The id is the
-    package id, exactly as the installed folder is named for it — which is
+    the user's to change, so `pnpm dev` exercises the read-only path â€” the badge
+    and the disabled rename/delete â€” without a real install. The id is the
+    package id, exactly as the installed folder is named for it â€” which is
     also what files the patch under its package's drawer heading. */
 const SHIPPED_PATCHES: Record<string, StoredPatch> = {
   'amalgam-jtm45': {
@@ -116,7 +116,7 @@ interface WorkingSnapshot {
 
 /** A stored rig: the public {id, name} plus the full chain snapshot. In the
     mock, cloning the rack modules stands in for the native engine's per-plugin
-    binary state — it captures every knob, value and bypass exactly. */
+    binary state â€” it captures every knob, value and bypass exactly. */
 interface StoredRig extends Rig {
   modules: RackModule[];
   /** Parallel-routing topology captured with the chain (absent for old rigs). */
@@ -125,7 +125,7 @@ interface StoredRig extends Rig {
   scenes?: Scene[];
 }
 
-/** A plausible spread of parameters a hosted plugin might expose — used so the
+/** A plausible spread of parameters a hosted plugin might expose â€” used so the
     mapping picker has something to choose from in the browser demo. */
 const MOCK_PARAM_NAMES = [
   'Input Gain',
@@ -165,7 +165,7 @@ const valueText = (name: string, v: number) => {
 const NO_ROUTING: RoutingState = { groups: [] };
 
 /** A plausible machine for the setup wizard to be built against: an ASIO
-    interface with four jacks, and the OS's own shared driver beside it — which
+    interface with four jacks, and the OS's own shared driver beside it â€” which
     is the split the wizard's advice exists for. Both families are here so the
     device step has something to switch between, and so the "you could be on
     ASIO" note has a case where it is right and one where it is not. */
@@ -217,7 +217,7 @@ function mockAudioDevices(): AudioDevicesState {
 
 /** Pitches the demo tuner walks, as MIDI notes: 5-string bass low B, low E,
     open A, concert A, and the top of the detector's range. The extremes are the
-    point — a low B is where the strobe's harmonic lanes earn their keep, and E6
+    point â€” a low B is where the strobe's harmonic lanes earn their keep, and E6
     is where its drift rate starts to outrun 60 fps. Same notes as
     Tests/audio/TunerDetectorTests.cpp. */
 const TUNER_DEMO_NOTES = [23, 40, 45, 69, 88];
@@ -226,7 +226,7 @@ const TUNER_DEMO_SECONDS_PER_NOTE = 10;
 /** A scripted detune, held long enough at each step to actually watch. Walks
     every regime the strobe has to handle: too fast to resolve, fast, readable,
     barely creeping, dead still, then the same again flat. A sine sweep would be
-    useless here — it reverses the drift several times a second, so the one state
+    useless here â€” it reverses the drift several times a second, so the one state
     that matters most, the freeze, would never appear. */
 const TUNER_DEMO_STAGES: readonly { cents: number; seconds: number; silent?: boolean }[] = [
   { cents: 22, seconds: 2.5 },
@@ -237,7 +237,7 @@ const TUNER_DEMO_STAGES: readonly { cents: number; seconds: number; silent?: boo
   { cents: -0.6, seconds: 3 },
   { cents: -3, seconds: 2.5 },
   { cents: -14, seconds: 2.5 },
-  // Keeps the UI's hold → fade → drop path exercised on every lap.
+  // Keeps the UI's hold â†’ fade â†’ drop path exercised on every lap.
   { cents: 0, seconds: 1, silent: true },
 ];
 const TUNER_DEMO_CYCLE_SECONDS = TUNER_DEMO_STAGES.reduce(
@@ -271,7 +271,7 @@ function tunerDemoNote(): number | undefined {
 
 /** Seeded 32-bit LCG, same shape as the native tuner tests' noise floor, so the
     demo replays identically across reloads and two screenshots are comparable.
-    The top bits only — an LCG's low bits cycle far too short to look random. */
+    The top bits only â€” an LCG's low bits cycle far too short to look random. */
 let tunerNoiseState = 22222;
 function tunerNoise(): number {
   tunerNoiseState = (Math.imul(tunerNoiseState, 1103515245) + 12345) >>> 0;
@@ -289,7 +289,7 @@ function tunerDemoStage(elapsed: number): { cents: number; detected: boolean } {
     if (stage.silent) return { cents: 0, detected: false };
     const previous =
       TUNER_DEMO_STAGES[(index - 1 + TUNER_DEMO_STAGES.length) % TUNER_DEMO_STAGES.length];
-    // Coming back from the dropout there is nothing to glide from — the note has
+    // Coming back from the dropout there is nothing to glide from â€” the note has
     // just been plucked again, so it arrives already at pitch.
     const from = previous.silent ? stage.cents : previous.cents;
     const glide = Math.min(1, remaining / (stage.seconds * TUNER_DEMO_RAMP));
@@ -319,7 +319,7 @@ function patchList(stored: Record<string, StoredPatch>, readOnly = false): Patch
 }
 
 /** The mock's plugin state: every parameter value the module currently holds,
-    mapped or not — the point being that a patch restores more than its own
+    mapped or not â€” the point being that a patch restores more than its own
     knobs. */
 function mockStateOf(module: RackModule): string {
   return JSON.stringify(module.params.map(({ paramIndex, value }) => ({ paramIndex, value })));
@@ -345,8 +345,8 @@ function withMockState(knobs: MappedParam[], state: string | undefined): MappedP
 /** A patch's mapping wearing the module's *current* readings, param by param.
     What a preview shows: the plugin itself has not been touched, so a knob the
     patch points at a parameter the module already had keeps that parameter's
-    value. The real engine gets this for free — its values come from polling the
-    live plugin — so this is only the mock catching up to it. */
+    value. The real engine gets this for free â€” its values come from polling the
+    live plugin â€” so this is only the mock catching up to it. */
 function withLiveValues(knobs: MappedParam[], live: MappedParam[]): MappedParam[] {
   const byIndex = new Map(live.map((p) => [p.paramIndex, p]));
   return knobs.map((k) => {
@@ -439,7 +439,7 @@ const cloneModules = (mods: RackModule[]): RackModule[] => structuredClone(mods)
 
     Effects is deliberately mixed: two packages filed under it directly and one
     in an "Effects > Reverb" subsection, so a card with both its own rows and a
-    nested heading — the shape a flat category list could not produce — is
+    nested heading â€” the shape a flat category list could not produce â€” is
     visible without a native build. */
 const MOCK_CATALOGUE: CataloguePackage[] = [
   {
@@ -573,27 +573,6 @@ const MOCK_CATALOGUE: CataloguePackage[] = [
     dependsOn: '',
   },
   {
-    id: 'airwindows-consolidated',
-    kind: 'plugin',
-    category: ['Effects'],
-    tags: ['Multi-effect', 'Distortion', 'Modulation'],
-    name: 'Airwindows Consolidated',
-    purpose: 'Utility, saturation and modulation collection',
-    version: '2026-08-02-f3fc037',
-    licenseId: 'GPL-3.0-only',
-    licenseUrl: 'https://raw.githubusercontent.com/baconpaul/airwin2rack/main/LICENSE',
-    projectUrl: 'https://github.com/baconpaul/airwin2rack',
-    downloadBytes: 13317479,
-    selfHosted: false,
-    installed: false,
-    installedVersion: '',
-    updateAvailable: false,
-    available: true,
-    unlisted: false,
-    dir: '',
-    dependsOn: '',
-  },
-  {
     // A package with no payload for the platform this build runs on (the
     // engine decides; on real builds this happens when a catalogue entry has
     // no asset for the current OS). Here so the greyed row with its disabled
@@ -638,15 +617,8 @@ const MOCK_BUNDLE: CatalogueBundle = {
     'cab-irs',
     'zam-plugins',
     'dragonfly-reverb',
-    'airwindows-consolidated',
   ],
-  missingPackageIds: [
-    'neural-amp-modeler',
-    'amalgam-jtm45',
-    'cab-irs',
-    'zam-plugins',
-    'airwindows-consolidated',
-  ],
+  missingPackageIds: ['neural-amp-modeler', 'amalgam-jtm45', 'cab-irs', 'zam-plugins'],
   outdatedPackageIds: ['dragonfly-reverb'],
   installedVersion: '',
   installed: false,
@@ -655,7 +627,7 @@ const MOCK_BUNDLE: CatalogueBundle = {
 
 /** Always fails to install in the mock, so the failure copy and the per-row
     Retry are exercised on every browser run rather than only in the wild. */
-const MOCK_CATALOGUE_FAILING_ID = 'airwindows-consolidated';
+const MOCK_CATALOGUE_FAILING_ID = 'zam-plugins';
 
 const MOCK_PLUGINS: PluginInfo[] = [
   // `packageId` on the first two joins them to MOCK_CATALOGUE, so a patch
@@ -706,7 +678,7 @@ function mockHostMode(): 'standalone' | 'plugin' {
 
 // No exe to ask, and nothing here may pass for a release build: the About
 // dialog reports this verbatim, so standalone UI work is never mistaken for the
-// shipped app in a bug report. Every group is still populated — the diagnostics
+// shipped app in a bug report. Every group is still populated â€” the diagnostics
 // layout has to be built against a full report, not against a page of dashes.
 const MOCK_APP_INFO: AppInfo = {
   version: 'dev',
@@ -800,7 +772,7 @@ function makeModule(pluginId: string): RackModule {
     module whose plugin is no longer in the catalog stays in the chain, marked
     missing with an empty param palette (audibly it would pass through). One
     whose plugin is back ("reinstalled") loses the mark and gets its palette
-    rebuilt — the snapshot itself is otherwise untouched, so nothing is lost
+    rebuilt â€” the snapshot itself is otherwise untouched, so nothing is lost
     while the plugin is away. */
 function withMissingState(module: RackModule): RackModule {
   if (MOCK_PLUGINS.some((p) => p.name === module.name)) {
@@ -827,7 +799,7 @@ export class MockEngine implements EngineBridge {
   /** The audition run in flight: the module whose patch menu is being walked,
       and the module as it was before the first patch was tried. Modules are
       replaced rather than mutated here, so holding the old object is the whole
-      snapshot. Never persisted — an audition is a pointer resting on a row. */
+      snapshot. Never persisted â€” an audition is a pointer resting on a row. */
   private patchPreview: { moduleId: string; module: RackModule } | null = null;
   private rigs: StoredRig[] = loadStoredRigs();
   private rigListeners = new Set<(r: Rig[]) => void>();
@@ -844,7 +816,7 @@ export class MockEngine implements EngineBridge {
     items: MOCK_CATALOGUE.map((item) => ({ ...item })),
     bundles: [MOCK_BUNDLE],
     // Two top-level categories, a subsection under one of them, and one
-    // uncategorised link — so the panel's nesting and its trailing fallback
+    // uncategorised link â€” so the panel's nesting and its trailing fallback
     // heading are both visible in browser development. The real catalogue
     // publishes three flat link categories, which would exercise neither.
     links: [
@@ -898,7 +870,7 @@ export class MockEngine implements EngineBridge {
   // The first-run starter install, exactly as the real engine does it. The
   // fixture above has packages installed, so it settles to "nothing owed"
   // unless a developer clears localStorage *and* the fixture's installed flags
-  // — which is how the empty rack's installing state is exercised in the
+  // â€” which is how the empty rack's installing state is exercised in the
   // browser.
   private starterChecked = false;
   private starterInstalling = false;
@@ -923,7 +895,7 @@ export class MockEngine implements EngineBridge {
   private appSettingsListeners = new Set<(settings: AppSettings) => void>();
   // Auto Standby, simulated so the UI can be built and demoed standalone. The
   // mock's synthetic input never actually falls silent, so the countdown runs
-  // off explicit interaction instead — which is what makes the feature
+  // off explicit interaction instead â€” which is what makes the feature
   // observable here without waiting for a real guitar to stop ringing.
   private standbyLastActivityMs = performance.now();
   private standbyWakeAtMs = 0;
@@ -942,7 +914,7 @@ export class MockEngine implements EngineBridge {
 
     // Same reasoning for the feedback guard: nothing here analyses audio, so
     // `plectrifyTripFeedback()` is the only way to see the tripped pill in the
-    // browser. Clearing it is the ordinary path — a click on the pill.
+    // browser. Clearing it is the ordinary path â€” a click on the pill.
     (window as { plectrifyTripFeedback?: () => void }).plectrifyTripFeedback = () => {
       this.status = { ...this.status, feedbackMuted: true };
       this.emitStatus();
@@ -961,7 +933,7 @@ export class MockEngine implements EngineBridge {
     }
 
     // 66 ms to match the native side's 15 Hz status timer, so anything built
-    // against the mock sees the same update cadence — and the same staircase —
+    // against the mock sees the same update cadence â€” and the same staircase â€”
     // that it will get from the engine.
     const tunerOverride = tunerDemoOverride();
     const pinnedNote = tunerDemoNote();
@@ -1074,8 +1046,8 @@ export class MockEngine implements EngineBridge {
   }
 
   /** Simulated single-loop looper: real state machine, no audio. Mirrors the
-      native LooperProcessor's transitions — including the mis-tap discard and
-      the 60 s auto-close — so the widget behaves identically in the browser. */
+      native LooperProcessor's transitions â€” including the mis-tap discard and
+      the 60 s auto-close â€” so the widget behaves identically in the browser. */
   private looper = {
     state: 'empty' as LooperState,
     loopSeconds: 0,
@@ -1084,13 +1056,13 @@ export class MockEngine implements EngineBridge {
     playStartMs: 0,
     hasUndo: false,
     undoIsRedo: false,
-    // The held loop is a loaded session nobody has modified — archiving it
+    // The held loop is a loaded session nobody has modified â€” archiving it
     // again would only duplicate the entry, so the clear-time archive skips
     // it. Mirrors the native looper's isLoopUnchangedSinceLoad.
     unchangedLoad: false,
   };
   /** How long the mock stays armed before pretending the player's first note
-      arrived — stands in for the engine's input-threshold trigger. */
+      arrived â€” stands in for the engine's input-threshold trigger. */
   private static readonly MOCK_ARM_PICKUP_MS = 900;
 
   private metronomeBeatStartMs = performance.now();
@@ -1113,7 +1085,7 @@ export class MockEngine implements EngineBridge {
       case 'toggle':
         if (l.state === 'empty') {
           // Arm first (recording starts when the simulated input arrives),
-          // unless auto-arm is off — then record on the press, as natively.
+          // unless auto-arm is off â€” then record on the press, as natively.
           if (this.status.looperArmEnabled) {
             l.state = 'armed';
             l.armStartMs = now;
@@ -1155,7 +1127,7 @@ export class MockEngine implements EngineBridge {
         }
         break;
       case 'clear':
-        // Clear archives instead of discarding — a closed loop, or the
+        // Clear archives instead of discarding â€” a closed loop, or the
         // partial take recorded so far (mis-tap short ones excepted). An
         // unmodified loaded session is already on disk: skip the duplicate.
         if (!l.unchangedLoad) {
@@ -1171,7 +1143,7 @@ export class MockEngine implements EngineBridge {
         break;
       case 'undo':
         // No audio to swap in the mock, but the parity is real: one press
-        // undoes, the next redoes — the button label follows it.
+        // undoes, the next redoes â€” the button label follows it.
         if (l.hasUndo && (l.state === 'playing' || l.state === 'stopped'))
           l.undoIsRedo = !l.undoIsRedo;
         break;
@@ -1244,7 +1216,7 @@ export class MockEngine implements EngineBridge {
     };
   }
 
-  // --- Looper session archive (metadata only — the mock has no audio) -------
+  // --- Looper session archive (metadata only â€” the mock has no audio) -------
 
   private looperSessions: LooperSession[] = loadStoredLooperSessions();
   private looperSessionListeners = new Set<(sessions: LooperSession[]) => void>();
@@ -1289,7 +1261,7 @@ export class MockEngine implements EngineBridge {
     const entry = this.looperSessions.find((s) => s.id === id);
     if (!entry) return Promise.resolve(false);
     const l = this.looper;
-    // Archive whatever is held first, exactly like the native path — unless
+    // Archive whatever is held first, exactly like the native path â€” unless
     // it is itself an unmodified loaded session, already on disk.
     if (l.state !== 'empty' && l.state !== 'armed' && !l.unchangedLoad) {
       this.archiveLooperSession(
@@ -1353,7 +1325,7 @@ export class MockEngine implements EngineBridge {
     if (!patch) return module;
     return {
       ...module,
-      // The card's look travels with the mapping, as in loadPatch — a new
+      // The card's look travels with the mapping, as in loadPatch â€” a new
       // module has none of its own to keep. A patch with no title override
       // still names the card: the drawer tile showed the patch's name, and
       // the drop must produce the module the tile promised.
@@ -1459,7 +1431,7 @@ export class MockEngine implements EngineBridge {
     if (index < 0) return null;
 
     // A swap in place: the module count and every serial position are
-    // unchanged, so — unlike removeModule followed by insertModule — there is
+    // unchanged, so â€” unlike removeModule followed by insertModule â€” there is
     // no split arithmetic to do and no lane to collapse. The replacement
     // simply inherits the old module's lane.
     const module = this.buildModule(pluginId, patchId);
@@ -1492,7 +1464,7 @@ export class MockEngine implements EngineBridge {
         candidate.id === group.id ? { ...candidate, lanes: [...candidate.lanes, lane] } : candidate,
       );
       const result = moveModuleInRack(this.rack, groups, id, { laneId: lane.id });
-      if (!result.changed) return; // unknown module — don't keep the orphan lane
+      if (!result.changed) return; // unknown module â€” don't keep the orphan lane
       this.rack = result.rack;
       this.routing = { groups: result.groups };
       this.emit();
@@ -1858,7 +1830,7 @@ export class MockEngine implements EngineBridge {
     this.rack = this.rack.map((m) => {
       if (m.id !== moduleId) return m;
       const next = { ...m };
-      // Per field: undefined leaves the value alone, null clears it — same
+      // Per field: undefined leaves the value alone, null clears it â€” same
       // guards as the real engine so both accept exactly the same values.
       if (style.color !== undefined)
         next.color = style.color === null ? undefined : asModuleColor(style.color);
@@ -1877,24 +1849,26 @@ export class MockEngine implements EngineBridge {
   // Async to match the real engine, where capturing the tone is a round-trip
   // to the audio side; here it resolves immediately.
   async savePatch(moduleId: string, name: string): Promise<string | null> {
+    // A preview must never be captured â€” JuceEngine's twin; see settlePreview.
+    this.settlePreview(moduleId);
     const mod = this.rack.find((m) => m.id === moduleId);
     if (!mod) return null;
     const id = uid('patch');
-    this.writePatch(id, {
-      ...storedFromModule(mod, name),
-      tone3000: mod.tone3000,
-      state: mockStateOf(mod),
-    });
+    const doc = { ...storedFromModule(mod, name), tone3000: mod.tone3000, state: mockStateOf(mod) };
+    this.writePatch(id, doc);
+    this.retitleModule(moduleId, doc.name);
     return id;
   }
 
   async updatePatch(patchId: string, moduleId: string): Promise<void> {
+    // Same rule as savePatch: never recapture a try-on.
+    this.settlePreview(moduleId);
     const mod = this.rack.find((m) => m.id === moduleId);
     const existing = this.storedPatches[patchId];
     if (!mod || !existing) return;
     // Recapture the live mapping but keep the patch's identity: same id (so
     // whoever has it loaded stays pointed at it), same name, and the drawer
-    // heading the user filed it under — storedFromModule knows nothing of the
+    // heading the user filed it under â€” storedFromModule knows nothing of the
     // category, so rebuilding the doc would silently drop it.
     this.writePatch(patchId, {
       ...storedFromModule(mod, existing.name),
@@ -1902,11 +1876,20 @@ export class MockEngine implements EngineBridge {
       tone3000: existing.tone3000,
       state: mockStateOf(mod),
     });
+    this.retitleModule(moduleId, existing.name);
+  }
+
+  /** A save names the module â€” JuceEngine's twin: the card must say the saved
+      name the moment the save lands, since the tile and the menu already do. */
+  private retitleModule(moduleId: string, title: string): void {
+    if (!this.rack.some((m) => m.id === moduleId && m.displayName !== title)) return;
+    this.rack = this.rack.map((m) => (m.id !== moduleId ? m : { ...m, displayName: title }));
+    this.emit();
   }
 
   loadPatch(moduleId: string, patchId: string): void {
     // Clicking a row commits the preview it was resting on, so the module it
-    // would have been put back to is forgotten — see previewPatch.
+    // would have been put back to is forgotten â€” see previewPatch.
     if (this.patchPreview?.moduleId === moduleId) this.patchPreview = null;
     this.applyPatch(moduleId, patchId, true);
   }
@@ -1917,7 +1900,7 @@ export class MockEngine implements EngineBridge {
     // A run belongs to one module, and its snapshot is taken once: stepping
     // over to another module puts the first one back first. Modules are
     // replaced rather than mutated here, so holding the old one is the whole
-    // snapshot — the real engine keeps the metadata half of it.
+    // snapshot â€” the real engine keeps the metadata half of it.
     if (this.patchPreview && this.patchPreview.moduleId !== moduleId) this.restorePreview();
     if (!this.patchPreview) this.patchPreview = { moduleId, module: mod };
     this.applyPatch(moduleId, patchId, false);
@@ -1926,6 +1909,12 @@ export class MockEngine implements EngineBridge {
   cancelPatchPreview(moduleId: string): void {
     if (this.patchPreview?.moduleId !== moduleId) return;
     this.restorePreview();
+  }
+
+  /** End any preview running on `moduleId` before a capture reads the module â€”
+      what is captured must be the module's own state, never the try-on. */
+  private settlePreview(moduleId: string): void {
+    if (this.patchPreview?.moduleId === moduleId) this.restorePreview();
   }
 
   private restorePreview(): void {
@@ -1949,7 +1938,7 @@ export class MockEngine implements EngineBridge {
             ...m,
             // The card's look travels with the mapping; a patch that carries
             // neither leaves the module's own name and colour alone. A TONE3000
-            // patch always names the card — the tone is its identity.
+            // patch always names the card â€” the tone is its identity.
             displayName: patchTitleOverride(patch) ?? m.displayName,
             color: patch.color ?? m.color,
             styleVariant: patch.styleVariant ?? m.styleVariant,
@@ -1970,7 +1959,8 @@ export class MockEngine implements EngineBridge {
     const clean = name.trim();
     const existing = this.storedPatches[patchId];
     if (!clean || !existing) return;
-    this.writePatch(patchId, { ...existing, name: clean });
+    // The card title follows the name, as it does on save â€” JuceEngine's twin.
+    this.writePatch(patchId, { ...existing, name: clean, displayName: clean });
   }
 
   setPatchCategory(patchId: string, category: string): void {
@@ -2030,7 +2020,7 @@ export class MockEngine implements EngineBridge {
   // --- TONE3000 -------------------------------------------------------------
   // A scripted stand-in for the real integration: no network, no account, no
   // files. Browsing happens in a native window there is no equivalent of here,
-  // so the mock plays the user's part too — it picks a tone and installs it, so
+  // so the mock plays the user's part too â€” it picks a tone and installs it, so
   // the splash, the install progress, the drawer tile and the missing-capture
   // repair can all be driven in the browser.
 
@@ -2061,8 +2051,8 @@ export class MockEngine implements EngineBridge {
   tone3000Browse(options?: { moduleId?: string; pluginId?: string; architecture?: string }): void {
     // The real thing opens TONE3000's own window and waits on the user. There
     // is no window here, so the mock plays the whole thing through: connect,
-    // pick a tone, download it. That is the flow the app now has — one click
-    // and a patch appears — so it is the flow the browser dev loop reproduces.
+    // pick a tone, download it. That is the flow the app now has â€” one click
+    // and a patch appears â€” so it is the flow the browser dev loop reproduces.
     this.tone3000 = { ...this.tone3000, pending: true };
     this.emitTone3000();
 
@@ -2124,7 +2114,7 @@ export class MockEngine implements EngineBridge {
       setTimeout(() => {
         const module = moduleId ? this.rack.find((m) => m.id === moduleId) : undefined;
 
-        // The same tone twice is one patch — JuceEngine's twin, with the doc in
+        // The same tone twice is one patch â€” JuceEngine's twin, with the doc in
         // hand rather than off disk, so there is no unreadable-document case.
         const existing = findTone3000Patch(
           Object.entries(this.storedPatches).map(([id, doc]) => ({ id, tone3000: doc.tone3000 })),
@@ -2148,13 +2138,13 @@ export class MockEngine implements EngineBridge {
             : { name: provenance.title, pluginName: NAM_PLUGIN_NAME, knobs: [] };
           this.writePatch(patchId, {
             ...base,
-            // The user's template (Settings → TONE3000), copied — JuceEngine's twin.
+            // The user's template (Settings â†’ TONE3000), copied â€” JuceEngine's twin.
             knobs:
               base.knobs.length > 0
                 ? base.knobs
                 : this.appSettings.tone3000TemplateKnobs.map((k) => ({ ...k })),
             name: provenance.title,
-            // Never the capturing module's name — see JuceEngine's twin.
+            // Never the capturing module's name â€” see JuceEngine's twin.
             displayName: undefined,
             state: `mock-t3k:${tone.id}-${model.id}`,
             tone3000: provenance,
@@ -2170,7 +2160,7 @@ export class MockEngine implements EngineBridge {
         };
 
         this.emitTone3000Install({ runId, stage: 'done', patchId });
-        // The reconcile push, after the stream — the page believes this.
+        // The reconcile push, after the stream â€” the page believes this.
         this.emitTone3000();
         if (moduleId) this.loadPatch(moduleId, patchId);
       }, 300);
@@ -2258,14 +2248,14 @@ export class MockEngine implements EngineBridge {
   }
 
   private persistPatches(): void {
-    // Only the user's own are persisted — SHIPPED_PATCHES stands in for a pack
+    // Only the user's own are persisted â€” SHIPPED_PATCHES stands in for a pack
     // on disk, which the app never writes.
     this.persist(PATCHES_KEY, this.storedPatches);
     const all = mergePatches(patchList(this.storedPatches), SHIPPED_LIST);
     for (const l of this.patchListeners) l(all);
   }
 
-  /** The stored half of a rig — everything but its identity, cloned so the
+  /** The stored half of a rig â€” everything but its identity, cloned so the
       snapshot is independent of the live rack. */
   private captureRigBody() {
     return {
@@ -2286,7 +2276,7 @@ export class MockEngine implements EngineBridge {
 
   updateRig(rigId: string): Promise<boolean> {
     if (!this.rigs.some((r) => r.id === rigId)) return Promise.resolve(false);
-    // Content only — id, name and list position all stay put.
+    // Content only â€” id, name and list position all stay put.
     this.rigs = this.rigs.map((r) => (r.id === rigId ? { ...r, ...this.captureRigBody() } : r));
     return Promise.resolve(this.persistRigs());
   }
@@ -2369,7 +2359,7 @@ export class MockEngine implements EngineBridge {
   }
 
   private emitRigs(): void {
-    // Hand out only the public {id, name} — the chain snapshot stays internal.
+    // Hand out only the public {id, name} â€” the chain snapshot stays internal.
     const list: Rig[] = this.rigs.map(({ id, name }) => ({ id, name }));
     for (const l of this.rigListeners) l(list);
   }
@@ -2479,7 +2469,7 @@ export class MockEngine implements EngineBridge {
 
   /** Adopt a scene as active and remember it for the current rig. The map in
       app settings is what brings the selection back after a rig switch or a
-      restart — no user save involved. */
+      restart â€” no user save involved. */
   private setActiveScene(sceneId: string | null): void {
     this.activeSceneId = sceneId;
     const rigId = this.appSettings.activeRigId;
@@ -2553,7 +2543,7 @@ export class MockEngine implements EngineBridge {
   // --- Plugin catalogue -----------------------------------------------------
   // A believable fake so the Packages panel is fully developable in the browser:
   // real-looking sizes, a package already installed, one with an update
-  // pending, and one that always fails — the states the panel must handle are
+  // pending, and one that always fails â€” the states the panel must handle are
   // otherwise only reachable by breaking a real download on purpose.
 
   subscribeCatalogue(listener: (state: CatalogueState) => void): () => void {
@@ -2593,7 +2583,7 @@ export class MockEngine implements EngineBridge {
 
   refreshCatalogue(): void {
     // The mock's catalogue is held right here, so there is nothing to re-fetch
-    // — but it still has to push, because a fresh `catalogueState` is the
+    // â€” but it still has to push, because a fresh `catalogueState` is the
     // only signal the panel gets that a refresh finished. Returning silently
     // left the browser exercising nothing but the panel's dropped-push timeout.
     // The delay stands in for the round trip a real fetch takes.
@@ -2682,7 +2672,7 @@ export class MockEngine implements EngineBridge {
           : item,
       );
 
-      // Bundles are derived from the plugin rows, never stored twice — the same
+      // Bundles are derived from the plugin rows, never stored twice â€” the same
       // rule the native side follows. The bundle's own installedVersion is
       // recorded only when the whole run succeeded, so a partial install never
       // claims the user has that edition.
@@ -2703,7 +2693,7 @@ export class MockEngine implements EngineBridge {
       for (const listener of this.installFinishedListeners) listener(result);
       this.emitCatalogue();
 
-      // A real install rescans, which is what makes the plugins appear — the
+      // A real install rescans, which is what makes the plugins appear â€” the
       // managed folder alone, except on the first run, which walks the whole
       // search path and so is worth doing even if nothing landed.
       const rescanAll = this.runRescanAll;
@@ -2720,7 +2710,7 @@ export class MockEngine implements EngineBridge {
       ...this.catalogue,
       items: this.catalogue.items
         // An unlisted package only exists because it is installed, so removing
-        // it takes the row with it — matching the native side, where the row
+        // it takes the row with it â€” matching the native side, where the row
         // came from the install marker that was just deleted.
         .filter((item) => !(item.unlisted && removing.has(item.id)))
         .map((item) =>
@@ -2798,7 +2788,7 @@ export class MockEngine implements EngineBridge {
   // A plausible two-interface machine, so the setup wizard can be built and
   // exercised in a plain browser. The meters are synthetic: one channel carries
   // a "guitar" that answers to the page being clicked, the rest sit at a noise
-  // floor — enough for the detection rule to have something to decide.
+  // floor â€” enough for the detection rule to have something to decide.
 
   subscribeAudioDevices(listener: (state: AudioDevicesState) => void): () => void {
     this.audioDeviceListeners.add(listener);
@@ -2899,7 +2889,7 @@ export class MockEngine implements EngineBridge {
 
   settingsReady(): Promise<void> {
     // localStorage is read synchronously in the field initialiser, so there is
-    // nothing to wait for — the settings were never a promise here.
+    // nothing to wait for â€” the settings were never a promise here.
     return Promise.resolve();
   }
 
@@ -2968,7 +2958,7 @@ export class MockEngine implements EngineBridge {
 
   private emit(): void {
     // Every structural mutation funnels through here, so this one call keeps
-    // scenes mirroring the rack (see `reconcileScenes`) — and runs before the
+    // scenes mirroring the rack (see `reconcileScenes`) â€” and runs before the
     // save below, so the persisted snapshot captures reconciled scenes.
     this.reconcileLiveScenes();
     for (const l of this.listeners) l(this.rack);

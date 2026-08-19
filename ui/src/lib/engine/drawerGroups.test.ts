@@ -6,11 +6,13 @@ import {
   UNKNOWN_MAKER,
   groupPatches,
   groupPluginsByMaker,
+  isSectionOnBranch,
   orderPatchEntries,
   packageDrawerItems,
   packageIdForPatch,
+  parentSectionKey,
   patchCategory,
-  pluginPackageIds,
+  patchSectionKey,
   splitCategoryPath,
 } from './drawerGroups';
 import type { CataloguePackage } from './catalogue';
@@ -50,17 +52,6 @@ const plugin = (over: Partial<PluginInfo> & { id: string }): PluginInfo => ({
   ...over,
 });
 
-describe('pluginPackageIds', () => {
-  it('maps display names onto the packages that installed them', () => {
-    const ids = pluginPackageIds([
-      plugin({ id: 'a', name: 'NeuralAmpModeler', packageId: 'neural-amp-modeler' }),
-      plugin({ id: 'b', name: 'Some Reverb' }),
-    ]);
-    expect(ids.get('NeuralAmpModeler')).toBe('neural-amp-modeler');
-    expect(ids.has('Some Reverb')).toBe(false);
-  });
-});
-
 describe('packageDrawerItems', () => {
   it('finds the plugins a package registered', () => {
     const items = packageDrawerItems(
@@ -69,7 +60,7 @@ describe('packageDrawerItems', () => {
       [
         plugin({ id: 'p1', packageId: 'surge-xt' }),
         plugin({ id: 'p2', packageId: 'surge-xt' }),
-        plugin({ id: 'p3', packageId: 'airwindows' }),
+        plugin({ id: 'p3', packageId: 'zam-plugins' }),
         plugin({ id: 'p4' }),
       ],
     );
@@ -143,51 +134,37 @@ describe('packageIdForPatch', () => {
 });
 
 describe('patchCategory', () => {
-  it('reads a separator-joined user category as a nested path', () => {
-    expect(patchCategory(patch({ id: 'a', category: 'TONE3000 · Pedal' }), [], new Map())).toEqual([
+  it('reads a separator-joined category as a nested path', () => {
+    expect(patchCategory(patch({ id: 'a', category: 'TONE3000 / Pedal' }))).toEqual([
       'TONE3000',
       'Pedal',
     ]);
   });
 
-  const amps = pkg({ id: 'amalgam-jtm45', category: ['Amps'] });
-  const reverb = pkg({ id: 'dragonfly-reverb', kind: 'plugin', category: ['Effects', 'Reverb'] });
-  const packages = [amps, reverb];
-  const byPlugin = new Map([['Dragonfly Hall', 'dragonfly-reverb']]);
-
-  it('lets the user’s own heading override everything', () => {
-    const p = patch({ id: 'amalgam-jtm45', readOnly: true, category: 'Favourites' });
-    expect(patchCategory(p, packages, byPlugin)).toEqual(['Favourites']);
-  });
-
-  it('files a pack patch under its package’s heading', () => {
+  it('leaves a pack patch uncategorised when its document names no heading', () => {
+    // Nothing is inherited from the package that installed it: a pack files
+    // its patches by writing `category` into patch.json like anyone else.
     const p = patch({ id: 'amalgam-jtm45', readOnly: true });
-    expect(patchCategory(p, packages, byPlugin)).toEqual(['Amps']);
+    expect(patchCategory(p)).toEqual([DRAWER_UNCATEGORISED]);
   });
 
-  it('joins a multi-patch pack by the id prefix its folders carry', () => {
-    const p = patch({ id: 'amalgam-jtm45_lead', readOnly: true });
-    expect(patchCategory(p, packages, byPlugin)).toEqual(['Amps']);
+  it('files a pack patch under the heading its own document names', () => {
+    const p = patch({ id: 'amalgam-jtm45', readOnly: true, category: 'Amps' });
+    expect(patchCategory(p)).toEqual(['Amps']);
   });
 
-  it('files a user patch under the package its plugin came from', () => {
+  it('leaves a user patch uncategorised, not filed under its plugin’s package', () => {
     const p = patch({ id: 'p1', pluginName: 'Dragonfly Hall' });
-    expect(patchCategory(p, packages, byPlugin)).toEqual(['Effects', 'Reverb']);
+    expect(patchCategory(p)).toEqual([DRAWER_UNCATEGORISED]);
   });
 
   it('falls back to uncategorised when nothing can name a heading', () => {
-    expect(patchCategory(patch({ id: 'p1' }), packages, byPlugin)).toEqual([DRAWER_UNCATEGORISED]);
+    expect(patchCategory(patch({ id: 'p1' }))).toEqual([DRAWER_UNCATEGORISED]);
   });
 
-  it('never returns an empty path, even for a package with no category', () => {
-    const bare = [pkg({ id: 'bare-pack' })];
-    const p = patch({ id: 'bare-pack', readOnly: true });
-    expect(patchCategory(p, bare, new Map())).toEqual([DRAWER_UNCATEGORISED]);
-  });
-
-  it('treats a blank user heading as unset rather than as a nameless section', () => {
+  it('treats a blank heading as unset rather than as a nameless section', () => {
     const p = patch({ id: 'amalgam-jtm45', readOnly: true, category: '  ' });
-    expect(patchCategory(p, packages, byPlugin)).toEqual(['Amps']);
+    expect(patchCategory(p)).toEqual([DRAWER_UNCATEGORISED]);
   });
 });
 
@@ -196,41 +173,76 @@ describe('groupPatches', () => {
     pkg({ id: 'amalgam-jtm45', category: ['Amps'] }),
     pkg({ id: 'dragonfly-reverb', kind: 'plugin', category: ['Effects', 'Reverb'] }),
   ];
-  const plugins = [
-    plugin({ id: 'dh', name: 'Dragonfly Hall', packageId: 'dragonfly-reverb' }),
-    plugin({ id: 'ma', name: 'Mock Amp' }),
-  ];
 
-  it('keeps heading order and moves uncategorised last', () => {
+  it('orders roots by the drawer rule: Effects before the other catalogue headings, uncategorised last', () => {
     const roots = groupPatches(
       [
         patch({ id: 'loose' }),
-        patch({ id: 'amalgam-jtm45', readOnly: true }),
-        patch({ id: 'hall', pluginName: 'Dragonfly Hall' }),
+        patch({ id: 'amalgam-jtm45', readOnly: true, category: 'Amps' }),
+        patch({ id: 'dragonfly-reverb', readOnly: true, category: 'Effects / Reverb' }),
       ],
       packages,
-      plugins,
     );
-    expect(roots.map((n) => n.category)).toEqual(['Amps', 'Effects', DRAWER_UNCATEGORISED]);
+    expect(roots.map((n) => n.category)).toEqual(['Effects', 'Amps', DRAWER_UNCATEGORISED]);
+  });
+
+  it('pins TONE3000 first and files user headings behind the catalogue ones', () => {
+    const roots = groupPatches(
+      [
+        patch({ id: 'mine', category: 'My Board' }),
+        patch({ id: 'amalgam-jtm45', readOnly: true, category: 'Amps' }),
+        patch({ id: 'dragonfly-reverb', readOnly: true, category: 'Effects / Reverb' }),
+        patch({
+          id: 'tone',
+          pluginName: 'NeuralAmpModeler',
+          tone3000: {
+            toneId: 1,
+            modelId: 2,
+            format: 'nam',
+            gear: 'amp',
+            title: 'JCM',
+            creator: { username: 'akka5' },
+            file: 'nam/1-2.nam',
+          },
+        }),
+      ],
+      packages,
+    );
+    expect(roots.map((n) => n.category)).toEqual(['TONE3000', 'Effects', 'Amps', 'My Board']);
   });
 
   it('nests a path the same way the packages panel does', () => {
-    const roots = groupPatches([patch({ id: 'hall', pluginName: 'Dragonfly Hall' })], packages, [
-      plugins[0],
-    ]);
+    const roots = groupPatches(
+      [patch({ id: 'dragonfly-reverb', readOnly: true, category: 'Effects / Reverb' })],
+      packages,
+    );
     expect(roots[0].category).toBe('Effects');
     expect(roots[0].children[0].category).toBe('Reverb');
-    expect(roots[0].children[0].entries[0].patch.id).toBe('hall');
+    expect(roots[0].children[0].entries[0].patch.id).toBe('dragonfly-reverb');
   });
 
   it('merges a user heading with a catalogue one of the same name', () => {
     const roots = groupPatches(
-      [patch({ id: 'mine', category: 'Amps' }), patch({ id: 'amalgam-jtm45', readOnly: true })],
+      [
+        patch({ id: 'mine', category: 'Amps' }),
+        patch({ id: 'amalgam-jtm45', readOnly: true, category: 'Amps' }),
+      ],
       packages,
-      plugins,
     );
     expect(roots).toHaveLength(1);
     expect(roots[0].entries.map((e) => e.patch.id)).toEqual(['mine', 'amalgam-jtm45']);
+  });
+
+  it('merges and pins case-insensitively: a hand-typed "effects" is the Effects section', () => {
+    const roots = groupPatches(
+      [
+        patch({ id: 'mine', category: 'effects / Fuzz' }),
+        patch({ id: 'amalgam-jtm45', readOnly: true, category: 'Amps' }),
+      ],
+      packages,
+    );
+    expect(roots.map((n) => n.category)).toEqual(['effects', 'Amps']);
+    expect(roots[0].children.map((n) => n.category)).toEqual(['Fuzz']);
   });
 });
 
@@ -238,17 +250,15 @@ describe('patchGroups', () => {
   const packages = [
     pkg({ id: 'dragonfly-reverb', kind: 'plugin', category: ['Effects', 'Reverb'] }),
   ];
-  const plugins = [plugin({ id: 'dh', name: 'Dragonfly Hall', packageId: 'dragonfly-reverb' })];
 
   it('flattens the tree depth-first, a parent above its subsections', () => {
     const groups = patchGroups(
       [
-        patch({ id: 'hall', pluginName: 'Dragonfly Hall' }),
+        patch({ id: 'hall', category: `Effects${CATEGORY_PATH_SEPARATOR}Reverb` }),
         patch({ id: 'multi', category: 'Effects' }),
         patch({ id: 'loose' }),
       ],
       packages,
-      plugins,
     );
     expect(groups.map((g) => g.label)).toEqual([
       'Effects',
@@ -259,20 +269,63 @@ describe('patchGroups', () => {
 
   it('applies the drawer’s hand order inside a heading, keyed as the drawer keys it', () => {
     const patches = [patch({ id: 'a', category: 'Amps' }), patch({ id: 'b', category: 'Amps' })];
-    const [section] = patchGroups(patches, [], []);
-    const reordered = patchGroups(patches, [], [], { [section.key]: ['b'] });
+    const [section] = patchGroups(patches, []);
+    const reordered = patchGroups(patches, [], { [section.key]: ['b'] });
     expect(reordered[0].entries.map((e) => e.patch.id)).toEqual(['b', 'a']);
+  });
+});
+
+describe('section keys', () => {
+  it('names a heading path, nested or not', () => {
+    expect(patchSectionKey(['Amps'])).toBe('patches:Amps');
+    expect(patchSectionKey(['TONE3000', 'Pedal', 'S'])).toBe('patches:TONE3000/Pedal/S');
+  });
+
+  it('walks one level up, and stops at a root', () => {
+    expect(parentSectionKey(['TONE3000', 'Pedal', 'S'])).toBe('patches:TONE3000/Pedal');
+    expect(parentSectionKey(['Amps'])).toBeUndefined();
+  });
+
+  it('holds every ancestor of the open heading open', () => {
+    const open = patchSectionKey(['TONE3000', 'Pedal', 'S']);
+    expect(isSectionOnBranch(patchSectionKey(['TONE3000']), open)).toBe(true);
+    expect(isSectionOnBranch(patchSectionKey(['TONE3000', 'Pedal']), open)).toBe(true);
+    expect(isSectionOnBranch(open, open)).toBe(true);
+  });
+
+  it('leaves a sibling, a descendant and a same-prefixed heading closed', () => {
+    const open = patchSectionKey(['TONE3000', 'Pedal']);
+    expect(isSectionOnBranch(patchSectionKey(['TONE3000', 'Amp + Cab']), open)).toBe(false);
+    expect(isSectionOnBranch(patchSectionKey(['TONE3000', 'Pedal', 'S']), open)).toBe(false);
+    // The separator is what stops "Pedal" from claiming "Pedals".
+    expect(isSectionOnBranch(patchSectionKey(['TONE3000', 'Pedals']), open)).toBe(false);
+    expect(isSectionOnBranch('plugins', open)).toBe(false);
+  });
+
+  it('is the key flattenPatchGroups mints, so the drawer and a patch menu agree', () => {
+    const groups = patchGroups([patch({ id: 'a', category: 'Effects / Reverb' })], []);
+    expect(groups.map((g) => g.key)).toContain(patchSectionKey(['Effects', 'Reverb']));
   });
 });
 
 describe('splitCategoryPath', () => {
   it('reads a stored category as a heading path', () => {
     expect(splitCategoryPath('Pedal')).toEqual(['Pedal']);
+    expect(splitCategoryPath('TONE3000 / Pedal')).toEqual(['TONE3000', 'Pedal']);
+  });
+
+  it('splits on a slash however it was spaced', () => {
+    expect(splitCategoryPath('Test/Sub')).toEqual(['Test', 'Sub']);
+    expect(splitCategoryPath('AA /SS')).toEqual(['AA', 'SS']);
+  });
+
+  it('still reads a category stored under the old " · " separator', () => {
     expect(splitCategoryPath('TONE3000 · Pedal')).toEqual(['TONE3000', 'Pedal']);
   });
 
   it('drops empty segments so a stray separator names no blank heading', () => {
-    expect(splitCategoryPath(' · Pedal')).toEqual(['Pedal']);
+    expect(splitCategoryPath(' / Pedal')).toEqual(['Pedal']);
+    expect(splitCategoryPath(' / ')).toEqual([]);
     expect(splitCategoryPath(' · ')).toEqual([]);
   });
 });

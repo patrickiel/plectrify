@@ -1228,6 +1228,11 @@ export class JuceEngine implements EngineBridge {
   }
 
   async savePatch(moduleId: string, name: string): Promise<string | null> {
+    // A preview must never be captured: "current" is the module's own mapping,
+    // not the patch the pointer happened to be trying on when the save was
+    // clicked. Settled before the module is read — this is what once let a
+    // hover over the menu write another patch's knob layout into this one.
+    this.settlePreview(moduleId);
     const mod = this.rack.find((m) => m.id === moduleId);
     const id = uid('patch');
     const path = patchPath(id);
@@ -1243,20 +1248,32 @@ export class JuceEngine implements EngineBridge {
     const doc: StoredPatch = { ...storedFromModule(mod, name), tone3000: mod.tone3000, ...tone };
     this.patches = [...this.patches, toPatch(id, doc)].sort(byName);
     this.writePatch(path, doc);
+    this.retitleModule(moduleId, doc.name);
     return id;
   }
 
   async updatePatch(patchId: string, moduleId: string): Promise<void> {
+    // Same rule as savePatch: the recapture reads the module, so a preview
+    // still applied would overwrite this patch with another patch's mapping.
+    this.settlePreview(moduleId);
     const mod = this.rack.find((m) => m.id === moduleId);
-    const existing = this.patches.find((p) => p.id === patchId);
-    const path = patchPath(patchId);
+    // A pack patch lives in the shared root, not the user's list, and is
+    // writable only where this machine carries the sources it was built from
+    // — a Debug build run out of the repo, which is what authoring one is.
+    // Everywhere else `devSource` is unset and this refuses, rather than
+    // quietly saving the pack's document somewhere else.
+    const shipped = this.shippedPatches.find((p) => p.id === patchId);
+    if (shipped && !shipped.devSource) return;
+    const root = shipped ? ('shared' as const) : undefined;
+    const existing = shipped ?? this.patches.find((p) => p.id === patchId);
+    const path = patchPath(patchId, root);
     if (!mod || !existing || !path) return;
     const tone = await this.captureModuleState(moduleId);
     // A failed capture keeps the tone already on disk rather than blanking it:
     // the mapping half is still an honest update, and silently dropping the
     // sound would be a worse answer than keeping the previous one. That is the
     // one path that has to read the file back — the tone is not held in memory.
-    const previous = tone ? null : await this.readPatch(patchId);
+    const previous = tone ? null : await this.readPatch(patchId, root);
     // Recapture the live mapping but keep the patch's identity: same id (so
     // whoever has it loaded stays pointed at it), same name, and the drawer
     // heading the user filed it under — storedFromModule knows nothing of the
@@ -1270,8 +1287,27 @@ export class JuceEngine implements EngineBridge {
       tone3000: existing.tone3000,
       ...(tone ?? { pluginVersion: previous?.pluginVersion, state: previous?.state }),
     };
-    this.patches = this.patches.map((p) => (p.id === patchId ? toPatch(patchId, doc) : p));
-    this.writePatch(path, doc);
+    const next = toPatch(patchId, doc, !!shipped, !!shipped);
+    if (shipped)
+      this.shippedPatches = this.shippedPatches.map((p) => (p.id === patchId ? next : p));
+    else this.patches = this.patches.map((p) => (p.id === patchId ? next : p));
+    this.writePatch(path, doc, root);
+    this.retitleModule(moduleId, doc.name);
+  }
+
+  /** A save names the module: the card, the drawer tile and the patch menu
+      must all say the saved name the moment the save lands, and the card is
+      the one of the three the save does not rewrite by itself. Loading the
+      patch back would retitle the card anyway (its stored displayName is its
+      name — see storedFromModule), so this only brings that forward. Guarded
+      on the module still existing: the capture round-trip was awaited, and
+      metaFor would resurrect a deleted module's meta. */
+  private retitleModule(moduleId: string, title: string): void {
+    if (!this.rack.some((m) => m.id === moduleId)) return;
+    const m = this.metaFor(moduleId);
+    if (m.displayName === title) return;
+    m.displayName = title;
+    this.afterMetaChange(moduleId, false);
   }
 
   loadPatch(moduleId: string, patchId: string): void {
@@ -1349,6 +1385,15 @@ export class JuceEngine implements EngineBridge {
     this.restorePreview();
   }
 
+  /** End any preview running on `moduleId` by putting the module back as it
+      was. Every capture path (savePatch, updatePatch) calls this before
+      reading the module: what is captured must be the module's own state,
+      never the try-on. A preview on some other module is left alone — it is
+      not what is being read. */
+  private settlePreview(moduleId: string): void {
+    if (this.patchPreview?.moduleId === moduleId) this.restorePreview();
+  }
+
   /** Put the previewed module's own mapping and look back, and end the run. */
   private restorePreview(): void {
     const run = this.patchPreview;
@@ -1366,7 +1411,10 @@ export class JuceEngine implements EngineBridge {
     const clean = name.trim();
     const path = patchPath(patchId);
     if (!clean || !path || !this.isUserPatch(patchId)) return;
-    void this.rewritePatchDoc(patchId, path, { name: clean });
+    // The card title follows the name, as it does on save: a renamed patch
+    // whose stored displayName kept the old name would keep showing it on the
+    // drawer tile and stamping it onto every card it is loaded on.
+    void this.rewritePatchDoc(patchId, path, { name: clean, displayName: clean });
   }
 
   setPatchCategory(patchId: string, category: string): void {
@@ -1385,7 +1433,7 @@ export class JuceEngine implements EngineBridge {
   private async rewritePatchDoc(
     patchId: string,
     path: string,
-    change: Pick<Partial<StoredPatch>, 'name' | 'category'>,
+    change: Pick<Partial<StoredPatch>, 'name' | 'displayName' | 'category'>,
   ): Promise<void> {
     const doc = await this.readPatch(patchId);
     if (!doc) {
@@ -1443,8 +1491,8 @@ export class JuceEngine implements EngineBridge {
 
   /** Fire-and-forget: the bridge is ordered, so a later read of this path is
       served after the write has landed. */
-  private writePatch(path: string, doc: StoredPatch): void {
-    void this.writeFile(path, JSON.stringify(doc, null, 2));
+  private writePatch(path: string, doc: StoredPatch, root?: 'shared'): void {
+    void this.writeFile(path, JSON.stringify(doc, null, 2), root);
     this.emitPatches();
   }
 
@@ -2878,13 +2926,20 @@ export class JuceEngine implements EngineBridge {
       The user's own are files in `patches/`; an installed pack's are folders at
       the top of the shared root, each holding its document and its assets. */
   private async readPatchDir(root?: 'shared'): Promise<Patch[]> {
-    const ids =
+    // Which of them the engine will accept a write for. Empty in a shipped
+    // build (nothing there has sources), so this is the whole gate: the page
+    // never asks what configuration it is running in.
+    const listing =
       root === 'shared'
-        ? sharedPatchIdsFrom(await this.listDirs('', root))
-        : patchIdsFrom(await this.listFiles(PATCH_DIR));
+        ? await this.listing('', 'dirs', root, 'writable')
+        : { names: patchIdsFrom(await this.listFiles(PATCH_DIR)), writable: [] };
+    const ids = root === 'shared' ? sharedPatchIdsFrom(listing.names) : listing.names;
+    const writable = new Set(listing.writable);
     const docs = await Promise.all(ids.map((id) => this.readPatch(id, root)));
     return docs
-      .flatMap((doc, i) => (doc ? [toPatch(ids[i]!, doc, root === 'shared')] : []))
+      .flatMap((doc, i) =>
+        doc ? [toPatch(ids[i]!, doc, root === 'shared', writable.has(ids[i]!))] : [],
+      )
       .sort(byName);
   }
 
@@ -3261,15 +3316,30 @@ export class JuceEngine implements EngineBridge {
     return this.listing(dir, 'dirs', root);
   }
 
-  private listing(dir: string, field: 'names' | 'dirs', root?: 'shared'): Promise<string[]> {
+  private listing(dir: string, field: 'names' | 'dirs', root?: 'shared'): Promise<string[]>;
+  private listing(
+    dir: string,
+    field: 'names' | 'dirs',
+    root: 'shared' | undefined,
+    also: 'writable',
+  ): Promise<{ names: string[]; writable: string[] }>;
+  private listing(
+    dir: string,
+    field: 'names' | 'dirs',
+    root?: 'shared',
+    also?: 'writable',
+  ): Promise<string[] | { names: string[]; writable: string[] }> {
+    const strings = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((name): name is string => typeof name === 'string') : [];
+
     return this.request('listFiles', { dir, root }).then(
       (data) =>
-        Array.isArray(data[field])
-          ? (data[field] as unknown[]).filter((name): name is string => typeof name === 'string')
-          : [],
+        also
+          ? { names: strings(data[field]), writable: strings(data[also]) }
+          : strings(data[field]),
       (error: unknown) => {
         console.error(`Failed to list ${field} in '${dir}'`, error);
-        return [];
+        return also ? { names: [], writable: [] } : [];
       },
     );
   }
@@ -3278,10 +3348,10 @@ export class JuceEngine implements EngineBridge {
       acknowledged a durable write; a negative acknowledgement, a dropped reply
       and a timeout all resolve false and raise the persistence notice. Anything
       that reports state as "saved" must await this. */
-  private async writeFile(path: string, text: string): Promise<boolean> {
+  private async writeFile(path: string, text: string, root?: 'shared'): Promise<boolean> {
     // No backend (browser dev) is not a failure: there is nothing to write to,
     // so `request` resolves {} and the absent `ok` reads as success.
-    const ok = await this.request('writeFile', { path, text }).then(
+    const ok = await this.request('writeFile', { path, text, root }).then(
       (d) => {
         if (d.ok === false) console.error(`Engine failed to write ${path}`);
         return d.ok !== false;

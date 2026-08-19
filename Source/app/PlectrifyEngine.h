@@ -376,9 +376,44 @@ private:
     // path to it at all, which is what keeps the page unable to touch anything
     // outside the per-user app-data sandbox no matter what it asks for.
     bool resolveSharedFile (const juce::String& rel, juce::File& out) const;
+   #if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
+    // Debug-only: a patch pack's sources in the repo shadow the installed copy
+    // of the same package id, so authoring one is "edit patch.json and restart"
+    // rather than build, publish, install. Returns the source folder for an id
+    // (this platform's build in preference to the OS-neutral one), or a null
+    // File when the repo has no pack by that name — in which case the installed
+    // copy answers as it always did.
+    //
+    // Read-only, like the root it shadows: nothing here is on a writable path,
+    // and the override lives in a compile-time symbol that does not exist
+    // outside Debug rather than in a setting a shipped build could be talked
+    // into honouring.
+    //
+    // Keyed by the folder a patch occupies in patches/, which is not always the
+    // package id: a source folder holding a patch.json is one patch and installs
+    // wrapped in a folder named for the package, while a pack of several ships
+    // flat and each of its subfolders installs under its own name.
+    static std::map<juce::String, juce::File> sharedPatchSources();
+    static juce::File sharedPatchSourceDir (const juce::String& patchId);
+    // The ids those folders offer, for listing the shared root.
+    static juce::StringArray sharedPatchSourceIds();
+    // The one writable path in this build, and it deliberately does not point
+    // where resolveSharedFile reads from: a write lands in the repo's sources
+    // for the pack, never in the installed copy. Refuses a pack the repo does
+    // not carry, and anything naming the pack folder itself rather than a file
+    // inside it.
+    static bool resolveSharedSourceFile (const juce::String& rel, juce::File& out);
+   #endif
     // Picks the resolver for a payload's optional "root" ("app" by default,
     // "shared" for a patch pack). Unknown roots resolve as "app".
     bool resolveReadableFile (const juce::var& payload, const juce::String& rel,
+                              juce::File& out) const;
+    // The writing counterpart. "app" is the whole of it in a shipped build —
+    // "shared" resolves to nothing at all there, rather than falling back to
+    // the app-data root. A Debug build resolves it against the pack's sources
+    // in the repo, so a pack can be re-saved from the app while it is being
+    // authored; see resolveSharedSourceFile.
+    bool resolveWritableFile (const juce::var& payload, const juce::String& rel,
                               juce::File& out) const;
 
     // Per-module (keyed by clientId) set of plugin parameter indices the UI has

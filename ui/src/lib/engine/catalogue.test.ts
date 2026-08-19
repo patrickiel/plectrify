@@ -322,6 +322,13 @@ describe('groupCatalogueLinks', () => {
     expect(groups[0].entries.map((l) => l.label)).toEqual(['tone3000', 'aida']);
   });
 
+  it('merges headings case-insensitively, printing the first-seen casing', () => {
+    const groups = groupByCategory([link(['Test', 'Sub'], 'one'), link(['test', 'Other'], 'two')]);
+
+    expect(groups.map((group) => group.category)).toEqual(['Test']);
+    expect(groups[0].children.map((child) => child.category)).toEqual(['Sub', 'Other']);
+  });
+
   it('gathers uncategorised links under one trailing heading', () => {
     const groups = groupByCategory([
       link([], 'loose-first'),

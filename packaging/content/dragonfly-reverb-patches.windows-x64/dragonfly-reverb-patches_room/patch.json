@@ -1,0 +1,33 @@
+{
+  "name": "Room",
+  "pluginName": "Dragonfly Room Reverb",
+  "displayName": "Room",
+  "color": "#22c55e",
+  "icon": "reverb",
+  "knobs": [
+    {
+      "paramIndex": 2,
+      "label": "Dry",
+      "pos": 0
+    },
+    {
+      "paramIndex": 6,
+      "label": "Size",
+      "pos": 1
+    },
+    {
+      "paramIndex": 3,
+      "label": "Early Level",
+      "pos": 2
+    },
+    {
+      "paramIndex": 7,
+      "label": "Width",
+      "pos": 3
+    }
+  ],
+  "category": "Effects",
+  "order": 40,
+  "pluginVersion": "3.2.10",
+  "state": "VkMyIYMCAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjQwNS5lOEVZdlkxV3lRV1h6VTFXaFUxWW80MVdlQS5ieFUxYmtRRy5NVUZZb1VXYWZMRGFrRWxiZkgwYXUwRi5lOEVZdlkxV3lRV1h6VTFXazRGWWU4RS5lOEVZdlkxV3ZFbGJnMFZZelVsYnk4a1hrY1ZadDgwVy5QbGI0OEVha1lXWXJBUE0zM0JNdmJpTDFQeU12alNNLlRWWHh3VmRld1ZZMVVGYS5IeUx0ZmlMMi5TTXdEaU14YkMua0VsYnJrMld5VWxhakFmTHgzeE0zYkNMeFRDTTBEeU0udlZYelUxV3JVbGNrd0YuNDNCTndUU056ZkNNM1h5THkudmJvb1dZLkRpTHRIeU16SFNOd2pTTnhIQy4ya0ZZemdGLncuQ0wuLm1ia1FWWXJFVmQuZkMualUxWGdrRy52M0JNdi5DTHYuQ0x2VFNOMS4uWW9ZbFkwTVdZLmJDTC5MR2JvNEYudjN4TTRqU040alNOMEh5THdYQy4yRWxhalVsYi5QQ0wuamxhZWdWWm1nMVdpVUdjLkRpTXYuQ0wuVFZYeHdWZGVRVlhzQUcudy5DTHYuQy5yRUZjazhFWWcwRmIuakNNdi5DLnI4MWNlSTFhdU1HYy5UQ0wuSDFhdU1HY2VZbGJrRUcuMS5DTC5qbGFldzFhMjgwWDBRRy56LnZXZVFGYmw4RWJnSVdYc1VGY2tJMmJlVWxhajgwVy4zTy48L0lDb21wb25lbnQ+PC9WU1QzUGx1Z2luU3RhdGU+AA=="
+}

@@ -131,17 +131,113 @@ describe('patch identity', () => {
   });
 
   it('a patch with no title override still names the new card after its own name', async () => {
+    let rack: RackModule[] = [];
+    const stop = engine.subscribeRack((next) => (rack = next));
+
+    // The mock's shipped pack patch is mapping-only — no displayName — but
+    // the drawer tile shows the patch's name, so the drop must produce the
+    // module the tile promised.
+    engine.insertModule('Neural Amp Modeler', { serialPosition: 0 }, 'amalgam-jtm45');
+    stop();
+
+    expect(rack[0].displayName).toBe('JTM45');
+  });
+
+  it('saving under a new name retitles the card, so it matches the saved patch', async () => {
     engine.insertModule('Mock Amp', { serialPosition: 0 });
     let rack: RackModule[] = [];
     const stop = engine.subscribeRack((next) => (rack = next));
 
-    // No rename before saving: the stored patch carries no displayName, but
-    // the drawer tile shows the patch's name — the drop must produce the
-    // module the tile promised.
-    const patchId = await engine.savePatch(rack[0].id, 'Small Room');
-    engine.insertModule('Mock Amp', { serialPosition: 1 }, patchId!);
+    // The card wears the previous patch's title — the shape of the reported
+    // bug: load the pack's "Dark Repeats", tweak, save as "Repeats", and the
+    // card and drawer tile kept saying "Dark Repeats".
+    engine.renameModule(rack[0].id, 'Dark Repeats');
+    const patchId = await engine.savePatch(rack[0].id, 'Repeats');
     stop();
 
-    expect(rack[1].displayName).toBe('Small Room');
+    expect(rack[0].displayName).toBe('Repeats');
+    let patches: Patch[] = [];
+    engine.subscribePatches((next) => (patches = next))();
+    const saved = patches.find((p) => p.id === patchId);
+    // The stored title is the patch's own name, so the tile and every card it
+    // is loaded on say "Repeats" too.
+    expect(saved?.displayName).toBe('Repeats');
+  });
+
+  it('updating a patch retitles the card after the patch, not the patch after the card', async () => {
+    engine.insertModule('Mock Amp', { serialPosition: 0 });
+    let rack: RackModule[] = [];
+    const stop = engine.subscribeRack((next) => (rack = next));
+
+    const patchId = await engine.savePatch(rack[0].id, 'Crunch');
+    engine.renameModule(rack[0].id, 'Dark Repeats');
+    await engine.updatePatch(patchId!, rack[0].id);
+    stop();
+
+    expect(rack[0].displayName).toBe('Crunch');
+    let patches: Patch[] = [];
+    engine.subscribePatches((next) => (patches = next))();
+    expect(patches.find((p) => p.id === patchId)?.displayName).toBe('Crunch');
+  });
+
+  it('updating a patch never captures a preview’s mapping', async () => {
+    engine.insertModule('Neural Amp Modeler', { serialPosition: 0 });
+    let rack: RackModule[] = [];
+    const stop = engine.subscribeRack((next) => (rack = next));
+    const moduleId = rack[0].id;
+
+    // A mapped module, saved, then rearranged: the module's own layout now
+    // differs from both the saved patch and the pack patch.
+    engine.loadPatch(moduleId, 'amalgam-jtm45');
+    const patchId = await engine.savePatch(moduleId, 'Mine');
+    const movedId = rack[0].params[0].knobId;
+    engine.moveKnob(moduleId, movedId, 9);
+
+    // The pointer rests on the pack's row on the way to "Update" — the try-on
+    // replaces the module's knobs — and the update lands while it is applied.
+    engine.previewPatch(moduleId, 'amalgam-jtm45');
+    await engine.updatePatch(patchId!, moduleId);
+    stop();
+
+    // The capture is the module's own layout, and the try-on is settled.
+    expect(rack[0].params.find((p) => p.knobId === movedId)?.pos).toBe(9);
+    let patches: Patch[] = [];
+    engine.subscribePatches((next) => (patches = next))();
+    expect(patches.find((p) => p.id === patchId)?.knobs.some((k) => k.pos === 9)).toBe(true);
+  });
+
+  it('saving as a new patch never captures a preview’s mapping either', async () => {
+    engine.insertModule('Neural Amp Modeler', { serialPosition: 0 });
+    let rack: RackModule[] = [];
+    const stop = engine.subscribeRack((next) => (rack = next));
+    const moduleId = rack[0].id;
+
+    engine.loadPatch(moduleId, 'amalgam-jtm45');
+    engine.moveKnob(moduleId, rack[0].params[0].knobId, 9);
+
+    engine.previewPatch(moduleId, 'amalgam-jtm45');
+    const patchId = await engine.savePatch(moduleId, 'Mine');
+    stop();
+
+    let patches: Patch[] = [];
+    engine.subscribePatches((next) => (patches = next))();
+    expect(patches.find((p) => p.id === patchId)?.knobs.some((k) => k.pos === 9)).toBe(true);
+  });
+
+  it('renaming a patch renames its stored title with it', async () => {
+    engine.insertModule('Mock Amp', { serialPosition: 0 });
+    let rack: RackModule[] = [];
+    engine.subscribeRack((next) => (rack = next))();
+
+    const patchId = await engine.savePatch(rack[0].id, 'Repeats');
+    engine.renamePatch(patchId!, 'Echoes');
+
+    let patches: Patch[] = [];
+    engine.subscribePatches((next) => (patches = next))();
+    // Both halves move together, or the drawer tile would keep the old name.
+    expect(patches.find((p) => p.id === patchId)).toMatchObject({
+      name: 'Echoes',
+      displayName: 'Echoes',
+    });
   });
 });

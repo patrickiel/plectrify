@@ -290,13 +290,18 @@ export function isTone3000Provenance(value: unknown): value is Tone3000Provenanc
   );
 }
 
+/** The root heading every downloaded tone files under — also what pins the
+    TONE3000 sections to the front of the drawer's list (see `groupPatches`),
+    so the two must stay one string. */
+export const TONE3000_HEADING = 'TONE3000';
+
 /** The drawer heading a TONE3000 patch files under, as a category path.
  *
  * Two levels, so twenty downloaded tones organise themselves into
  * TONE3000 › Amp + Cab, TONE3000 › Pedal and so on with no new UI code — the
  * drawer already renders category paths as a tree. */
 export function tone3000Category(provenance: Tone3000Provenance): string[] {
-  return ['TONE3000', gearLabel(provenance.gear)];
+  return [TONE3000_HEADING, gearLabel(provenance.gear)];
 }
 
 /** The patch a downloaded tone would duplicate, if the user already has one.

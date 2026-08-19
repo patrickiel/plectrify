@@ -101,7 +101,7 @@ Name the package for what a guitarist installs (`amalgam-jtm45`, "JTM45"), not
 for how it's packaged. Edit the folder, then:
 
 ```sh
-pnpm --dir packaging host -- --author amalgamaudio
+pnpm --dir packaging host
 ```
 
 That's the whole thing, for every pack we author, on whatever platforms it has

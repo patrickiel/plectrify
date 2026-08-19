@@ -228,8 +228,10 @@ export function groupByCategory<T extends { category: readonly string[] }>(
 
   function nodeFor(path: string[]): CategoryNode<T> {
     // NUL joins the segments, so no heading anyone could type makes two
-    // different paths share a key.
-    const key = path.join('\u0000');
+    // different paths share a key. Case-folded, because hand-typed headings
+    // ("test / sub", "Test / Other") mean the same section whatever the
+    // shift key did — the first-seen casing is the one printed.
+    const key = path.map((segment) => segment.toLowerCase()).join('\u0000');
     const existing = byPath.get(key);
     if (existing !== undefined) return existing;
 

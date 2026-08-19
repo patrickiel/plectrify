@@ -1207,7 +1207,8 @@ plugin opens — patches are Plectrify's own format, so the app has to read them
 Build one with `pnpm --dir packaging host`, which is the single script for
 **every** pack Plectrify's own author made — patches, NAM captures, and whatever
 comes next. It is only ever for our own content: it checks each `.nam`'s
-`modeled_by` against `--author`, because TONE3000's terms forbid redistributing
+`modeled_by` against the one `AUTHOR` constant it carries — a name that must
+never vary is not a flag — because TONE3000's terms forbid redistributing
 tones obtained there and the large GPL-labelled `.nam` collection relicenses
 other people's captures wholesale. `host-content` and `host-plugin` remain
 separate — they mirror a third party's files from a pinned upstream URL, which
@@ -1218,6 +1219,41 @@ the whole folder ships. These packages have no upstream to mirror, so the repo
 is where they live: a rebuild is then reproducible on any machine, and what is
 published is under the same review as the catalogue entry pinning its hash.
 Never build one out of `%APPDATA%`.
+
+**A Debug build reads those sources before the installed pack**, the same dev
+loop `PLECTRIFY_CATALOGUE_FILE` gives the catalogue: edit
+`packaging/content/<id>.<platform>/patch.json`, restart, and the pack is what
+the repo says it is — no `host`, no publish, no install. The override is keyed by the
+folder a patch occupies in `patches/` and applies file by file
+(`MainComponent::sharedPatchSources`), so it reads both shapes `host` ships —
+the wrapped single patch and a pack of several, whose subfolders install under
+their own names. A pack the repo carries is listed whether it is installed or
+not, so a brand-new one shows up in the drawer. Only this platform's folder is
+read; the OS-neutral `content/<id>/` shape counts only if it holds a
+`patch.json`.
+
+**And a Debug build can write those sources back.** A pack patch loaded on a
+module offers *Update pack source "…"* in the patch menu wherever the repo has
+the folder it was built from, which re-captures the live mapping and tone into
+`packaging/content/<id>.<platform>/…/patch.json` — so authoring is arrange the
+knobs, click, `host`, rather than a hand-copy out of `%APPDATA%`. It is the one
+write in the app that leaves the per-user sandbox, and it is scoped hard: the
+target is always the *repo* folder, never the installed copy under the shared
+content root, so nothing can edit somebody's installation. A shipped build has
+no such path at all — `resolveWritableFile` answers a `"shared"` write with a
+refusal rather than falling back to `%APPDATA%`, and the page never asks what
+configuration it is in: `listFiles` reports which pack folders are writable
+(none, outside Debug) and `Patch.devSource` is what the menu reads.
+
+Assets are the one thing it cannot shadow, and for the reason the whole folder
+layout exists: a patch's plugin state names its capture by *absolute installed
+path*, which nothing here can rewrite. So the edited document is read beside
+the installed assets — which is the case that matters, since the document is
+what is being iterated on — and a pack whose assets have never been installed
+loads a patch pointing at files that are not there. Install it once and edit
+freely after that. Like the catalogue's bypass this is a compile-time symbol
+absent outside Debug, never a setting, and it is read-only exactly like the
+root it shadows.
 
 A folder holding a `patch.json` at its top level *is* a patch, and `host`
 ships it wrapped in a folder named for the package id — so the repo layout is

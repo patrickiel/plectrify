@@ -1,4 +1,4 @@
-import { tone3000Category } from './tone3000';
+import { TONE3000_HEADING, tone3000Category } from './tone3000';
 import type { CataloguePackage, CategoryNode } from './catalogue';
 import { groupByCategory } from './catalogue';
 import type { Patch, PluginInfo } from './types';
@@ -20,20 +20,56 @@ export const DRAWER_UNCATEGORISED = 'Uncategorised';
     groups instead of a column of one-item headings. Sorts last. */
 export const UNKNOWN_MAKER = 'Other';
 
-/** How a heading path reads (and is written) as one string: the same " · "
+/** How a heading path reads (and is written) as one string: the same " / "
     the drawer prints between segments. A stored `Patch.category` containing
     it is a path — which is what lets a reorder drag dropped on a nested
-    section ("TONE3000 · Pedal") re-file the patch to exactly that section,
+    section ("TONE3000 / Pedal") re-file the patch to exactly that section,
     and lets the tag editor reach nested headings by typing what the drawer
     shows. */
-export const CATEGORY_PATH_SEPARATOR = ' · ';
+export const CATEGORY_PATH_SEPARATOR = ' / ';
 
-/** A stored category string back into a heading path. Empty segments are
-    dropped so a stray separator cannot produce a heading with no name; an
-    all-separator string counts as no category at all. */
+/** How a heading path is named in stored state — the drawer's open section and
+    its per-section hand order, both of which live in `settings.json`.
+
+    Joined with the same `/` a category is written with, and that is what makes
+    it unambiguous: a segment cannot contain one, because `splitCategoryPath`
+    is what splits on it. It replaced a NUL, which was unambiguous in the same
+    way but is a control character in every store the key passes through — a
+    JSON document, a settings file, a DOM attribute — and needed nothing to go
+    wrong to be worth removing. */
+export const SECTION_KEY_SEPARATOR = '/';
+
+/** The key naming one patch heading. `patches:` distinguishes it from the
+    plugins section, which is the one key that names no path. */
+export function patchSectionKey(path: readonly string[]): string {
+  return `patches:${path.join(SECTION_KEY_SEPARATOR)}`;
+}
+
+/** The key of the heading one level up, or undefined for a root — what
+    closing a nested section hands the open state back to. */
+export function parentSectionKey(path: readonly string[]): string | undefined {
+  return path.length > 1 ? patchSectionKey(path.slice(0, -1)) : undefined;
+}
+
+/** Whether `openKey` names this section or something under it — the test for
+    "draw this row open", since the stored key names the deepest open heading
+    and every ancestor of it is open with it. The separator is what keeps this
+    a prefix check rather than a path walk, and what stops "Amps" from
+    claiming "Amps Extra". */
+export function isSectionOnBranch(sectionKey: string, openKey: string): boolean {
+  return openKey === sectionKey || openKey.startsWith(`${sectionKey}${SECTION_KEY_SEPARATOR}`);
+}
+
+/** A stored category string back into a heading path. Reading is deliberately
+    looser than writing: any slash splits, with or without spaces around it —
+    "Test/Sub" typed into the tag editor names the same path as the
+    "Test / Sub" the drawer prints — and the " · " older patches were stored
+    under still splits too. Empty segments are dropped so a stray separator
+    cannot produce a heading with no name; an all-separator string counts as
+    no category at all. */
 export function splitCategoryPath(category: string): string[] {
   return category
-    .split(CATEGORY_PATH_SEPARATOR)
+    .split(/[/·]/)
     .map((segment) => segment.trim())
     .filter(Boolean);
 }
@@ -43,17 +79,6 @@ export function splitCategoryPath(category: string): string[] {
 export interface DrawerPatch {
   patch: Patch;
   category: string[];
-}
-
-/** pluginName → packageId for every plugin the catalogue installed, from the
-    natively joined plugins list. Keyed by display name because that is the
-    only plugin identity a patch carries (`Patch.pluginName`). */
-export function pluginPackageIds(plugins: readonly PluginInfo[]): Map<string, string> {
-  const ids = new Map<string, string>();
-  for (const plugin of plugins) {
-    if (plugin.packageId) ids.set(plugin.name, plugin.packageId);
-  }
-  return ids;
 }
 
 /** What a catalogue package put in the drawer: the pack patches it installed
@@ -113,63 +138,74 @@ function packageForPatch(
 
 /** The heading path a patch files under. First answer wins:
 
-    1. The category the user set on the patch itself.
+    1. The category written on the patch itself.
     2. A TONE3000 patch's gear, under a TONE3000 heading — a downloaded tone
        arrives with no category and no package of its own, and filing twenty of
        them under "Uncategorised" would bury them. The two-level path costs no
        UI: the drawer already renders category paths as a tree.
-    3. A pack patch's own package — the pack was authored under that heading.
-    4. The package the patch's plugin was installed from — a patch saved for a
-       catalogue plugin belongs where that plugin is filed.
-    5. `DRAWER_UNCATEGORISED`.
+    3. `DRAWER_UNCATEGORISED`.
 
-    Never returns an empty path: a package with no category of its own falls
-    through to the next answer rather than producing a heading with no name. */
-export function patchCategory(
-  patch: Patch,
-  packages: readonly CataloguePackage[],
-  pluginPackageIdByName: ReadonlyMap<string, string>,
-): string[] {
+    Nothing is inherited — not from the package a pack patch was installed by,
+    and not from the one its plugin came from. A patch says where it files or
+    it lands in the uncategorised row at the top of the drawer, in sight and
+    ready to be filed by hand. That is the whole rule, and it reads the same
+    for a patch the user saved and one a pack shipped: a pack that wants a
+    heading writes `category` into its `patch.json` like anyone else, which is
+    one visible field in the document instead of an answer assembled from the
+    catalogue at read time.
+
+    Never returns an empty path: a category of nothing but separators falls
+    through rather than producing a heading with no name. */
+export function patchCategory(patch: Patch): string[] {
   const own = patch.category?.trim();
   if (own) {
     const path = splitCategoryPath(own);
     if (path.length > 0) return path;
   }
 
-  // After the user's own choice, so refiling a downloaded tone still wins.
+  // After the patch's own choice, so refiling a downloaded tone still wins.
   if (patch.tone3000) return tone3000Category(patch.tone3000);
-
-  if (patch.readOnly) {
-    const pack = packageForPatch(patch, packages);
-    if (pack && pack.category.length > 0) return [...pack.category];
-  }
-
-  const pluginPackageId = pluginPackageIdByName.get(patch.pluginName);
-  if (pluginPackageId !== undefined) {
-    const pack = packages.find((pkg) => pkg.id === pluginPackageId);
-    if (pack && pack.category.length > 0) return [...pack.category];
-  }
 
   return [DRAWER_UNCATEGORISED];
 }
 
+/** The heading the catalogue files effect plugins under, pinned by name right
+    behind TONE3000 — the rule is the user's ("effects third"), not derived. */
+const EFFECTS_HEADING = 'Effects';
+
 /** The drawer's patch tree: `groupByCategory` over patches with their resolved
-    headings, catalogue heading order preserved, `DRAWER_UNCATEGORISED` moved
-    last — `groupByCategory` only knows to demote its own fallback label, and
-    every path here is non-empty, so it never sees these as uncategorised. */
+    headings, then the root headings put in the drawer's fixed reading order —
+    TONE3000 first, Effects second, the catalogue's other headings next, the
+    headings the user made up after those, `DRAWER_UNCATEGORISED` last (the
+    drawer hoists it out to the resolved row *above* every section, so last
+    here is first on screen). The sort is stable, so catalogue order survives
+    within the catalogue run and first-appearance order within the user's. */
 export function groupPatches(
   patches: readonly Patch[],
   packages: readonly CataloguePackage[],
-  plugins: readonly PluginInfo[],
 ): CategoryNode<DrawerPatch>[] {
-  const pluginPackages = pluginPackageIds(plugins);
   const entries = patches.map((patch) => ({
     patch,
-    category: patchCategory(patch, packages, pluginPackages),
+    category: patchCategory(patch),
   }));
-  const roots = groupByCategory(entries);
-  const uncategorised = roots.filter((node) => node.category === DRAWER_UNCATEGORISED);
-  return [...roots.filter((node) => node.category !== DRAWER_UNCATEGORISED), ...uncategorised];
+  // Case-folded like the grouping itself: a hand-typed "effects" heading is
+  // the Effects section, pinned where Effects is pinned.
+  const catalogueRoots = new Set(
+    packages.map((pkg) => pkg.category[0]?.toLowerCase()).filter(Boolean),
+  );
+  const rank = (node: CategoryNode<DrawerPatch>) => {
+    const root = node.category.toLowerCase();
+    return root === TONE3000_HEADING.toLowerCase()
+      ? 0
+      : root === EFFECTS_HEADING.toLowerCase()
+        ? 1
+        : catalogueRoots.has(root)
+          ? 2
+          : root !== DRAWER_UNCATEGORISED.toLowerCase()
+            ? 3
+            : 4;
+  };
+  return [...groupByCategory(entries)].sort((a, b) => rank(a) - rank(b));
 }
 
 /** One heading's patches, the tree flattened depth-first with each node's own
@@ -195,10 +231,7 @@ export function flattenPatchGroups(
   for (const node of nodes) {
     if (node.entries.length > 0)
       out.push({
-        // NUL between segments, not the printed separator: the key is stored
-        // (the drawer's open section, the hand order) and must not collide with
-        // a heading that happens to contain the separator's own characters.
-        key: `patches:${node.path.join('\0')}`,
+        key: patchSectionKey(node.path),
         label: node.path.join(CATEGORY_PATH_SEPARATOR),
         path: [...node.path],
         entries: node.entries,
@@ -216,10 +249,9 @@ export function flattenPatchGroups(
 export function patchGroups(
   patches: readonly Patch[],
   packages: readonly CataloguePackage[],
-  plugins: readonly PluginInfo[],
   order: Readonly<Record<string, string[]>> = {},
 ): PatchGroup[] {
-  return flattenPatchGroups(groupPatches(patches, packages, plugins)).map((group) => ({
+  return flattenPatchGroups(groupPatches(patches, packages)).map((group) => ({
     ...group,
     entries: orderPatchEntries(group.entries, order[group.key]),
   }));

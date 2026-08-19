@@ -2631,12 +2631,108 @@ juce::File PlectrifyEngine::sharedPatchesDir()
     return CatalogueInstaller::contentDirectory ("patches");
 }
 
+#if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
+std::map<juce::String, juce::File> PlectrifyEngine::sharedPatchSources()
+{
+    std::map<juce::String, juce::File> sources;
+    const juce::File root { PLECTRIFY_CONTENT_SOURCE_DIR };
+    const juce::String suffix = juce::String (".") + catalogueRuntimePlatform;
+
+    for (const auto& dir : root.findChildFiles (juce::File::findDirectories, false, "*"))
+    {
+        const auto name = dir.getFileName();
+        // A pack is authored per platform, because the saved tone bakes that
+        // platform's install path into the plugin state — so a folder built
+        // for the other OS is not this build's to read. A folder with no
+        // suffix at all is the OS-neutral shape, which path-free content ships
+        // as and a patch never can; it is taken only if it holds one anyway.
+        const auto packageId = name.endsWith (suffix) ? name.dropLastCharacters (suffix.length())
+                                                      : name;
+        if (packageId == name && name.containsChar ('.'))
+            continue;
+
+        // The two shapes `host` ships, and the same test it applies: a folder
+        // holding a patch.json IS one patch, and installs wrapped in a folder
+        // named for the package; anything else ships flat, so each of its
+        // subfolders installs under its own name. Either way the key here is
+        // the folder the pack occupies in patches/, which is what the page
+        // asks for.
+        if (dir.getChildFile ("patch.json").existsAsFile())
+            sources.emplace (packageId, dir);
+        else
+            for (const auto& sub : dir.findChildFiles (juce::File::findDirectories, false, "*"))
+                if (sub.getChildFile ("patch.json").existsAsFile())
+                    sources.emplace (sub.getFileName(), sub);
+    }
+
+    return sources;
+}
+
+juce::File PlectrifyEngine::sharedPatchSourceDir (const juce::String& patchId)
+{
+    if (patchId.isEmpty() || patchId.containsChar ('.'))
+        return {};
+
+    const auto sources = sharedPatchSources();
+    const auto found = sources.find (patchId);
+    return found != sources.end() ? found->second : juce::File();
+}
+
+juce::StringArray PlectrifyEngine::sharedPatchSourceIds()
+{
+    juce::StringArray ids;
+    for (const auto& [id, dir] : sharedPatchSources())
+        ids.add (id);
+
+    return ids;
+}
+
+bool PlectrifyEngine::resolveSharedSourceFile (const juce::String& rel, juce::File& out)
+{
+    const auto relative = rel.replaceCharacter ('\\', '/');
+    const auto source = sharedPatchSourceDir (relative.upToFirstOccurrenceOf ("/", false, false));
+    const auto rest = relative.fromFirstOccurrenceOf ("/", false, false);
+    if (source == juce::File() || rest.isEmpty())
+        return false;
+
+    // The repo folder is the only writable thing here, and only within itself.
+    const auto f = source.getChildFile (rest);
+    if (! f.isAChildOf (source))
+        return false;
+
+    out = f;
+    return true;
+}
+#endif
+
 bool PlectrifyEngine::resolveSharedFile (const juce::String& rel, juce::File& out) const
 {
     const auto base = sharedPatchesDir();
     const auto f = base.getChildFile (rel);
     if (f != base && ! f.isAChildOf (base))
         return false; // path escaped the shared root
+
+   #if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
+    // Debug-only: the repo's own sources for a pack shadow the installed copy,
+    // per package id and file by file. Only what the repo actually has is
+    // shadowed, so a pack whose assets are installed but whose document is
+    // being edited here reads the edited document beside the installed assets
+    // — which is the case that matters, since a patch's plugin state names its
+    // assets by absolute installed path and no override can rewrite that.
+    const auto relative = f.getRelativePathFrom (base).replaceCharacter ('\\', '/');
+    if (const auto source = sharedPatchSourceDir (relative.upToFirstOccurrenceOf ("/", false, false));
+        source != juce::File())
+    {
+        const auto rest = relative.fromFirstOccurrenceOf ("/", false, false);
+        if (const auto overridden = rest.isEmpty() ? source : source.getChildFile (rest);
+            overridden.exists())
+        {
+            out = overridden;
+            return true;
+        }
+    }
+   #endif
+
     out = f;
     return true;
 }
@@ -2648,11 +2744,35 @@ bool PlectrifyEngine::resolveReadableFile (const juce::var& payload, const juce:
                                                   : resolveAppFile (rel, out);
 }
 
+bool PlectrifyEngine::resolveWritableFile (const juce::var& payload, const juce::String& rel,
+                                           juce::File& out) const
+{
+    if (payload["root"].toString() != "shared")
+        return resolveAppFile (rel, out);
+
+   #if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
+    // Debug-only, and it does not write where the reads come from: the target
+    // is the pack's sources in the repo, never the installed copy under the
+    // shared content root. Authoring a pack is editing those sources, so the
+    // app writing them back is the same act as editing the JSON by hand — a
+    // pack that is only installed, with no folder here, has no writable path
+    // at all and this refuses it.
+    return resolveSharedSourceFile (rel, out);
+   #else
+    // A release build has no writable shared root of any kind, and must not
+    // quietly answer with the app-data one: a page asking for "shared" is
+    // asking for something this build does not have, and silently writing a
+    // pack's document into %APPDATA% would be a worse answer than none.
+    juce::ignoreUnused (rel, out);
+    return false;
+   #endif
+}
+
 void PlectrifyEngine::handleWriteFile (const juce::var& payload)
 {
     bool ok = false;
     juce::File f;
-    if (resolveAppFile (payload["path"].toString(), f))
+    if (resolveWritableFile (payload, payload["path"].toString(), f))
     {
         f.getParentDirectory().createDirectory();
 
@@ -2772,10 +2892,33 @@ void PlectrifyEngine::handleListFiles (const juce::var& payload)
             dirs.add (f.getFileName());
     }
 
+   #if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
+    // Debug-only: a pack the repo carries is listed whether it is installed or
+    // not, so a new one shows up in the drawer without a publish. Outside that
+    // block (the installed root may not exist at all on a dev machine) and
+    // deduplicated against it, since an installed pack is already named.
+    juce::Array<juce::var> writable;
+    if (payload["root"].toString() == "shared" && payload["dir"].toString().isEmpty())
+        for (const auto& id : sharedPatchSourceIds())
+        {
+            if (! dirs.contains (juce::var (id)))
+                dirs.add (id);
+
+            // Reported so the page can offer to write one back. Named rather
+            // than implied by a build flag: a pack the repo does not carry is
+            // read-only even here, so "which are editable" is a fact about
+            // this machine's source tree and only this side knows it.
+            writable.add (id);
+        }
+   #endif
+
     auto* r = new juce::DynamicObject();
     r->setProperty ("requestId", payload["requestId"]);
     r->setProperty ("names", names);
     r->setProperty ("dirs", dirs);
+   #if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
+    r->setProperty ("writable", writable);
+   #endif
     emit ("filesListed", juce::var (r));
 }
 

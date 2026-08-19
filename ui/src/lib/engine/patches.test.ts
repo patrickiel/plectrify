@@ -84,7 +84,6 @@ describe('storedFromModule', () => {
   it('carries the card’s look, so a patch restores the module it was saved from', () => {
     const p = storedFromModule(
       module({
-        displayName: 'Lead Amp',
         color: '#c04a2b',
         styleVariant: 'bold',
         icon: 'amp',
@@ -92,17 +91,30 @@ describe('storedFromModule', () => {
       }),
       'x',
     );
-    expect(p.displayName).toBe('Lead Amp');
     expect(p.color).toBe('#c04a2b');
     expect(p.styleVariant).toBe('bold');
     expect(p.icon).toBe('amp');
     expect(p.texture).toBe('tolex');
   });
 
+  it('titles the card after the patch, never after the title the card was wearing', () => {
+    // The module's title is whatever patch was loaded last — saving "Repeats"
+    // off a card still saying "Dark Repeats" must not bake the old name in,
+    // or the drawer tile and the card keep answering to it forever.
+    const p = storedFromModule(module({ displayName: 'Dark Repeats' }), 'Repeats');
+    expect(p.name).toBe('Repeats');
+    expect(p.displayName).toBe('Repeats');
+    // The empty-name fallback stamps the same resolved name.
+    expect(storedFromModule(module({ displayName: 'Dark Repeats' }), '  ').displayName).toBe(
+      'Mock Amp',
+    );
+  });
+
   it('leaves the look unset for a module still at its defaults', () => {
-    // Unset means "leave the card alone" on load, not "clear it".
+    // Unset means "leave the card alone" on load, not "clear it" — except the
+    // title, which a saved patch always claims as its own name.
     const p = storedFromModule(module(), 'x');
-    expect(p.displayName).toBeUndefined();
+    expect(p.displayName).toBe('x');
     expect(p.color).toBeUndefined();
     expect(p.styleVariant).toBeUndefined();
     expect(p.icon).toBeUndefined();
@@ -310,6 +322,15 @@ describe('toPatch', () => {
     expect(toPatch('p1', stored('Lead')).category).toBeUndefined();
   });
 
+  it('carries a pack’s authored order, and drops one that is not a number', () => {
+    expect(toPatch('p1', { ...stored('Lead'), order: 20 }).order).toBe(20);
+    expect(toPatch('p1', stored('Lead')).order).toBeUndefined();
+    // isStoredPatch would have refused these; the guard is here too because a
+    // NaN would sort every other patch around it unpredictably.
+    expect(toPatch('p1', { ...stored('Lead'), order: NaN } as never).order).toBeUndefined();
+    expect(toPatch('p1', { ...stored('Lead'), order: '3' } as never).order).toBeUndefined();
+  });
+
   it('marks a pack’s patches read-only', () => {
     expect(toPatch('amps_jtm45', stored('JTM45'), true).readOnly).toBe(true);
     expect('readOnly' in toPatch('p1', stored('Lead'))).toBe(false);
@@ -327,6 +348,21 @@ describe('byName', () => {
     expect(
       [p('b', 'Rhythm'), p('c', 'Lead'), p('a', 'Lead')].sort(byName).map((x) => x.id),
     ).toEqual(['a', 'c', 'b']);
+  });
+
+  it('puts an authored order ahead of the name sort', () => {
+    const ordered = [
+      { ...p('plate', 'Plate'), order: 50 },
+      { ...p('chorus', 'Chorus'), order: 10 },
+      { ...p('hall', 'Concert Hall'), order: 30 },
+      { ...p('delay', 'Delay'), order: 20 },
+    ];
+    expect(ordered.sort(byName).map((x) => x.id)).toEqual(['chorus', 'delay', 'hall', 'plate']);
+  });
+
+  it('sorts an unnumbered patch behind every numbered one, by name', () => {
+    const mixed = [p('b', 'Alpha'), { ...p('a', 'Zulu'), order: 10 }, p('c', 'Beta')];
+    expect(mixed.sort(byName).map((x) => x.id)).toEqual(['a', 'b', 'c']);
   });
 });
 
