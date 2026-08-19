@@ -125,7 +125,8 @@ public:
     // The inverse gate of the two above: served by the plugin, no-op in the
     // standalone (whose window the OS resizes). AUv2 gives a host no way to
     // learn the view is resizable, so no AU host offers frame dragging — the
-    // page draws its own grip in plugin mode and drives the size through here.
+    // page draws its own resize handles in plugin mode and drives the size
+    // through here.
     virtual void handleSetEditorSize (const juce::var&) {}
 };
 

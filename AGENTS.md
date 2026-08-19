@@ -732,14 +732,23 @@ effect (`aufx`, not JUCE's default `aumf`) because Logic files
 "MIDI-controlled Effects" outside the Audio FX menu on audio tracks, the one
 place a guitar rig must appear, and an aufx receives no MIDI there.
 Discoverability wins; the trade is documented at the `AU_MAIN_TYPE` line in
-`CMakeLists.txt`, and auval warns about the pairing and passes. Editor
-resizing splits by format the same way: a VST3 window resizes by its host
-frame (`IPlugView::canResize` is a real contract), but AUv2 gives a host no
-way to learn a view is resizable, so no AU host offers the drag — and JUCE's
-own corner grip sits beneath the native web view. The page therefore draws
-its own grip in plugin mode (`EditorResizeGrip` → `setEditorSize` →
-`HostServices::handleSetEditorSize` → the editor's `setSize`), the
-plugin-initiated resize every host honours, GarageBand included. The plugin's
+`CMakeLists.txt`, and auval warns about the pairing and passes. **The editor
+resizes by handles the page draws**, in both plugin formats
+(`EditorResizeHandles` → `setEditorSize` → `HostServices::handleSetEditorSize`
+→ the editor's `setSize`, the plugin-initiated resize every host honours,
+GarageBand included). Two separate reasons converge on that. The AU has no
+alternative at all: AUv2 gives a host no way to learn a view is resizable, so
+no AU host offers a border drag, and JUCE's own corner grip sits beneath the
+native web view. A VST3 host does offer one (`IPlugView::canResize` is a real
+contract) — but its border is a hairline that the web view abuts, and the view
+swallows every pointer event a step inside it, so the only place that resizes
+is a two-pixel line the user has to hunt for. That is exactly why the
+standalone draws `WindowResizeHandles` over its own edges, and the handles here
+are the same idea with the other half of the mechanism: no hosted editor has an
+OS sizing loop to hand the drag to, so these track the pointer themselves and
+stream a size per animation frame. Right and bottom only — a plugin may ask its
+host for a *size* and nothing more, so a left or top drag could not hold the
+opposite edge still — with the corner the one visible affordance. The plugin's
 WebView2 profile is `WebView2-Plugin`, never the app's — two processes must
 not share a profile lock. `moduleResourceDir()` in `AppPaths.h` is what lets
 `provideUiResource` and the bundled-plugin directory resolve inside either the

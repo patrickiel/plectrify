@@ -42,7 +42,7 @@
   import PersistenceNotice from './features/status/PersistenceNotice.svelte';
   import StandbyOverlay from './features/status/StandbyOverlay.svelte';
   import StatusBar from './features/status/StatusBar.svelte';
-  import EditorResizeGrip from './features/window/EditorResizeGrip.svelte';
+  import EditorResizeHandles from './features/window/EditorResizeHandles.svelte';
   import WindowResizeHandles from './features/window/WindowResizeHandles.svelte';
   import TooltipLayer from './lib/components/TooltipLayer.svelte';
   import { exportCurrentView } from './lib/exportView';
@@ -526,10 +526,13 @@
 {#if nativeHost && caps.windowChrome}
   <WindowResizeHandles {engine} />
 {:else if nativeHost}
-  <!-- The mirror case: the DAW owns the frame but cannot be told the view is
-       resizable (AUv2 has no such contract), so the page carries the grip
-       and drives the editor size over the bridge. -->
-  <EditorResizeGrip {engine} />
+  <!-- The mirror case: the DAW owns the frame, so there is no OS sizing loop
+       to hand a drag to — and its border is a hairline this web view abuts,
+       dead to the pointer a step inside. The page therefore carries handles
+       of its own and drives the editor size over the bridge. (An AU host
+       offers no border drag at all: AUv2 cannot be told a view is
+       resizable.) -->
+  <EditorResizeHandles {engine} />
 {/if}
 
 <TooltipLayer />
