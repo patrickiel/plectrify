@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { applyPreview, canRefileInto, previewOrder, type Reorder } from './drawerDrag.svelte';
+import {
+  adoptOrder,
+  applyPreview,
+  canRefileInto,
+  previewOrder,
+  type Reorder,
+} from './drawerDrag.svelte';
 import type { DrawerPatch } from '../../lib/engine/drawerGroups';
 import type { DrawerSection, PatchNode, PluginsSection } from './drawerTree';
 import type { Patch } from '../../lib/engine/types';
@@ -34,6 +40,7 @@ const plugins: PluginsSection = {
 };
 
 const reorder = (over: Partial<Reorder> = {}): Reorder => ({
+  homeKey: 'patches:Effects',
   sectionKey: 'patches:Effects',
   patchId: 'b',
   ids: ['a', 'b', 'c'],
@@ -77,6 +84,24 @@ describe('previewOrder', () => {
   });
 });
 
+describe('adoptOrder', () => {
+  it('puts a tile arriving from elsewhere at the end, to be placed from there', () => {
+    expect(adoptOrder(['a', 'c'], 'b')).toEqual(['a', 'c', 'b']);
+  });
+
+  // Carried back to where it came from: the section's own order already names
+  // it, so it lands in the place it was taken from rather than at the end.
+  it('leaves an order that already names the tile alone', () => {
+    expect(adoptOrder(['a', 'b', 'c'], 'b')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('does not write through to the section it was given', () => {
+    const ids = ['a', 'c'];
+    adoptOrder(ids, 'b');
+    expect(ids).toEqual(['a', 'c']);
+  });
+});
+
 describe('canRefileInto', () => {
   const patches = [patch({ id: 'b' }), patch({ id: 'pack', readOnly: true })];
 
@@ -84,8 +109,16 @@ describe('canRefileInto', () => {
     expect(canRefileInto(reorder(), section('patches:Amps'), patches)).toBe(true);
   });
 
-  it('refuses the section the drag came from — that one is a reorder', () => {
+  it('refuses the section showing the preview — that one is a reorder', () => {
     expect(canRefileInto(reorder(), section('patches:Effects'), patches)).toBe(false);
+  });
+
+  // Once another section has adopted the drag, the one it came from is a
+  // target again: carrying it back is how the move is called off.
+  it('takes back the section the drag came from once another has adopted it', () => {
+    const carried = reorder({ sectionKey: 'patches:Amps' });
+    expect(canRefileInto(carried, section('patches:Effects'), patches)).toBe(true);
+    expect(canRefileInto(carried, section('patches:Amps'), patches)).toBe(false);
   });
 
   it('refuses the plugins section', () => {
@@ -125,5 +158,24 @@ describe('applyPreview', () => {
 
   it('drops an entry the preview does not name', () => {
     expect(applyPreview(base, ['a', 'b']).map((e) => e.patch.id)).toEqual(['a', 'b']);
+  });
+
+  // The tile carried in from another category: the section's own entries know
+  // nothing of it until the drop re-files it, so the preview supplies it.
+  it('splices in the tile being carried in', () => {
+    expect(applyPreview(base, ['a', 'in', 'b', 'c'], entry('in')).map((e) => e.patch.id)).toEqual([
+      'a',
+      'in',
+      'b',
+      'c',
+    ]);
+  });
+
+  it('still skips it where the order does not name it', () => {
+    expect(applyPreview(base, ['a', 'b', 'c'], entry('in')).map((e) => e.patch.id)).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
   });
 });

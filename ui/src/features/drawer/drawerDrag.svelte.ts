@@ -4,7 +4,7 @@ import type { DrawerSection, PatchNode } from './drawerTree';
 import type { Patch } from '../../lib/engine/types';
 
 /**
- * The drawer's own drag: reordering a patch inside its section, re-filing it
+ * The drawer's own drag: reordering a patch inside its section, carrying it
  * under another heading, and the mid-flight conversion between "this is going
  * to the rack" and "this is staying in here".
  *
@@ -15,8 +15,15 @@ import type { Patch } from '../../lib/engine/types';
  * the rack. The two directions are one gesture, and nothing has to be clicked
  * to undo either.
  *
- * Scoped to the section the tile came from — a tile's place in another
- * category is a category change, which the refile drop handles instead.
+ * **A section adopts a drag carried over its tiles**, whichever section that
+ * is. The preview moves there, its tiles step aside under the pointer, and the
+ * drop re-files the patch *and* commits the place it is being shown in. Filing
+ * and placing used to be two gestures — drop to change the heading, then pick
+ * the tile up again to say where in it — and the second one is the whole of
+ * what this removes; a heading is still a target in its own right, for the
+ * section that is closed or empty, and dropping on one files the patch at the
+ * end of it. Carrying the drag back over the section it came from is the same
+ * rule read backwards: that section adopts it again and its own order returns.
  *
  * Markup contract: spread `{...drag.rootAttrs}` on the drawer root (the
  * `dragBack` watch, which must run before the window listener sees the same
@@ -27,9 +34,15 @@ import type { Patch } from '../../lib/engine/types';
  * constructor — never plain values, which JS would freeze at construction.
  */
 
-/** The in-flight reorder: which section, which tile, and the section's ids in
-    the order shown right now (the live preview the drop commits). */
+/** The in-flight reorder: which patch, the section it is filed under, the
+    section the preview has been carried into, and that section's ids in the
+    order shown right now (the live preview the drop commits). */
 export interface Reorder {
+  /** Where the patch is filed — the section the drag started in. A drop
+      anywhere else is a re-file as well as a placement. */
+  homeKey: string;
+  /** The section hosting the preview: `homeKey` until the drag is carried
+      over another section's tiles, which adopt it. */
   sectionKey: string;
   patchId: string;
   ids: string[];
@@ -51,9 +64,19 @@ export function previewOrder(
   return next.some((id, i) => id !== ids[i]) ? next : null;
 }
 
-/** Whether this section can take the dragged patch: another patch section,
-    and a patch of the user's own — a pack's read-only patch is filed by its
-    pack and cannot be re-filed, exactly as its tile offers no tag button. */
+/** The order a section takes the moment it adopts a drag: its own, with the
+    incoming id appended if it is not already in it. Appended, so a tile
+    arriving over the section's empty space already has a place before the
+    pointer has crossed a tile — and a tile carried back to where it came from
+    keeps the one it started in, since that order already names it. */
+export function adoptOrder(ids: readonly string[], patchId: string): string[] {
+  return ids.includes(patchId) ? [...ids] : [...ids, patchId];
+}
+
+/** Whether this section can take the dragged patch: another patch section than
+    the one hosting the preview, and a patch of the user's own — a pack's
+    read-only patch is filed by its pack and cannot be re-filed, exactly as its
+    tile offers no tag button. */
 export function canRefileInto(
   reorder: Reorder | null,
   section: DrawerSection,
@@ -66,9 +89,16 @@ export function canRefileInto(
 
 /** A section's entries in the live preview's order. Ids naming entries that
     have gone are skipped, and entries the order does not name are dropped —
-    the preview is a snapshot of the section it was taken from. */
-export function applyPreview(base: readonly DrawerPatch[], ids: readonly string[]): DrawerPatch[] {
+    the preview is a snapshot of the section it was taken from. `incoming` is
+    the tile carried in from elsewhere, which the section's own entries do not
+    know about yet. */
+export function applyPreview(
+  base: readonly DrawerPatch[],
+  ids: readonly string[],
+  incoming?: DrawerPatch,
+): DrawerPatch[] {
   const byId = new Map(base.map((entry) => [entry.patch.id, entry]));
+  if (incoming) byId.set(incoming.patch.id, incoming);
   return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
@@ -89,13 +119,13 @@ interface DragDeps {
   onSetOpenSection: (key: string) => void;
   onSetPatchCategory: (patchId: string, category: string) => void;
   onReorderPatches: (sectionKey: string, patchIds: string[]) => void;
+  /** The rack's own end-of-drag, reported from here rather than from the
+      tile — see #done. */
+  onRackDragEnd: () => void;
 }
 
 export class DrawerDrag {
   reorder = $state<Reorder | null>(null);
-  /** The section a reorder drag would re-file into if released right now —
-      drawn highlighted so the header answers before the drop commits. */
-  refileKey = $state<string | null>(null);
 
   /** The drag that lowered the drawer has come back over it.
    *
@@ -118,6 +148,14 @@ export class DrawerDrag {
       untouched. */
   #armed: { sectionKey: string; patchId: string } | null = null;
 
+  /** A rack drag left one of our tiles, convertible or not — what says the
+      rack has to be told when the gesture ends (see #done). */
+  #rackDrag = false;
+
+  /** The heading the pointer is over right now, if a drop there would file
+      the patch under it. */
+  #headerKey = $state<string | null>(null);
+
   /** Deliberately not `$state`: written on every dragover, and nothing
       renders it. */
   #hoverKey: string | null = null;
@@ -128,10 +166,24 @@ export class DrawerDrag {
     this.#deps = deps;
   }
 
+  /** The section a drop right now would file the patch under, drawn
+      highlighted so the destination answers before the drop commits: the
+      heading under the pointer, or — once another section has adopted the
+      drag — that section, whose tiles have already stepped aside for it. */
+  get refileKey(): string | null {
+    const reorder = this.reorder;
+    if (!reorder) return null;
+    if (this.#headerKey !== null) return this.#headerKey;
+    return reorder.sectionKey !== reorder.homeKey ? reorder.sectionKey : null;
+  }
+
   get rootAttrs(): HTMLAttributes<HTMLDivElement> {
     return {
       ondragover: this.#backOver,
       ondragleave: this.#backLeave,
+      // #done clears this too, but only for a drag one of our patch tiles
+      // started: a plugin chip or the TONE3000 tile lowers the drawer just the
+      // same and has no gesture of ours to end.
       ondrop: this.#clearBack,
       ondragend: this.#clearBack,
     };
@@ -139,82 +191,100 @@ export class DrawerDrag {
 
   /** A section's entries as displayed: the persisted hand order over the
       name-sorted list, overridden by the live preview while a reorder drag is
-      over this section. */
+      being shown in this section — and with the tile subtracted from the
+      section it is being carried out of, so it is never drawn twice. */
   orderedEntries(section: PatchNode): DrawerPatch[] {
     const base = orderPatchEntries(section.entries, this.#deps.patchOrder()[section.key]);
-    if (this.reorder?.sectionKey !== section.key) return base;
-    return applyPreview(base, this.reorder.ids);
+    const reorder = this.reorder;
+    if (!reorder) return base;
+    if (reorder.sectionKey === section.key)
+      return applyPreview(base, reorder.ids, this.#draggedEntry());
+    if (reorder.homeKey === section.key)
+      return base.filter((entry) => entry.patch.id !== reorder.patchId);
+    return base;
   }
 
-  /** A plain drag left a tile for the rack, but stays armed for the mid-drag
-      conversion — coming back over the drawer (see #convert). */
-  armPlainDrag(sectionKey: string, patchId: string): void {
-    this.#armed = { sectionKey, patchId };
-    window.addEventListener('dragover', this.#convert);
+  /** A plain drag left a tile for the rack. `convertible` arms the mid-drag
+      conversion with it — coming back over the drawer (see #convert) — and is
+      false while the list is filtered, where the order on screen is not the
+      order that is stored and a reorder would mean nothing. The rest of the
+      bookkeeping is the same either way: the rack is holding state for this
+      drag and has to be told when it ends. */
+  armPlainDrag(sectionKey: string, patchId: string, convertible: boolean): void {
+    this.#rackDrag = true;
+    if (convertible) {
+      this.#armed = { sectionKey, patchId };
+      window.addEventListener('dragover', this.#convert);
+    }
+    this.#watch();
   }
 
   startReorder(sectionKey: string, patchId: string): void {
-    const section = this.#deps
-      .sections()
-      .find((s): s is PatchNode => s.kind === 'patches' && s.key === sectionKey);
+    const section = this.#patchSection(sectionKey);
     if (!section) return;
-    this.reorder = {
-      sectionKey,
-      patchId,
-      ids: orderPatchEntries(section.entries, this.#deps.patchOrder()[sectionKey]).map(
-        (e) => e.patch.id,
-      ),
-    };
+    this.reorder = { homeKey: sectionKey, sectionKey, patchId, ids: this.#sectionIds(section) };
+    this.#watch();
   }
 
-  /** dragend from a plain (rack) drag: the armed conversion is torn down as
-      well as the preview. Deliberately distinct from `endReorder`, because a
-      tile reports one or the other and never both. */
+  /** dragend from a plain (rack) drag. Named apart from `endReorder` because a
+      tile reports one or the other and never both, and they read differently
+      at the call site — but both land on the same teardown, which is the whole
+      point of there being one. */
   endPlainDrag(): void {
-    window.removeEventListener('dragover', this.#convert);
-    this.#armed = null;
-    this.endReorder();
+    this.#done();
   }
 
-  /** dragend from a reorder: fires after a landed drop's commit (the preview
-      is already cleared then) and on its own for a drag released elsewhere,
-      which snaps the preview back by discarding it. */
+  /** dragend from a reorder: after a landed drop's commit (which has already
+      torn the gesture down, so this finds nothing left), and on its own for a
+      drag released elsewhere, which snaps the preview back by discarding it. */
   endReorder(): void {
-    this.reorder = null;
-    this.refileKey = null;
-    this.#cancelHoverOpen();
+    this.#done();
   }
 
   refileOver(e: DragEvent, section: DrawerSection): void {
-    if (!this.#canRefile(section)) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    this.refileKey = section.key;
-    this.#armHoverOpen(section);
+    if (this.#canRefile(section)) {
+      this.#accept(e);
+      this.#headerKey = section.key;
+      this.#armHoverOpen(section);
+      return;
+    }
+    // The heading of the section that has already adopted the drag: a drop
+    // there lands the placement its tiles are showing, rather than being a
+    // strip of nothing across the top of the target.
+    if (this.#adoptedBy(section)) this.#accept(e);
   }
 
   refileLeave(section: DrawerSection): void {
-    if (this.refileKey === section.key) this.refileKey = null;
+    if (this.#headerKey === section.key) this.#headerKey = null;
     if (this.#hoverKey === section.key) this.#cancelHoverOpen();
   }
 
   refileDrop(e: DragEvent, section: DrawerSection): void {
-    if (!this.#canRefile(section) || section.kind !== 'patches') return;
+    if (section.kind !== 'patches') return;
+    if (this.#adoptedBy(section)) return this.#land(e, section);
+    if (!this.#canRefile(section)) return;
     e.preventDefault();
-    this.#deps.onSetPatchCategory(this.reorder!.patchId, section.label);
-    this.refileKey = null;
-    this.#cancelHoverOpen();
-    this.reorder = null;
+    // Home's own heading is where the patch already is: the drag is simply
+    // put down, and nothing is written.
+    const reorder = this.reorder!;
+    if (section.key !== reorder.homeKey)
+      this.#deps.onSetPatchCategory(reorder.patchId, section.label);
+    this.#done();
   }
 
-  /** Live preview: as the drag crosses a tile, the dragged id moves before or
+  /** Live preview: the section under the pointer adopts the drag if it has not
+      already, and as the drag crosses a tile the dragged id moves before or
       after it depending on which half of the tile the pointer is in. */
   reorderOver(e: DragEvent, section: PatchNode): void {
-    if (this.#canRefile(section)) return this.refileOver(e, section);
     const reorder = this.reorder;
-    if (!reorder || reorder.sectionKey !== section.key) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    if (!reorder) return;
+    if (reorder.sectionKey !== section.key) {
+      if (!this.#canRefile(section)) return;
+      reorder.sectionKey = section.key;
+      reorder.ids = adoptOrder(this.#sectionIds(section), reorder.patchId);
+      this.#cancelHoverOpen();
+    }
+    this.#accept(e);
     const tile = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-reveal-id]');
     const overId = tile?.dataset.revealId;
     if (!tile || overId === undefined) return;
@@ -225,23 +295,69 @@ export class DrawerDrag {
   }
 
   reorderDrop(e: DragEvent, section: PatchNode): void {
-    if (this.#canRefile(section)) return this.refileDrop(e, section);
-    if (!this.reorder || this.reorder.sectionKey !== section.key) return;
-    e.preventDefault();
-    this.#deps.onReorderPatches(this.reorder.sectionKey, this.reorder.ids);
-    this.reorder = null;
+    if (this.reorder?.sectionKey !== section.key) return;
+    this.#land(e, section);
   }
 
-  /** The drawer is going away with a drag still armed (edit mode left); the
-      window must not keep the conversion listener, nor a timer fire into a
-      component that is gone. */
+  /** The drawer is going away with a drag still in flight (edit mode left);
+      the window must not keep this gesture's listeners, nor a timer fire into
+      a component that is gone. */
   destroy(): void {
+    this.#unwatch();
     window.removeEventListener('dragover', this.#convert);
     this.#cancelHoverOpen();
   }
 
+  /** The drop that ends the gesture where the preview shows it: the patch
+      takes this section — re-filed if it is not the one it came from — and
+      this section's hand order becomes the preview's. */
+  #land(e: DragEvent, section: PatchNode): void {
+    const reorder = this.reorder;
+    if (!reorder) return;
+    e.preventDefault();
+    if (section.key !== reorder.homeKey)
+      this.#deps.onSetPatchCategory(reorder.patchId, section.label);
+    this.#deps.onReorderPatches(section.key, [...reorder.ids]);
+    this.#done();
+  }
+
+  #accept(e: DragEvent): void {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  }
+
   #canRefile(section: DrawerSection): boolean {
     return canRefileInto(this.reorder, section, this.#deps.patches());
+  }
+
+  /** This section is hosting the preview, having taken it from another — the
+      state a drop lands rather than merely re-files. Never the section the
+      patch is already filed under: that one is an ordinary reorder. */
+  #adoptedBy(section: DrawerSection): boolean {
+    const reorder = this.reorder;
+    return (
+      reorder !== null && section.key === reorder.sectionKey && section.key !== reorder.homeKey
+    );
+  }
+
+  #patchSection(key: string): PatchNode | undefined {
+    return this.#deps.sections().find((s): s is PatchNode => s.kind === 'patches' && s.key === key);
+  }
+
+  #sectionIds(section: PatchNode): string[] {
+    return orderPatchEntries(section.entries, this.#deps.patchOrder()[section.key]).map(
+      (entry) => entry.patch.id,
+    );
+  }
+
+  /** The entry the drag is carrying, looked up where the patch is still filed
+      — the section showing the preview has no entry for it yet. */
+  #draggedEntry(): DrawerPatch | undefined {
+    const reorder = this.reorder;
+    if (!reorder || reorder.sectionKey === reorder.homeKey) return undefined;
+    return this.#patchSection(reorder.homeKey)?.entries.find(
+      (entry) => entry.patch.id === reorder.patchId,
+    );
   }
 
   /** The mid-drag conversion, and the one rule that decides which drag this
@@ -281,6 +397,58 @@ export class DrawerDrag {
 
   #clearBack = (): void => {
     this.dragBack = false;
+  };
+
+  /** The end of the gesture, watched on the window rather than taken from the
+   * tile's own dragend.
+   *
+   * The tile is not there to report it. A section that adopts the drag draws
+   * the tile itself, and the heading it sprang open closed the one the drag
+   * started in — either way the source element has been replaced, and Chromium
+   * does not deliver `dragend` to a node that has left the document. So the
+   * drop and the dragend are watched wherever they land, and a mouse move is
+   * the backstop for the drag that fires neither: Escape ends one with nothing
+   * dispatched at all, and a move is the first thing heard afterwards, since
+   * ordinary mouse events are suppressed for as long as a drag is running.
+   *
+   * Deliberately not `mouseup`, which would be the obvious other half: it is
+   * the very event a drop is made of, and a browser dispatching it before the
+   * `drop` would tear the preview down a moment before the drop went to commit
+   * it. A move costs a pixel and cannot land in the middle of anything. */
+  #watch(): void {
+    window.addEventListener('drop', this.#done);
+    window.addEventListener('dragend', this.#done);
+    window.addEventListener('mousemove', this.#idle);
+  }
+
+  #unwatch(): void {
+    window.removeEventListener('drop', this.#done);
+    window.removeEventListener('dragend', this.#done);
+    window.removeEventListener('mousemove', this.#idle);
+  }
+
+  /** Escape ends the drag with the button still down, so the move that says so
+      is the one after it comes back up. */
+  #idle = (e: MouseEvent): void => {
+    if (e.buttons === 0) this.#done();
+  };
+
+  /** Everything one gesture leaves behind, dropped at once and idempotently —
+      it runs from the drop that landed the preview, from the tile's dragend
+      when there still is one, and from the window watch when there is not. */
+  #done = (): void => {
+    const wasRackDrag = this.#rackDrag;
+    this.#unwatch();
+    window.removeEventListener('dragover', this.#convert);
+    this.#armed = null;
+    this.#rackDrag = false;
+    this.dragBack = false;
+    this.reorder = null;
+    this.#headerKey = null;
+    this.#cancelHoverOpen();
+    // The rack lowered the drawer for this drag and holds insert state for it,
+    // and the tile that would have told it so may be gone.
+    if (wasRackDrag) this.#deps.onRackDragEnd();
   };
 
   #armHoverOpen(section: DrawerSection): void {

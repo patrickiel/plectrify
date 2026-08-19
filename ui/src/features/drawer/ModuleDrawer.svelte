@@ -87,9 +87,13 @@
     onRenamePatch: (patchId: string, name: string) => void;
     /** Hand order per patch section (persisted app setting): section key →
         patch ids in display order. Written back through onReorderPatches when
-        a reorder drag inside a section lands. */
+        a reorder drag lands — in the section it started in, or in the one that
+        adopted it on the way. */
     patchOrder: Record<string, string[]>;
     onReorderPatches: (sectionKey: string, patchIds: string[]) => void;
+    /** File a patch under a heading. A drag that lands in another category
+        reports this *and* onReorderPatches, in that order: one gesture says
+        both which section the patch belongs to and where in it. */
     onSetPatchCategory: (patchId: string, category: string) => void;
     onDeletePatch: (patchId: string) => void;
     onScan: () => void;
@@ -174,6 +178,7 @@
     onSetOpenSection: (key) => onSetOpenSection(key),
     onSetPatchCategory: (patchId, category) => onSetPatchCategory(patchId, category),
     onReorderPatches: (sectionKey, patchIds) => onReorderPatches(sectionKey, patchIds),
+    onRackDragEnd: () => onDragEnd(),
   });
 
   /** Down to the shelf, whether the user parked it there or a drag out of the
@@ -449,13 +454,10 @@
             onDragStart={(payload) => {
               // A plain drag leaves for the rack, but stays armed for the
               // mid-drag conversion — coming back over the drawer.
-              if (!filterActive) drag.armPlainDrag(section.key, entry.patch.id);
+              drag.armPlainDrag(section.key, entry.patch.id, !filterActive);
               onDragStart(payload);
             }}
-            onDragEnd={() => {
-              drag.endPlainDrag();
-              onDragEnd();
-            }}
+            onDragEnd={() => drag.endPlainDrag()}
             onReorderStart={filterActive
               ? undefined
               : () => drag.startReorder(section.key, entry.patch.id)}
@@ -477,8 +479,9 @@
     <!-- The uncategorised patches, resolved in place: no heading, no
            accordion, always visible above the sections. The container still
            carries the section's reorder/refile handlers, so dragging within
-           the row reorders it and a reorder drag from a section dropped here
-           re-files the patch as uncategorised. -->
+           the row reorders it, and a drag carried in from a section is adopted
+           here exactly as it would be by any other — the drop un-files the
+           patch and places it in the row in one go. -->
     {#if tree.uncategorised}
       {@const section = tree.uncategorised}
       <div
@@ -686,10 +689,12 @@
     transform: translate(0, 0);
   }
 
-  /* The section a reorder drag would re-file into if released now: the same
-     accent language as every drop zone, on the header so a closed section
-     answers as well as an open one — and on the uncategorised row itself,
-     which has no header. Element+class so it outranks the header's own
+  /* The section a reorder drag would file the patch under if released now: the
+     same accent language as every drop zone, on the header so a closed section
+     answers as well as an open one — and it stays lit once that section has
+     adopted the drag, so the heading above the tiles stepping aside says which
+     category they belong to. Also on the uncategorised row itself, which has
+     no header. Element+class so it outranks the header's own
      text-colour utilities without an !important. (Both are drawn by this
      component — the header is a snippet, not a child — so one scoped rule
      reaches them.) */
