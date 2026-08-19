@@ -322,6 +322,15 @@ describe('toPatch', () => {
     expect(toPatch('p1', stored('Lead')).category).toBeUndefined();
   });
 
+  it('carries a pack’s authored order, and drops one that is not a number', () => {
+    expect(toPatch('p1', { ...stored('Lead'), order: 20 }).order).toBe(20);
+    expect(toPatch('p1', stored('Lead')).order).toBeUndefined();
+    // isStoredPatch would have refused these; the guard is here too because a
+    // NaN would sort every other patch around it unpredictably.
+    expect(toPatch('p1', { ...stored('Lead'), order: NaN } as never).order).toBeUndefined();
+    expect(toPatch('p1', { ...stored('Lead'), order: '3' } as never).order).toBeUndefined();
+  });
+
   it('marks a pack’s patches read-only', () => {
     expect(toPatch('amps_jtm45', stored('JTM45'), true).readOnly).toBe(true);
     expect('readOnly' in toPatch('p1', stored('Lead'))).toBe(false);

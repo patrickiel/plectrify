@@ -172,7 +172,7 @@
     "by 'the other platform'."
   ],
   "schemaVersion": 4,
-  "revision": 17,
+  "revision": 18,
   "_noticesComment": [
     "Licence disclosure travels WITH the catalogue rather than shipping in the",
     "installer. If the offered plugins change, the notices change with them - no new",
@@ -652,7 +652,7 @@
       ],
       "name": "Lupex Chorus patches",
       "purpose": "Chorus - a BBD chorus with rate, depth, level and shelf tone mapped",
-      "version": "3",
+      "version": "4",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -664,9 +664,9 @@
       ],
       "assets": {
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-3-windows-x64.zip",
-          "sha256": "884b27d357685c9e34cec526c91c0ab0bc685da2c2adc8d54815c163a9af83f0",
-          "downloadBytes": 1245,
+          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-4-windows-x64.zip",
+          "sha256": "5019677b9e724f2878f6e3361267e9557d380d4dda52fb0a58c3731725863694",
+          "downloadBytes": 1301,
           "selfHosted": true
         }
       },
@@ -749,7 +749,7 @@
       ],
       "name": "QDelay patches",
       "purpose": "Delay - a dual delay with time, feedback, mode and mix mapped",
-      "version": "3",
+      "version": "4",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -761,9 +761,9 @@
       ],
       "assets": {
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-3-windows-x64.zip",
-          "sha256": "42e84a39a066897a13ce9f0c61f3fd84c3e070987ac9019df4078a6b30b5520a",
-          "downloadBytes": 3390,
+          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-4-windows-x64.zip",
+          "sha256": "2631f95f0a4df28eb6e4825445bcd6df8513662af9d393a7278b4897da56ca69",
+          "downloadBytes": 3424,
           "selfHosted": true
         }
       },
@@ -924,7 +924,7 @@
       ],
       "name": "Dragonfly Reverb patches",
       "purpose": "One patch each for the hall, room and plate reverbs",
-      "version": "3",
+      "version": "4",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -936,9 +936,9 @@
       ],
       "assets": {
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-3-windows-x64.zip",
-          "sha256": "765be46ced8ed72edb7b8f6c7d6ec931e54b8c56b01abece1ba019eb022e4627",
-          "downloadBytes": 3283,
+          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-4-windows-x64.zip",
+          "sha256": "793778d1d9295a2d9e6c3b9143e2a1867e692c6a60f90626b6f427014fa1057d",
+          "downloadBytes": 3321,
           "selfHosted": true
         }
       },
