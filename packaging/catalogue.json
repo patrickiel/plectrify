@@ -145,7 +145,7 @@
     "before it can be listed. The bar bites hardest on macOS, where a .dmg or .pkg is",
     "the usual release format: `host-plugin` extracts those as plain data on a",
     "Mac and re-hosts the bundles, which is how dragonfly-reverb reached macOS and",
-    "what airwindows-consolidated is still waiting on.",
+    "what peakeater is still waiting on.",
     "",
     "LICENSING, and note that `selfHosted` sits on the ASSET rather than the package -",
     "it is a fact about ONE url, so a package can be a mirror on one platform and a",
@@ -172,7 +172,7 @@
     "by 'the other platform'."
   ],
   "schemaVersion": 4,
-  "revision": 14,
+  "revision": 15,
   "_noticesComment": [
     "Licence disclosure travels WITH the catalogue rather than shipping in the",
     "installer. If the offered plugins change, the notices change with them - no new",
@@ -388,44 +388,6 @@
   ],
   "packages": [
     {
-      "id": "airwindows-consolidated",
-      "kind": "plugin",
-      "category": "Effects",
-      "tags": [
-        "Multi-effect",
-        "Distortion",
-        "Modulation"
-      ],
-      "name": "Airwindows Consolidated",
-      "purpose": "Utility, saturation and modulation collection",
-      "version": "2026-08-02-f3fc037",
-      "licenseId": "GPL-3.0-only",
-      "licenseUrl": "https://raw.githubusercontent.com/baconpaul/airwin2rack/main/LICENSE",
-      "projectUrl": "https://github.com/baconpaul/airwin2rack",
-      "sourceUrl": "https://github.com/baconpaul/airwin2rack/tree/f3fc037",
-      "include": [
-        "**/*.vst3/**",
-        "*.vst3"
-      ],
-      "assets": {
-        "macos-arm64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/hosted/airwindows-consolidated/airwindows-consolidated-2026-08-02-f3fc037-macos-arm64.zip",
-          "sha256": "7f26b16182cc67bfa62369bf44f0691fbb05b037ba4c59e1b905a2d5b90522dd",
-          "downloadBytes": 12287036,
-          "selfHosted": true
-        },
-        "windows-x64": {
-          "url": "https://github.com/baconpaul/airwin2rack/releases/download/DAWPlugin/AirwindowsConsolidated-2026-08-02-f3fc037-Windows.zip",
-          "sha256": "670ec3abb43838c0a51934205d21ffc45992d364e46bc227b15c372177f0ae5b",
-          "downloadBytes": 13317479
-        }
-      },
-      "_macNote": "THE MAC ASSET IS A RE-HOST OF UPSTREAM'S OWN dmg, not a build of ours. This release ships mac only as airwindows-consolidated-macOS-2026-08-02-f3fc037.dmg, which cannot back an asset url - the app will not mount a disk image on a user's behalf - so `host-plugin` mounted it here as plain data, expanded the airwindows-consolidated_VST3.pkg inside it, and re-zipped the one bundle unmodified (see PROVENANCE-macos-arm64.txt beside the archive, which records the dmg's own sha256). Nothing from the payload was executed, and the bundle's Developer ID signature (Paul Walker, 547U7G7MZC) still verifies after extraction. The binary is universal, x86_64 and arm64; only the arm64 slice matters here and it is checked with lipo before archiving, which is why the asset is keyed macos-arm64 rather than by what else is in it. The dmg also carries AU and CLAP builds, which Plectrify does not host: it is a VST3 host, and shipping formats it cannot load would be payload nobody asked for.",
-      "_licenceNote": "Source is MIT, but the shipped binaries carry GPL-3.0 (pre-3.8 VST3 SDK linkage) - LICENSE.gpl3 in the Windows zip, License.txt in the mac pkg, checked separately rather than assumed from the Windows one. The panel shows the BINARY's licence, which is what this field records. Re-check BOTH on every version bump.",
-      "_sourceNote": "sourceUrl NAMES THE COMMIT, NOT THE RELEASE TARBALL, and that is deliberate. Serving the mac binary ourselves makes Plectrify its conveyor, so GPL section 6 requires the corresponding source to stay published for as long as we serve the object code. This release does ship airwin2rack-source-f3fc037.tar.gz, which is the fuller snapshot - but it hangs off the ROLLING DAWPlugin tag and is replaced the moment upstream rebuilds, which would leave us conveying a GPL binary behind a dead source pointer in the window before anyone noticed. The commit f3fc037 is what the dmg's own filename names, it is reachable on main, and it cannot be replaced in place. Re-point it at the new commit whenever the binary is re-hosted, in the same edit as the hash.",
-      "_rotNote": "This project publishes to a ROLLING tag ('DAWPlugin') whose asset filename carries a build date and commit, so both the URL and the hash change whenever it is rebuilt - unlike the other entries, which point at immutable version tags. Expect this pin to rot; re-verify it on every publish. BOTH platforms rot together and must be re-pinned together: they are cut from the one tag, so a mac re-host without a matching Windows re-pin would leave this entry's single `version` describing only one of the two binaries. `check-updates` cannot see the mac pin move (a self-hosted url never appears in an upstream release), so it falls back to matching this `version` against the newest release's asset filenames - which is exactly why the version string is that filename's date-and-commit and not something prettier."
-    },
-    {
       "id": "surge-xt-effects",
       "kind": "plugin",
       "category": "Effects",
@@ -525,7 +487,7 @@
           "downloadBytes": 3727973
         }
       },
-      "_macNote": "A MAC BUILD EXISTS BUT CANNOT BE PINNED AS IT SHIPS - this release publishes macOS only as peakeater-v0.8.2-macOS-universal.dmg, and the app will not mount a disk image on a user's behalf. So this is the airwindows-consolidated/dragonfly-reverb shape, not the lupex one: the binary is there and `host-plugin` on a Mac would expand the dmg as plain data and re-host the bundle, which needs a Mac to run and has not been done. Until it is, the row renders greyed on macOS. Note that re-hosting flips selfHosted:true on that asset and GPL section 6 then attaches to us, so a sourceUrl must land in the same edit.",
+      "_macNote": "A MAC BUILD EXISTS BUT CANNOT BE PINNED AS IT SHIPS - this release publishes macOS only as peakeater-v0.8.2-macOS-universal.dmg, and the app will not mount a disk image on a user's behalf. So this is the dragonfly-reverb shape, not the lupex one: the binary is there and `host-plugin` on a Mac would expand the dmg as plain data and re-host the bundle, which needs a Mac to run and has not been done. Until it is, the row renders greyed on macOS. Note that re-hosting flips selfHosted:true on that asset and GPL section 6 then attaches to us, so a sourceUrl must land in the same edit.",
       "_includeNote": "The archive is a peakeater_artefacts/Release/ tree holding CLAP and LV2 builds beside the VST3 - roughly two thirds of it. The include patterns match only .vst3 paths, so both are dropped at extraction; that, not a truncated download, is why the installed plugin is about a third of what came down. The bundle itself is nested at Release/VST3/peakeater.vst3/, which '**/' handles, so no per-platform include is needed.",
       "_licenceNote": "LICENSE.md is the bare GPLv3 text with no 'or any later version' offer from the project itself, so GPL-3.0-only - the same reading as dragonfly-reverb, reev-r and open-spatial-delay. selfHosted is false, so the project conveys its own binary and section 6 rests with it.",
       "_rotNote": "UPSTREAM IS DORMANT: v0.8.2 was cut in August 2023 and nothing has been pushed since. That is not a reason to drop the entry - the pin is an immutable release tag and the plugin works - but expect check-updates to report it current forever, and do not read a long-unchanged version as a stale pin here."
@@ -731,7 +693,7 @@
           "downloadBytes": 4670255
         }
       },
-      "_macNote": "NO macOS BUILD EXISTS TO PIN. Both Lupex releases ship Windows and Linux only, and unlike airwindows-consolidated or dragonfly-reverb there is no mac artifact in an awkward format to re-host - there is simply nothing. Building it ourselves is not the answer either: that is what `builtFromSource` means, and it commits us to producing and standing behind a binary, which is a step to take for an amp sim nobody else builds (see neural-amp-modeler) and not for a chorus. If the author ever publishes a mac zip, this becomes an ordinary assets['macos-arm64'] entry from the same release as the windows-x64 one.",
+      "_macNote": "NO macOS BUILD EXISTS TO PIN. Both Lupex releases ship Windows and Linux only, and unlike dragonfly-reverb there is no mac artifact in an awkward format to re-host - there is simply nothing. Building it ourselves is not the answer either: that is what `builtFromSource` means, and it commits us to producing and standing behind a binary, which is a step to take for an amp sim nobody else builds (see neural-amp-modeler) and not for a chorus. If the author ever publishes a mac zip, this becomes an ordinary assets['macos-arm64'] entry from the same release as the windows-x64 one.",
       "_licenceNote": "Same author, same arrangement as lupex-delay above - MIT claimed in the README with no LICENSE file, on a JUCE build. Read that entry's note before changing either.",
       "_versionNote": "v0.1.0 is the project's first and so far only release, cut the same day as Lupex Delay v1.1.0. A 0.x version is the author's own numbering, not a beta channel; there is no other tag to prefer."
     },
@@ -1099,7 +1061,7 @@
         }
       },
       "_versionNote": "THE TAG SAYS v0.9 AND THE PLUGIN SAYS v1.0, and both are right. The Windows asset under this tag was replaced in place on 2026-04-07 with a 1.0 build: the bundle inside is named 'OpenSpatialDelay v1.0.vst3' and its moduleinfo.json reports 1.0.0. `version` records the release we pin, because that is what the URL names and what check-updates compares, so expect the plugin's own header to read v1.0 and do not 'correct' one to match the other. THE MAC ASSET WAS NOT SWAPPED: OpenSpatialDelay-v0.9-macOS.zip still holds 'OpenSpatialDelay v0.9.vst3' reporting 0.9.0. So this is the one entry where the two platforms genuinely deliver different builds under one `version` - not by our choice but because upstream replaced one file and not the other. It is recorded rather than smoothed over; the fix, if the difference ever matters, is a release that ships both again, not a second version field. The mac bundle is arm64-only (the Windows one is x64-only), which is fine - each asset only ever has to run on the platform that selects it.",
-      "_rotNote": "DO NOT 'UPDATE' THIS TO v1.0.0. That release exists and is newer, but it publishes no Windows binary at all - its own notes say 'Plugin binaries are distributed via the mailing list, not GitHub' and send users to andrewrahman.com/get-osd, an email-gated form page. There is no direct, stable URL there to pin a hash against, so it cannot back an asset on either platform (same objection as the Gateway note on neural-amp-modeler). v0.9 is the newest release carrying binaries at all, and its Windows asset is the 1.0 build anyway. Separately: because that asset was already swapped in place once, the hash can rot without the URL moving - the same failure mode as airwindows-consolidated's rolling tag. Re-verify on every publish.",
+      "_rotNote": "DO NOT 'UPDATE' THIS TO v1.0.0. That release exists and is newer, but it publishes no Windows binary at all - its own notes say 'Plugin binaries are distributed via the mailing list, not GitHub' and send users to andrewrahman.com/get-osd, an email-gated form page. There is no direct, stable URL there to pin a hash against, so it cannot back an asset on either platform (same objection as the Gateway note on neural-amp-modeler). v0.9 is the newest release carrying binaries at all, and its Windows asset is the 1.0 build anyway. Separately: because that asset was already swapped in place once, the hash can rot without the URL moving - a release asset replaced in place looks current to `check-updates` and is not. Re-verify on every publish.",
       "_layoutNote": "This is a spatial plugin - up to 12 taps rendered through binaural HRTF, 15 surround formats and 6 ambisonic orders - so it looks like a poor fit for a rack that is 2-in/2-out throughout. It works because its VST3 isBusesLayoutSupported accepts whatever the host proposes, so Plectrify hands it stereo and it renders to stereo. Set the output format to Binaural for headphones or Stereo for speakers; the surround and ambisonic formats have nowhere to go here. The five measured HRTFs are compiled into the binary, so nothing else needs installing.",
       "_licenceNote": "GPL-3.0-only rather than -or-later: the project's LICENSE opens 'This software is licensed under the GNU General Public License v3.0' with no 'or any later version' grant of its own - the two later-version lines in that file are the GPL's own 'How to Apply These Terms' appendix, not this project's offer. Same reading as dragonfly-reverb and reev-r."
     },

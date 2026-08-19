@@ -60,7 +60,7 @@ describe('packageDrawerItems', () => {
       [
         plugin({ id: 'p1', packageId: 'surge-xt' }),
         plugin({ id: 'p2', packageId: 'surge-xt' }),
-        plugin({ id: 'p3', packageId: 'airwindows' }),
+        plugin({ id: 'p3', packageId: 'zam-plugins' }),
         plugin({ id: 'p4' }),
       ],
     );

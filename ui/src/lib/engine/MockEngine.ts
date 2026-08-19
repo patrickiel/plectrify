@@ -573,27 +573,6 @@ const MOCK_CATALOGUE: CataloguePackage[] = [
     dependsOn: '',
   },
   {
-    id: 'airwindows-consolidated',
-    kind: 'plugin',
-    category: ['Effects'],
-    tags: ['Multi-effect', 'Distortion', 'Modulation'],
-    name: 'Airwindows Consolidated',
-    purpose: 'Utility, saturation and modulation collection',
-    version: '2026-08-02-f3fc037',
-    licenseId: 'GPL-3.0-only',
-    licenseUrl: 'https://raw.githubusercontent.com/baconpaul/airwin2rack/main/LICENSE',
-    projectUrl: 'https://github.com/baconpaul/airwin2rack',
-    downloadBytes: 13317479,
-    selfHosted: false,
-    installed: false,
-    installedVersion: '',
-    updateAvailable: false,
-    available: true,
-    unlisted: false,
-    dir: '',
-    dependsOn: '',
-  },
-  {
     // A package with no payload for the platform this build runs on (the
     // engine decides; on real builds this happens when a catalogue entry has
     // no asset for the current OS). Here so the greyed row with its disabled
@@ -638,15 +617,8 @@ const MOCK_BUNDLE: CatalogueBundle = {
     'cab-irs',
     'zam-plugins',
     'dragonfly-reverb',
-    'airwindows-consolidated',
   ],
-  missingPackageIds: [
-    'neural-amp-modeler',
-    'amalgam-jtm45',
-    'cab-irs',
-    'zam-plugins',
-    'airwindows-consolidated',
-  ],
+  missingPackageIds: ['neural-amp-modeler', 'amalgam-jtm45', 'cab-irs', 'zam-plugins'],
   outdatedPackageIds: ['dragonfly-reverb'],
   installedVersion: '',
   installed: false,
@@ -655,7 +627,7 @@ const MOCK_BUNDLE: CatalogueBundle = {
 
 /** Always fails to install in the mock, so the failure copy and the per-row
     Retry are exercised on every browser run rather than only in the wild. */
-const MOCK_CATALOGUE_FAILING_ID = 'airwindows-consolidated';
+const MOCK_CATALOGUE_FAILING_ID = 'zam-plugins';
 
 const MOCK_PLUGINS: PluginInfo[] = [
   // `packageId` on the first two joins them to MOCK_CATALOGUE, so a patch
