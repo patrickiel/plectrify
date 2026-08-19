@@ -216,6 +216,17 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         // that mistakes a plugin for the standalone applies the standalone's
         // autosaved working rack over the DAW's session.
         .withInitialisationData ("host", juce::String (host.hostKind()))
+        // The capabilities ride with it, and for the same reason: they are the
+        // other half of the same one-shot. appInfo is asked for once at boot
+        // and never re-asked (unlike the rack, status and device pushes, which
+        // the page re-requests), so a reply dropped because the view was not
+        // yet visible — routine when a DAW builds an editor before showing it,
+        // and what made a mac-hosted plugin offer the looper and the metronome
+        // it had already dropped from the chain — leaves the page on the
+        // standalone defaults for the life of the document. Baked in, the gate
+        // is right from the first frame in every host. JSON because
+        // initialisation data carries strings.
+        .withInitialisationData ("capabilities", juce::JSON::toString (buildCapabilitiesState(), true))
         // Not an activity event (the UI asks on startup), but it must not answer
         // while deep standby holds the rig parked: buildRackState() would report
         // an empty rack, which prunes every knob mapping and lane name and lets
@@ -578,6 +589,23 @@ void PlectrifyEngine::emitPluginsChanged()
     emit ("pluginsChanged", buildPluginsState());
 }
 
+juce::var PlectrifyEngine::buildCapabilitiesState() const
+{
+    const auto caps = host.capabilities();
+    auto* capabilities = new juce::DynamicObject();
+    // Every field, always: the page merges what arrives over the standalone
+    // defaults, so a key left out here does not read as "absent, assume
+    // standalone" — it reads as false and hides the feature in both builds.
+    capabilities->setProperty ("audioDevices", caps.audioDevices);
+    capabilities->setProperty ("midiDevices", caps.midiDevices);
+    capabilities->setProperty ("windowChrome", caps.windowChrome);
+    capabilities->setProperty ("autoStandby", caps.autoStandby);
+    capabilities->setProperty ("looper", caps.looper);
+    capabilities->setProperty ("metronome", caps.metronome);
+    capabilities->setProperty ("feedbackGuard", caps.feedbackGuard);
+    return juce::var (capabilities);
+}
+
 juce::var PlectrifyEngine::buildAppInfoState()
 {
     auto* info = new juce::DynamicObject();
@@ -602,19 +630,7 @@ juce::var PlectrifyEngine::buildAppInfoState()
     // around it — what the page gates its standalone-only surfaces on (the
     // setup wizard, device settings, window chrome, Auto Standby).
     info->setProperty ("host", host.hostKind());
-    const auto caps = host.capabilities();
-    auto* capabilities = new juce::DynamicObject();
-    // Every field, always: the page merges what arrives over the standalone
-    // defaults, so a key left out here does not read as "absent, assume
-    // standalone" — it reads as false and hides the feature in both builds.
-    capabilities->setProperty ("audioDevices", caps.audioDevices);
-    capabilities->setProperty ("midiDevices", caps.midiDevices);
-    capabilities->setProperty ("windowChrome", caps.windowChrome);
-    capabilities->setProperty ("autoStandby", caps.autoStandby);
-    capabilities->setProperty ("looper", caps.looper);
-    capabilities->setProperty ("metronome", caps.metronome);
-    capabilities->setProperty ("feedbackGuard", caps.feedbackGuard);
-    info->setProperty ("capabilities", juce::var (capabilities));
+    info->setProperty ("capabilities", buildCapabilitiesState());
     info->setProperty ("juceVersion", juce::SystemStats::getJUCEVersion());
 
     // --- Provenance: which source this exe is, and what it can host ---------

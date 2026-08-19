@@ -203,6 +203,12 @@ private:
     // re-pushed whenever they do (see the shell's changeListenerCallback and
     // scanForPlugins).
     juce::var buildAppInfoState();
+
+    // Which host-owned facilities exist around this engine, as the page's
+    // AppInfo.capabilities object. Built here rather than inline in
+    // buildAppInfoState because the same object is also baked into the web
+    // view's initialisation data — see registerEventListeners.
+    juce::var buildCapabilitiesState() const;
     void emitPluginScanChanged (const juce::String& status);
 
     // The plugin files the scanner skips (see PluginManager::unblacklistPlugins).

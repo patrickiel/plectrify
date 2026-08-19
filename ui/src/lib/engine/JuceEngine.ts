@@ -14,6 +14,7 @@ import type {
   AudioDevicesState,
   BlacklistedPlugin,
   EngineBusyState,
+  HostCapabilities,
   LooperSession,
   MidiEvent,
   MidiTrigger,
@@ -41,7 +42,12 @@ import { sanitizeTrigger } from './midi';
 import type { ModuleIcon, ModuleStyleVariant, ModuleTexture } from './moduleAppearance';
 import { asModuleColor, asModuleIcon, asModuleTexture, asStyleVariant } from './moduleAppearance';
 import { knobMeterPatch } from './contentMidi';
-import { DEFAULT_APP_INFO, DEFAULT_STATUS_STATE, EMPTY_AUDIO_DEVICES } from './types';
+import {
+  DEFAULT_APP_INFO,
+  DEFAULT_STATUS_STATE,
+  EMPTY_AUDIO_DEVICES,
+  STANDALONE_CAPABILITIES,
+} from './types';
 import { normalizeAudioDevices } from './audioDevices';
 import { DEFAULT_APP_SETTINGS, normalizeAppSettings } from './appSettings';
 import { firstFreePos, moveKnobToPos, normalizePositions } from './knobLayout';
@@ -295,12 +301,43 @@ function bootHostKind(): 'standalone' | 'plugin' | undefined {
   return kind === 'standalone' || kind === 'plugin' ? kind : undefined;
 }
 
-/** bootHostKind as an AppInfo fragment: an absent answer contributes no `host`
-    key at all, keeping "engine older than the field" indistinguishable from
-    the default it always meant. */
-function hostSeed(): Pick<AppInfo, 'host'> {
+/** The capabilities the engine baked in beside the host kind, for the same
+    reason: appInfo is asked for once at boot and never re-asked, so a push
+    dropped because the view was not yet visible — which is how a DAW builds an
+    editor before showing it — would leave the page on the standalone defaults
+    for the life of the document, offering tools the engine has already dropped
+    from the chain. Absent on an engine older than the field. */
+function bootCapabilities(): HostCapabilities | undefined {
+  const pushed = (
+    window as unknown as { __JUCE__?: { initialisationData?: { capabilities?: unknown[] } } }
+  ).__JUCE__?.initialisationData?.capabilities;
+  const raw = Array.isArray(pushed) ? pushed[0] : undefined;
+  if (typeof raw !== 'string') return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return undefined;
+  const seen = parsed as Record<string, unknown>;
+  const caps = { ...STANDALONE_CAPABILITIES };
+  for (const key of Object.keys(caps) as Array<keyof HostCapabilities>) {
+    if (typeof seen[key] === 'boolean') caps[key] = seen[key] as boolean;
+  }
+  return caps;
+}
+
+/** The boot-baked facts as an AppInfo fragment: an absent answer contributes no
+    key at all, keeping "engine older than the field" indistinguishable from the
+    default it always meant. */
+function hostSeed(): Pick<AppInfo, 'host' | 'capabilities'> {
   const kind = bootHostKind();
-  return kind === undefined ? {} : { host: kind };
+  const caps = bootCapabilities();
+  return {
+    ...(kind === undefined ? {} : { host: kind }),
+    ...(caps === undefined ? {} : { capabilities: caps }),
+  };
 }
 
 /** True when running inside the JUCE WebBrowserComponent. */
@@ -569,8 +606,8 @@ export class JuceEngine implements EngineBridge {
     // readWorkingSession), so the first arrival resolves the gate the session
     // restore waits behind.
     b?.addEventListener('appInfo', (data) => {
-      // hostSeed under the push: the boot-baked host kind stays the floor even
-      // if a push ever arrives without the field.
+      // hostSeed under the push: the boot-baked host kind and capabilities stay
+      // the floor even if a push ever arrives without those fields.
       this.appInfo = { ...DEFAULT_APP_INFO, ...hostSeed(), ...(data as Partial<AppInfo>) };
       this.appInfoSeen = true;
       this.resolveAppInfoKnown();
