@@ -228,10 +228,7 @@
     }
     const out = new Map<string, PatchGroup[]>();
     for (const [pluginName, list] of byPlugin)
-      out.set(
-        pluginName,
-        patchGroups(list, catalogue.items, plugins, appSettings.drawerPatchOrder),
-      );
+      out.set(pluginName, patchGroups(list, catalogue.items, appSettings.drawerPatchOrder));
     return out;
   });
 
