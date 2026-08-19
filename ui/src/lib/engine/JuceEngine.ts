@@ -1180,15 +1180,23 @@ export class JuceEngine implements EngineBridge {
     // still applied would overwrite this patch with another patch's mapping.
     this.settlePreview(moduleId);
     const mod = this.rack.find((m) => m.id === moduleId);
-    const existing = this.patches.find((p) => p.id === patchId);
-    const path = patchPath(patchId);
+    // A pack patch lives in the shared root, not the user's list, and is
+    // writable only where this machine carries the sources it was built from
+    // — a Debug build run out of the repo, which is what authoring one is.
+    // Everywhere else `devSource` is unset and this refuses, rather than
+    // quietly saving the pack's document somewhere else.
+    const shipped = this.shippedPatches.find((p) => p.id === patchId);
+    if (shipped && !shipped.devSource) return;
+    const root = shipped ? ('shared' as const) : undefined;
+    const existing = shipped ?? this.patches.find((p) => p.id === patchId);
+    const path = patchPath(patchId, root);
     if (!mod || !existing || !path) return;
     const tone = await this.captureModuleState(moduleId);
     // A failed capture keeps the tone already on disk rather than blanking it:
     // the mapping half is still an honest update, and silently dropping the
     // sound would be a worse answer than keeping the previous one. That is the
     // one path that has to read the file back — the tone is not held in memory.
-    const previous = tone ? null : await this.readPatch(patchId);
+    const previous = tone ? null : await this.readPatch(patchId, root);
     // Recapture the live mapping but keep the patch's identity: same id (so
     // whoever has it loaded stays pointed at it), same name, and the drawer
     // heading the user filed it under — storedFromModule knows nothing of the
@@ -1202,8 +1210,11 @@ export class JuceEngine implements EngineBridge {
       tone3000: existing.tone3000,
       ...(tone ?? { pluginVersion: previous?.pluginVersion, state: previous?.state }),
     };
-    this.patches = this.patches.map((p) => (p.id === patchId ? toPatch(patchId, doc) : p));
-    this.writePatch(path, doc);
+    const next = toPatch(patchId, doc, !!shipped, !!shipped);
+    if (shipped)
+      this.shippedPatches = this.shippedPatches.map((p) => (p.id === patchId ? next : p));
+    else this.patches = this.patches.map((p) => (p.id === patchId ? next : p));
+    this.writePatch(path, doc, root);
     this.retitleModule(moduleId, doc.name);
   }
 
@@ -1403,8 +1414,8 @@ export class JuceEngine implements EngineBridge {
 
   /** Fire-and-forget: the bridge is ordered, so a later read of this path is
       served after the write has landed. */
-  private writePatch(path: string, doc: StoredPatch): void {
-    void this.writeFile(path, JSON.stringify(doc, null, 2));
+  private writePatch(path: string, doc: StoredPatch, root?: 'shared'): void {
+    void this.writeFile(path, JSON.stringify(doc, null, 2), root);
     this.emitPatches();
   }
 
@@ -2760,13 +2771,20 @@ export class JuceEngine implements EngineBridge {
       The user's own are files in `patches/`; an installed pack's are folders at
       the top of the shared root, each holding its document and its assets. */
   private async readPatchDir(root?: 'shared'): Promise<Patch[]> {
-    const ids =
+    // Which of them the engine will accept a write for. Empty in a shipped
+    // build (nothing there has sources), so this is the whole gate: the page
+    // never asks what configuration it is running in.
+    const listing =
       root === 'shared'
-        ? sharedPatchIdsFrom(await this.listDirs('', root))
-        : patchIdsFrom(await this.listFiles(PATCH_DIR));
+        ? await this.listing('', 'dirs', root, 'writable')
+        : { names: patchIdsFrom(await this.listFiles(PATCH_DIR)), writable: [] };
+    const ids = root === 'shared' ? sharedPatchIdsFrom(listing.names) : listing.names;
+    const writable = new Set(listing.writable);
     const docs = await Promise.all(ids.map((id) => this.readPatch(id, root)));
     return docs
-      .flatMap((doc, i) => (doc ? [toPatch(ids[i]!, doc, root === 'shared')] : []))
+      .flatMap((doc, i) =>
+        doc ? [toPatch(ids[i]!, doc, root === 'shared', writable.has(ids[i]!))] : [],
+      )
       .sort(byName);
   }
 
@@ -3143,15 +3161,30 @@ export class JuceEngine implements EngineBridge {
     return this.listing(dir, 'dirs', root);
   }
 
-  private listing(dir: string, field: 'names' | 'dirs', root?: 'shared'): Promise<string[]> {
+  private listing(dir: string, field: 'names' | 'dirs', root?: 'shared'): Promise<string[]>;
+  private listing(
+    dir: string,
+    field: 'names' | 'dirs',
+    root: 'shared' | undefined,
+    also: 'writable',
+  ): Promise<{ names: string[]; writable: string[] }>;
+  private listing(
+    dir: string,
+    field: 'names' | 'dirs',
+    root?: 'shared',
+    also?: 'writable',
+  ): Promise<string[] | { names: string[]; writable: string[] }> {
+    const strings = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((name): name is string => typeof name === 'string') : [];
+
     return this.request('listFiles', { dir, root }).then(
       (data) =>
-        Array.isArray(data[field])
-          ? (data[field] as unknown[]).filter((name): name is string => typeof name === 'string')
-          : [],
+        also
+          ? { names: strings(data[field]), writable: strings(data[also]) }
+          : strings(data[field]),
       (error: unknown) => {
         console.error(`Failed to list ${field} in '${dir}'`, error);
-        return [];
+        return also ? { names: [], writable: [] } : [];
       },
     );
   }
@@ -3160,10 +3193,10 @@ export class JuceEngine implements EngineBridge {
       acknowledged a durable write; a negative acknowledgement, a dropped reply
       and a timeout all resolve false and raise the persistence notice. Anything
       that reports state as "saved" must await this. */
-  private async writeFile(path: string, text: string): Promise<boolean> {
+  private async writeFile(path: string, text: string, root?: 'shared'): Promise<boolean> {
     // No backend (browser dev) is not a failure: there is nothing to write to,
     // so `request` resolves {} and the absent `ok` reads as success.
-    const ok = await this.request('writeFile', { path, text }).then(
+    const ok = await this.request('writeFile', { path, text, root }).then(
       (d) => {
         if (d.ok === false) console.error(`Engine failed to write ${path}`);
         return d.ok !== false;

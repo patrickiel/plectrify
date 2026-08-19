@@ -1,9 +1,9 @@
 /**
  * Build, upload and re-pin every content pack Plectrify's own author made.
  *
- *   pnpm --dir packaging host -- --author amalgamaudio
- *   pnpm --dir packaging host -- --author amalgamaudio --id amalgam-jtm45
- *   pnpm --dir packaging host -- --author amalgamaudio --dry-run
+ *   pnpm --dir packaging host
+ *   pnpm --dir packaging host -- --id amalgam-jtm45
+ *   pnpm --dir packaging host -- --dry-run
  *
  * ONE SCRIPT FOR ALL OF THEM. A package is a folder of files in
  * `packaging/content/<id>/` plus the catalogue entry with the same id, and that
@@ -44,10 +44,15 @@
  * WHAT THIS IS NOT FOR. Anything with an upstream. `host-content` mirrors a
  * third party's freely-licensed files and `host-plugin` re-hosts a binary
  * somebody else compiled; both pin and re-verify a URL, and both answer a
- * licensing question this does not have to. Here the author is us — which is
- * exactly why `--author` is checked against every capture's `modeled_by`:
- * TONE3000's terms forbid redistributing tones obtained there, and the large
- * GPL-labelled .nam collection relicenses other people's captures wholesale.
+ * licensing question this does not have to. Here the author is us, and that is
+ * the whole rule: AUTHOR is a constant rather than a flag, checked against
+ * every capture's `modeled_by`, because TONE3000's terms forbid redistributing
+ * tones obtained there and the large GPL-labelled .nam collection relicenses
+ * other people's captures wholesale. A capture some other name trained is not
+ * ours to publish under any spelling of the flag, so there is nothing for one
+ * to say — `--author` only ever had one right answer, and a value that must
+ * never vary is not an argument. Renaming the author is editing this constant,
+ * which is also the review that deserves.
  *
  * IT IS SAFE TO RUN ANY TIME. The archive is reproducible (see pack.ts), so a
  * pack whose files have not changed hashes to what the catalogue already pins
@@ -85,6 +90,11 @@ const PROVENANCE = 'PROVENANCE.txt';
  *  level is itself a patch, rather than a pack containing some. */
 const PATCH_DOC = 'patch.json';
 
+/** Who made everything this script publishes. Recorded in every
+ *  PROVENANCE.txt, and the name each capture's own `modeled_by` must carry —
+ *  see the header for why that is a constant and not a flag. */
+const AUTHOR = 'Plectrify';
+
 /** What a never-published package pins until its first upload. `validate`
  *  requires a 64-character hex sha256, so a new entry cannot simply leave it
  *  out; zeroes are the one value that says "nothing is published here yet"
@@ -110,9 +120,6 @@ const { values } = parseArgs({
   options: {
     /** Packs to build. Defaults to every folder under packaging/content. */
     id: { type: 'string', multiple: true, default: [] },
-    /** Whoever made this content: recorded in every PROVENANCE.txt, and
-     *  checked against each capture's own `modeled_by`. */
-    author: { type: 'string' },
     /** Build and report, changing nothing anywhere. */
     'dry-run': { type: 'boolean', default: false },
     /** Override the automatic bump. Only needed for a version that is not a
@@ -123,8 +130,6 @@ const { values } = parseArgs({
   },
 });
 
-if (!values.author?.trim()) fail(SCRIPT, 'pass --author, whoever made this content.');
-const author = values.author.trim();
 
 const catalogue = JSON.parse(readFileSync(CATALOGUE, 'utf8')) as { packages: Entry[] };
 
@@ -304,7 +309,7 @@ function buildPack(entry: Entry, id: string, sourceDir: string, work: string): P
     console.log(`    staged ${to}`);
   }
 
-  const lines = [...header(entry, author), ''];
+  const lines = [...header(entry), ''];
   // Provenance is written per top-level entry, which is the unit a user sees
   // installed: one patch folder, or one loose capture.
   const stagedPaths = sources.map(({ to }) => to);
@@ -385,7 +390,7 @@ function escapeRegExp(text: string): string {
     Deliberately carries no version: this file is inside the archive, so a
     version here would change the hash that decides whether the version changes
     at all. Which edition of a pack a user has is the catalogue's answer. */
-function header(entry: Entry, author: string): string[] {
+function header(entry: Entry): string[] {
   const licence = entry.licenseId ?? 'an unstated licence';
   const title = `Plectrify content pack: ${entry.name ?? entry.id}`;
   switch (entry.installDir) {
@@ -393,7 +398,7 @@ function header(entry: Entry, author: string): string[] {
       return [
         title,
         '',
-        `Knob mappings and plugin tones authored by ${author}, released under`,
+        `Knob mappings and plugin tones authored by ${AUTHOR}, released under`,
         `${licence}. One patch is one folder: which parameters to put on knobs,`,
         "the plugin's own saved state, and any assets it loads. No plugin travels",
         'with it, and nothing here is loaded as code.',
@@ -402,13 +407,13 @@ function header(entry: Entry, author: string): string[] {
       return [
         title,
         '',
-        `Neural Amp Modeler captures trained by ${author}, who owns them and`,
+        `Neural Amp Modeler captures trained by ${AUTHOR}, who owns them and`,
         `releases them under ${licence}. Plectrify hosts them because they are the`,
         'work of the same person who publishes Plectrify - no third-party capture is',
         'redistributed here, and none ever should be.',
       ];
     default:
-      return [title, '', `Authored by ${author} and released under ${licence}.`];
+      return [title, '', `Authored by ${AUTHOR} and released under ${licence}.`];
   }
 }
 
@@ -453,10 +458,10 @@ function checkCapture(path: string, rel: string): void {
         'attribution identifies the author; restore it before packaging this capture.',
     );
   }
-  if (modeledBy.toLowerCase() !== author.toLowerCase()) {
+  if (modeledBy.toLowerCase() !== AUTHOR.toLowerCase()) {
     fail(
       SCRIPT,
-      `${rel} records modeled_by "${modeledBy}" but --author is "${author}". ` +
+      `${rel} records modeled_by "${modeledBy}", not "${AUTHOR}". ` +
         'Plectrify only hosts captures its own author trained; if this one is somebody ' +
         "else's, link to it instead of packaging it.",
     );

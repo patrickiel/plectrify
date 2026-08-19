@@ -272,7 +272,11 @@
                  and saving under a new name is the way to an editable copy. -->
               <span
                 class="mr-2 shrink-0 rounded bg-ink/10 px-1 py-px text-[.6rem] text-muted"
-                {@attach tooltip('Installed with a package')}>Pack</span
+                {@attach tooltip(
+                  p.devSource
+                    ? 'Installed with a package — the repo has its sources, so it can be re-saved'
+                    : 'Installed with a package',
+                )}>Pack</span
               >
             {:else}
               <button
@@ -312,13 +316,21 @@
          a tone tweaked in the plugin's own editor with no way to be
          re-captured. The dot means "the mapping drifted"; this button means
          "re-capture everything". -->
-    {#if activePatch && !activePatch.readOnly}
+    <!-- A pack patch is the one exception, and only where this machine carries
+         the sources it was built from (`devSource`): the write goes to those
+         sources in the repo, never to the installed copy, so re-saving one is
+         authoring it rather than editing somebody's installation. Says so on
+         the row — the same click means two different things. -->
+    {#if activePatch && (!activePatch.readOnly || activePatch.devSource)}
       <button
         type="button"
         class="block w-full rounded px-3 py-1.5 text-left text-xs text-ink/80 hover:bg-ink/10"
         onclick={update}
+        {@attach activePatch.devSource
+          ? tooltip('Writes packaging/content in the repo, not the installed pack')
+          : () => {}}
       >
-        Update “{activePatch.name}”
+        Update {activePatch.devSource ? 'pack source ' : ''}“{activePatch.name}”
       </button>
     {/if}
 

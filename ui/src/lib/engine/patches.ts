@@ -63,6 +63,9 @@ export interface StoredPatch {
   /** The drawer heading the user filed this patch under. See `Patch.category`;
       absent means the heading is derived from the catalogue instead. */
   category?: string;
+  /** Where this patch sorts within its drawer heading. See `Patch.order` —
+      a pack authoring field, absent from anything the app writes. */
+  order?: number;
   /** The plugin's version at capture time. Advisory — a plugin owns its own
       state versioning — but worth logging when a restore looks wrong. */
   pluginVersion?: string;
@@ -190,6 +193,7 @@ export function isStoredPatch(value: unknown): value is StoredPatch {
     Array.isArray(doc?.knobs) &&
     doc.knobs.every((k) => typeof k?.paramIndex === 'number' && typeof k?.label === 'string') &&
     (doc.category === undefined || typeof doc.category === 'string') &&
+    (doc.order === undefined || typeof doc.order === 'number') &&
     (doc.pluginVersion === undefined || typeof doc.pluginVersion === 'string') &&
     (doc.state === undefined || (typeof doc.state === 'string' && doc.state.length > 0)) &&
     // Same leniency as the union fields above, and it matters more here: a
@@ -204,7 +208,7 @@ export function isStoredPatch(value: unknown): value is StoredPatch {
     has no business sitting in memory all session. The card's look does come
     along, since loading a patch applies it in the same pass as the mapping —
     it is a couple of short strings, not a blob. */
-export function toPatch(id: string, doc: StoredPatch, readOnly = false): Patch {
+export function toPatch(id: string, doc: StoredPatch, readOnly = false, devSource = false): Patch {
   const patch: Patch = {
     id,
     name: doc.name,
@@ -216,9 +220,13 @@ export function toPatch(id: string, doc: StoredPatch, readOnly = false): Patch {
     texture: asModuleTexture(doc.texture),
     knobs: doc.knobs,
     category: doc.category,
+    order: typeof doc.order === 'number' && Number.isFinite(doc.order) ? doc.order : undefined,
     tone3000: isTone3000Provenance(doc.tone3000) ? doc.tone3000 : undefined,
   };
-  return readOnly ? { ...patch, readOnly: true } : patch;
+  if (!readOnly) return patch;
+  // Only ever together: a patch the repo has sources for is still a pack
+  // patch, and everything that reads `readOnly` must keep seeing one.
+  return devSource ? { ...patch, readOnly: true, devSource: true } : { ...patch, readOnly: true };
 }
 
 /** The card title a patch asks for when it lands on a module, or `undefined`
@@ -238,9 +246,17 @@ export function patchTitleOverride(
 
 /** Display order. A directory listing's order is the file system's business,
     so the list is sorted rather than inherited; the id breaks ties, since two
-    patches may share a name. */
+    patches may share a name.
+
+    An authored `order` comes first, which is how a pack ships its patches in
+    the order they were designed to read. Nothing the app writes carries one,
+    so an unnumbered patch sorts by name exactly as it always did — and since
+    the user's patches and the installed ones are sorted as separate lists and
+    only then concatenated (`mergePatches`), a numbered pack patch can never
+    jump ahead of a patch the user saved. */
 export function byName(a: Patch, b: Patch): number {
-  return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  const rank = (p: Patch) => p.order ?? Number.MAX_SAFE_INTEGER;
+  return rank(a) - rank(b) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 }
 
 /** What the UI sees: the user's own patches first, then anything installed.

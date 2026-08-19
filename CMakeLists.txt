@@ -360,6 +360,13 @@ target_compile_definitions(Plectrify PRIVATE
     # Gitignored like the rest of third_party/, and simply absent otherwise, in
     # which case the dev loop finds whatever is installed on the machine.
     $<$<CONFIG:Debug>:PLECTRIFY_BUNDLED_PLUGIN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/third_party/plugins">
+    # Debug-only: patch packs are read from their sources in the repo before
+    # the installed copy under the shared content root, so authoring one is
+    # "edit patch.json and restart" instead of build, publish, install. The
+    # override is per package id and read-only, exactly like the installed
+    # root it shadows; a pack with no folder here is unaffected. See the
+    # *Installed patches* section of AGENTS.md for the asset caveat.
+    $<$<CONFIG:Debug>:PLECTRIFY_CONTENT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/packaging/content">
     PLECTRIFY_CATALOGUE_URL="${PLECTRIFY_CATALOGUE_URL}"
     # TONE3000. The redirect URI differs per configuration because localhost is
     # always accepted for development, which keeps the dev loop independent of

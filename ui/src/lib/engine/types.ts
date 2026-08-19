@@ -275,11 +275,26 @@ export interface Patch {
       drawer tile, the module card and the patch dropdown all render it, and a
       missing-capture repair needs it — see `Tone3000Provenance`. */
   tone3000?: Tone3000Provenance;
+  /** The order this patch asks for within its drawer heading, ahead of the
+      name sort. Only ever authored — a pack numbers the patches it ships so
+      they read in the order they were designed to (a chorus before a delay
+      before three reverbs) rather than alphabetically. Absent sorts last, so
+      every patch the user saved, and every pack that numbers nothing, is
+      ordered exactly as before. Initial only: `orderPatchEntries` still lets
+      a hand drag override it. */
+  order?: number;
   /** Set on patches that came from an installed pack rather than from the user.
       They live under the shared package root, are never written to the user's
       patches directory, and cannot be renamed, updated or deleted — only
       duplicated into the user's own list. Absent on everything the user saved. */
   readOnly?: true;
+  /** Set on a pack patch whose *sources* this machine carries — a Debug build
+      run out of the repo, where `packaging/content/` holds the folder the pack
+      was built from. Such a patch can be re-saved from the app (the write goes
+      to those sources, never to the installed copy), which is what authoring
+      one looks like. Never set in a shipped build: nothing there has sources
+      to write back to. */
+  devSource?: true;
 }
 
 /** One VST3 plugin the host knows about — the choices the module drawer
