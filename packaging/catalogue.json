@@ -288,6 +288,19 @@
       "note": "Three dozen free effects - compressor, EQs, reverb, delay, chorus, phaser and more"
     },
     {
+      "category": "Pro freeware",
+      "tags": [
+        "Amps",
+        "Distortion",
+        "Modulation",
+        "Dynamics",
+        "EQ"
+      ],
+      "label": "Plugin Alliance free plugins",
+      "url": "https://www.plugin-alliance.com/pages/free-plugins",
+      "note": "bx_rockrack V3 Player, the bx pedals, bx_opto - needs an account and their Installation Manager"
+    },
+    {
       "category": "Open source",
       "tags": [
         "Multi-effect",
