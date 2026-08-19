@@ -340,6 +340,21 @@ describe('byName', () => {
       [p('b', 'Rhythm'), p('c', 'Lead'), p('a', 'Lead')].sort(byName).map((x) => x.id),
     ).toEqual(['a', 'c', 'b']);
   });
+
+  it('puts an authored order ahead of the name sort', () => {
+    const ordered = [
+      { ...p('plate', 'Plate'), order: 50 },
+      { ...p('chorus', 'Chorus'), order: 10 },
+      { ...p('hall', 'Concert Hall'), order: 30 },
+      { ...p('delay', 'Delay'), order: 20 },
+    ];
+    expect(ordered.sort(byName).map((x) => x.id)).toEqual(['chorus', 'delay', 'hall', 'plate']);
+  });
+
+  it('sorts an unnumbered patch behind every numbered one, by name', () => {
+    const mixed = [p('b', 'Alpha'), { ...p('a', 'Zulu'), order: 10 }, p('c', 'Beta')];
+    expect(mixed.sort(byName).map((x) => x.id)).toEqual(['a', 'b', 'c']);
+  });
 });
 
 describe('mergePatches', () => {
