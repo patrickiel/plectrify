@@ -259,6 +259,11 @@ set(PLECTRIFY_CATALOGUE_URL
 # *binaries*, an OAuth client id is app identity, and a build that cannot reach
 # R2 must still be able to sign in.
 #
+# The Debug URI's port is *not* the Vite dev server's (see scripts/devServer.ts)
+# and must not be made to follow it: this URI is registered against the client
+# id at TONE3000, and the window vetoes the navigation before it loads, so
+# nothing ever has to be listening there.
+#
 # The redirect URI only has to be *accepted* by TONE3000 and registered against
 # the key — the app intercepts the navigation before it loads, so it never has
 # to resolve. Localhost is allowed for development, which is why the two

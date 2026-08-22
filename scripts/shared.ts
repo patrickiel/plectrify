@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEV_SERVER_URL } from './devServer.ts';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -95,7 +96,7 @@ export function sha256File(path: string): string {
 }
 
 /** What is on the Vite dev port: 'free', Plectrify's 'vite', or 'foreign'.
-    A bare TCP connect is not enough — anything can hold 5173, and then the app
+    A bare TCP connect is not enough — anything can hold the port, and then the app
     renders the wrong UI, which reads as "the app is broken" rather than
     "wrong server". Verify both Vite's client module and the Plectrify
     application-name sentinel in the served index. fetch() resolves localhost
@@ -104,7 +105,7 @@ export function sha256File(path: string): string {
 export async function devServerStatus(): Promise<'free' | 'vite' | 'foreign'> {
   const probeUrl = async (path: string) => {
     try {
-      const response = await fetch(`http://localhost:5173${path}`, {
+      const response = await fetch(`${DEV_SERVER_URL}${path}`, {
         signal: AbortSignal.timeout(5000),
       });
       return response.ok ? await response.text() : null;

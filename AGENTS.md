@@ -104,7 +104,7 @@ pnpm app --plugin    # build the Debug VST3 and install it for this user's DAWs
                      #   (%LOCALAPPDATA%\Programs\Common\VST3 on Windows,
                      #   ~/Library/Audio/Plug-Ins/VST3 on macOS). Starts Vite
                      #   like the default loop; launch the DAW with
-                     #   PLECTRIFY_DEV_URL=http://localhost:5173 in its
+                     #   PLECTRIFY_DEV_URL=http://localhost:5273 in its
                      #   environment for live HMR. A Debug .vst3 needs no
                      #   staging — UI, catalogue and bundled plugins resolve
                      #   from the source tree. Note the copy step fails while a
@@ -181,12 +181,25 @@ cmake --build build --config Debug --target Plectrify
 
 ```sh
 pnpm install
-pnpm dev      # http://localhost:5173 — standalone against MockEngine
+pnpm dev      # http://localhost:5273 — standalone against MockEngine
 pnpm build    # emits ui/dist/ — the ship path
 pnpm check    # svelte-check type check
 pnpm format   # Prettier + Tailwind class sorting
 pnpm format:check # verify formatting without changing files
 ```
+
+The dev server's port is **5273, not Vite's default 5173**, declared once in
+`scripts/devServer.ts` and read by `ui/vite.config.ts` (with `strictPort`) as
+well as by both run scripts. 5173 is a port every Vite project on the machine
+competes for, so whichever dev server started first owns it and Plectrify's
+either lands on 5174 — where the dev loop is not looking — or, worse, the app
+loads someone else's UI. The loop could only detect that and refuse (it checks
+the served index for a Plectrify sentinel), which reports a collision rather
+than preventing one. `site/` keeps 5173, so the two halves of this repo no
+longer collide either. The one place that still names 5173 is the Debug
+TONE3000 redirect URI in `CMakeLists.txt`: it is a string the browser window
+intercepts and never fetches, and it is what is registered against the client
+id, so it is deliberately not the dev-server port.
 
 ### Website (`site/`)
 

@@ -11,6 +11,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { DEV_SERVER_PORT } from './devServer.ts';
 import { ROOT, capture, fail } from './shared.ts';
 
 export function assertWindows(script: string): void {
@@ -137,7 +138,7 @@ export async function startApp(
     the whole diagnosis. */
 export function devPortOwner(): string {
   const owner = powershell(
-    '$c = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; ' +
+    `$c = Get-NetTCPConnection -LocalPort ${DEV_SERVER_PORT} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; ` +
       'if ($c) { $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)" -ErrorAction SilentlyContinue; ' +
       'if ($p) { "pid $($c.OwningProcess) ($($p.Name)): $($p.CommandLine)" } else { "pid $($c.OwningProcess)" } }',
   ).output.trim();

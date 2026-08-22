@@ -4,7 +4,9 @@
  * run.macos.ts exactly:
  *
  *   pnpm app                    Default HMR loop: start the Vite dev server +
- *                               launch the app pointed at http://localhost:5173.
+ *                               launch the app pointed at Plectrify's own Vite
+ *                               port (see scripts/devServer.ts — not Vite's
+ *                               default, which every other project wants too).
  *                               Edit a .svelte file and it hot-reloads live
  *                               inside the real host. (Debug; real audio.)
  *   pnpm app --ui-only          Fast path: rebuild ui/dist + relaunch the exe,
@@ -44,6 +46,7 @@ import { parseArgs } from 'node:util';
 import {
   ROOT, TEST_TARGETS, devServerStatus, fail, fetchBundledPluginArchives, pnpm, run,
 } from './shared.ts';
+import { DEV_SERVER_PORT, DEV_SERVER_URL } from './devServer.ts';
 import {
   assertWindows,
   clearBuildMarker,
@@ -226,8 +229,9 @@ if (!existsSync(join(uiDir, 'node_modules'))) {
 let status = await devServerStatus();
 if (status === 'foreign') {
   fail(
-    "port 5173 is held by something that is not Plectrify's Vite dev server, so the app " +
-      `would load the wrong UI (WebView2 shows a bare error page). Stop it and retry.\n${devPortOwner()}`,
+    `port ${DEV_SERVER_PORT} is held by something that is not Plectrify's Vite dev server, so ` +
+      'the app would load the wrong UI (WebView2 shows a bare error page). Stop it and retry.\n' +
+      devPortOwner(),
   );
 }
 
@@ -240,9 +244,9 @@ if (status === 'free') {
     await new Promise((resolve) => setTimeout(resolve, 500));
     status = await devServerStatus();
   }
-  if (status !== 'vite') fail('Plectrify Vite dev server did not come up on http://localhost:5173');
+  if (status !== 'vite') fail(`Plectrify Vite dev server did not come up on ${DEV_SERVER_URL}`);
 } else {
-  console.log('==> Plectrify Vite dev server already running on :5173');
+  console.log(`==> Plectrify Vite dev server already running on :${DEV_SERVER_PORT}`);
 }
 
 stageBundledPlugins();
@@ -261,10 +265,10 @@ if (values.plugin) {
   installPluginForHosts();
   console.log(`
 ==> Debug Plectrify.vst3 installed for this user's DAWs.
-    The Vite dev server is running on http://localhost:5173. For live HMR the
+    The Vite dev server is running on ${DEV_SERVER_URL}. For live HMR the
     DAW must inherit PLECTRIFY_DEV_URL — e.g. from PowerShell:
 
-      $env:PLECTRIFY_DEV_URL = 'http://localhost:5173'; & 'C:\\path\\to\\your\\DAW.exe'
+      $env:PLECTRIFY_DEV_URL = '${DEV_SERVER_URL}'; & 'C:\\path\\to\\your\\DAW.exe'
 
     Launched plainly, the plugin serves the last-built ui/dist instead.`);
   process.exit(0);
@@ -274,7 +278,7 @@ stopApp();
 nativeBuild(cmake, 'Plectrify');
 
 if (!values['no-run']) {
-  await startApp(config, { PLECTRIFY_DEV_URL: 'http://localhost:5173' }, ' (UI from http://localhost:5173, HMR live)');
+  await startApp(config, { PLECTRIFY_DEV_URL: DEV_SERVER_URL }, ` (UI from ${DEV_SERVER_URL}, HMR live)`);
 } else {
   console.log(`Built: ${exePath(config)} (dev-server mode)`);
 }
