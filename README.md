@@ -41,10 +41,6 @@
 A free guitar rig for Windows and macOS. Plug in and play through your own
 VST3 amp sims and pedals. No DAW, no session to set up.
 
-```
-GUITAR IN  →  [ drive ]  →  [ amp sim ]  →  [ reverb ]  →  OUT
-```
-
 Reorder, bypass and swap modules like pedals on a board. It runs live, at the
 lowest latency your interface can do.
 
