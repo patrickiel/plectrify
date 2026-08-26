@@ -85,10 +85,9 @@
 <!-- ── Hero ─────────────────────────────────────────────────────────────── -->
 <section class="relative overflow-hidden px-5 pt-20 pb-14 sm:px-8 sm:pt-28">
   <div class="mx-auto max-w-3xl text-center">
-    <p class="eyebrow">For guitarists · Practice and stage</p>
-    <h1 class="mt-5 text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+    <h1 class="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
       Your pedalboard,<br class="hidden sm:inline" />
-      <span class="text-accent [text-shadow:var(--text-shadow-glow-accent)]">without the DAW.</span>
+      <span class="text-accent text-shadow-(--text-shadow-glow-accent)">without the DAW.</span>
     </h1>
     <!-- The TONE3000 sentence lives here rather than in site.ts because it ends
          in their wordmark, which is markup. First appearance of the mark on the
@@ -134,7 +133,7 @@
        reflow the section once it lands. -->
   <div class="mx-auto mt-16 max-w-6xl sm:mt-20">
     <div
-      class="rounded-control-lg relative overflow-hidden bg-[var(--color-panel-solid)] shadow-[var(--shadow-panel)]"
+      class="rounded-control-lg relative overflow-hidden bg-panel-solid shadow-(--shadow-panel)"
     >
       <img
         src={screenshotRack}
@@ -264,7 +263,7 @@
      centred stack of small lines under one button. -->
 <section id="download" class="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-24">
   <div class="mx-auto max-w-6xl">
-    <div class="surface relative overflow-hidden shadow-[var(--shadow-glow-accent-lg)]">
+    <div class="surface relative overflow-hidden shadow-(--shadow-glow-accent-lg)">
       <div
         class="absolute inset-x-0 top-0 h-px"
         style="background: linear-gradient(90deg, transparent, var(--color-accent), transparent)"
@@ -300,7 +299,7 @@
         </div>
       </div>
 
-      <div class="border-t border-[color:var(--edge-hair)] px-7 py-4 sm:px-12">
+      <div class="border-t border-control-edge-hair px-7 py-4 sm:px-12">
         <p class="text-muted flex items-center gap-2.5 text-sm">
           <span class="bg-accent size-1.5 shrink-0 rounded-full" aria-hidden="true"></span>
           <span>
