@@ -20,12 +20,12 @@ A line under the button tells you where it landed.
 
 ## What is in it
 
-| In the backup | Not in the backup |
-| --- | --- |
-| Your saved rigs | Plugins you installed from Packages |
-| Your patches, with their knob mappings and tone | Tones you downloaded from TONE3000 |
-| Songs, setlists and MIDI bindings | Loop recordings |
-| Preferences — theme, zoom, standby, tuner | This computer's audio device settings |
+| In the backup                                   | Not in the backup                     |
+| ----------------------------------------------- | ------------------------------------- |
+| Your saved rigs                                 | Plugins you installed from Packages   |
+| Your patches, with their knob mappings and tone | Tones you downloaded from TONE3000    |
+| Songs, setlists and MIDI bindings               | Loop recordings                       |
+| Preferences — theme, zoom, standby, tuner       | This computer's audio device settings |
 
 The right-hand column is deliberate rather than an oversight.
 

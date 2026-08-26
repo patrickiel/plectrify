@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DOWNLOADS, RELEASES_URL } from '$lib/site';
+  import { DOWNLOADS } from '$lib/site';
 
   /**
    * Both platforms, always both shown, but the one that will actually run on
@@ -51,17 +51,13 @@
         {/if}
         <span class="label">
           <span class="title">Download for {dl.os}</span>
-          <span class="req">{dl.requirement}</span>
         </span>
       </a>
     {/each}
-    <!-- No version number. It is the one fact here that nobody needs before
+    <!-- No version number and no releases link. Nobody needs either before
          clicking (the button already points at the current release), and
-         printing it turns a call to action into a changelog line. Whoever does
-         care is after the release notes, which is what the link is. Lives
-         inside the row so that when one platform is demoted to a quiet link,
-         this joins it on the same line instead of adding another. -->
-    <a class="rel" href={RELEASES_URL} rel="noreferrer noopener" target="_blank">all releases</a>
+         printing them turns a call to action into a changelog line. Whoever
+         does want past versions has the footer's Releases link. -->
   </div>
 
   <!-- The macOS build is not notarized, so the first launch is refused and the
@@ -99,22 +95,6 @@
       flex-wrap: wrap;
       justify-content: center;
     }
-  }
-
-  /* --ink-quiet, not --ink-off: 28% white on near-black is under 2.5:1, which is
-     decorative contrast on text that is not decoration. With no OS detected it
-     takes the whole row, a quiet line under the pair of buttons. */
-  .rel {
-    flex-basis: 100%;
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
-    color: var(--color-accent);
-    text-align: center;
-  }
-
-  .rel:hover {
-    text-decoration: underline;
   }
 
   /* ── Resting state: neither platform detected, so neither leads ─────────── */
@@ -163,14 +143,6 @@
     font-size: 0.875rem;
   }
 
-  .req {
-    display: block;
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    letter-spacing: 0.06em;
-    color: var(--ink-quiet);
-  }
-
   /* ── Promoted: the build that runs on this machine ──────────────────────
      A solid accent fill, and `order: -1` so it comes first in both the row and
      the stacked column. Colour alone is never the signal: the button says
@@ -200,47 +172,28 @@
     color: var(--color-accent-ink);
   }
 
-  :global(:root[data-os='windows']) .dl[data-platform='windows'] .req,
-  :global(:root[data-os='macos']) .dl[data-platform='macos'] .req {
-    color: color-mix(in srgb, var(--color-accent-ink) 70%, transparent);
-  }
-
   /* ── Demoted: the other platform, reduced to a link underneath ───────────
      Once we know which build runs on this machine, the other one is a footnote
      rather than a second call to action. The non-matching entry drops its
      border, fill and padding to read as a plain quiet link below the button.
 
      It keeps its glyph, because this is still the control someone downloading
-     for their *other* machine clicks, but it drops the requirement text. On the
-     promoted button that line answers "will this run here"; on the demoted one it
-     cannot, since the machine it describes is not the one reading, and a second
-     mono chip beside a quiet link is the noisiest thing in the hero for the least
-     said. The requirement still travels with the file, on the releases page.
+     for their *other* machine clicks. The system requirements travel with the
+     file, on the releases page, rather than under the button.
 
      The transparent border rather than `border: 0` is deliberate: it holds the
      same box size, so switching states never nudges the layout.
 
-     A grid rather than a column, so the demoted link and the releases link
-     share the second line: the promoted button spans both columns above them,
-     and a separator dot appears between the pair. */
+     A grid rather than a column: the promoted button sets the column, and the
+     demoted link is centred under it rather than hugging its left edge. */
   :global(:root[data-os='windows']) .row,
   :global(:root[data-os='macos']) .row {
     display: grid;
-    grid-template-columns: auto auto;
+    grid-template-columns: auto;
     align-items: center;
     justify-content: center;
-    gap: 0.85rem 0.5rem;
-  }
-
-  :global(:root[data-os='windows']) .rel,
-  :global(:root[data-os='macos']) .rel {
-    text-align: left;
-  }
-
-  :global(:root[data-os='windows']) .rel::before,
-  :global(:root[data-os='macos']) .rel::before {
-    content: '· ';
-    color: var(--ink-quiet);
+    justify-items: center;
+    gap: 0.85rem;
   }
 
   :global(:root[data-os='windows']) .dl[data-platform='macos'],
@@ -257,11 +210,6 @@
     width: 0.85rem;
     height: 0.85rem;
     color: var(--ink-off);
-  }
-
-  :global(:root[data-os='windows']) .dl[data-platform='macos'] .req,
-  :global(:root[data-os='macos']) .dl[data-platform='windows'] .req {
-    display: none;
   }
 
   :global(:root[data-os='windows']) .dl[data-platform='macos'] .title,

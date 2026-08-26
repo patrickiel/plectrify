@@ -2,6 +2,7 @@
   import { DESCRIPTION, IDENTITY, PRODUCT, TAGLINE, VIDEO } from '$lib/site';
   import DownloadButtons from '$lib/components/DownloadButtons.svelte';
   import VideoEmbed from '$lib/components/VideoEmbed.svelte';
+  import Knob from '$lib/components/Knob.svelte';
   import tone3000Logo from '$lib/assets/tone3000-logo.svg';
   import screenshotRack from '$lib/assets/screenshot-rack.png';
 
@@ -11,42 +12,47 @@
      be literally true of the shipping app: "amps included" was cut when the
      starter amps stopped being bundled.
 
-     Each card leads with an icon so the grid scans without reading. The icons
-     are lucide.dev strokes (ISC licence), inlined so the page stays
-     self-contained; `icon` is the inner markup of a 24×24 stroke SVG. The
-     TONE3000 card carries their wordmark instead. The artwork is their
-     trademark, reproduced verbatim (this dark page is the ground it was drawn
-     for), and this is its first appearance on the site, which their integration
-     rules require to be the full logo rather than the compact T3K mark. */
-  const features: { title: string; body: string; icon?: string }[] = [
+     Each card leads with a vignette rather than an icon. A stroke icon from a
+     general-purpose set says "feature card" and nothing about this product; a
+     fragment of the rack drawn in the app's own idiom (mono readouts, module
+     chips, knobs, lanes) says what the card is about before the title is read,
+     and it could only belong to this page. `art` names the snippet below that
+     draws it. The TONE3000 card carries their wordmark instead. The artwork is
+     their trademark, reproduced verbatim (this dark page is the ground it was
+     drawn for), and this is its first appearance on the site, which their
+     integration rules require to be the full logo rather than the compact T3K
+     mark. */
+  type Art = 'latency' | 'chain' | 'tone3000' | 'split' | 'knobs' | 'rigs';
+  const features: { title: string; body: string; art: Art }[] = [
     {
       title: 'Low latency',
       body: 'ASIO on Windows, CoreAudio on macOS. Plug in and play in real time.',
-      icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />',
+      art: 'latency',
     },
     {
       title: 'Your plugins, any order',
       body: 'Runs your own VST3 amps and effects, from any maker, in any chain you like.',
-      icon: '<rect width="7" height="7" x="14" y="3" rx="1" /><path d="M10 21V8a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H3" />',
+      art: 'chain',
     },
     {
       title: 'Thousands of amp captures',
       body: 'Load a capture of a real amp from the TONE3000 library, right inside the app.',
+      art: 'tone3000',
     },
     {
       title: 'Two amps at once',
       body: 'Split the chain into parallel paths, each with its own volume, pan, mute and solo.',
-      icon: '<path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" /><path d="m15 9 6-6" />',
+      art: 'split',
     },
     {
       title: 'Only the controls you use',
       body: 'Map the few knobs you actually reach for, and hide the rest of the plugin.',
-      icon: '<line x1="21" x2="14" y1="4" y2="4" /><line x1="10" x2="3" y1="4" y2="4" /><line x1="21" x2="12" y1="12" y2="12" /><line x1="8" x2="3" y1="12" y2="12" /><line x1="21" x2="16" y1="20" y2="20" /><line x1="12" x2="3" y1="20" y2="20" /><line x1="14" x2="14" y1="2" y2="6" /><line x1="8" x2="8" y1="10" y2="14" /><line x1="16" x2="16" y1="18" y2="22" />',
+      art: 'knobs',
     },
     {
       title: 'Save and recall',
       body: 'Save rigs and patches, load them any time. Your last session restores on launch.',
-      icon: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /><path d="M7 3v4a1 1 0 0 0 1 1h7" />',
+      art: 'rigs',
     },
   ];
 
@@ -54,21 +60,25 @@
      given a section of its own, because "can I practise with this" and "can I
      gig with this" are questions a card in the feature grid does not answer
      convincingly. Every item listed ships in the sidebar today; see
-     ui/src/features/. */
-  const occasions = [
+     ui/src/features/. Text only, unlike the feature cards: vignettes (a
+     metronome, the Perform switch) and player pictograms were both tried here
+     and dropped, since an occasion is not a thing to draw a still of. */
+  const occasions: {
+    title: string;
+    body: string;
+    items: string[];
+  }[] = [
     {
-      kicker: 'At home',
-      title: 'Everything you need to practice',
+      title: 'At home',
       body: 'Tune up, set a tempo and loop a passage until you have it, all without leaving your rig.',
       items: ['Tuner', 'Metronome with tap tempo', 'Looper'],
     },
     {
-      kicker: 'On stage',
-      title: 'Ready to play live',
+      title: 'On stage',
       body:
         'Put your songs in a setlist, and each one loads its rig. Step through the set with a ' +
         'MIDI footswitch.',
-      items: ['Songs and setlists', 'Scenes', 'MIDI learn', 'Stage view'],
+      items: ['Songs and setlists', 'Scenes', 'MIDI learn'],
     },
   ];
 </script>
@@ -93,8 +103,8 @@
          in their wordmark, which is markup. First appearance of the mark on the
          page, so it is the full logo, per their integration rules. -->
     <p class="text-ink mx-auto mt-6 max-w-xl text-lg font-medium text-balance sm:text-xl">
-      {IDENTITY}
-      Loads thousands of real amp captures from
+      {IDENTITY}<br />
+      Thousands of amp captures from
       <img
         src={tone3000Logo}
         alt="TONE3000"
@@ -132,9 +142,7 @@
        page's largest element and its LCP, so it must neither be deferred nor
        reflow the section once it lands. -->
   <div class="mx-auto mt-16 max-w-6xl sm:mt-20">
-    <div
-      class="rounded-control-lg relative overflow-hidden bg-panel-solid shadow-(--shadow-panel)"
-    >
+    <div class="rounded-control-lg bg-panel-solid relative overflow-hidden shadow-(--shadow-panel)">
       <img
         src={screenshotRack}
         alt="The Plectrify rack: a chorus and an overdrive feeding three parallel amp lanes, then a reverb, each module showing only its mapped knobs"
@@ -161,34 +169,29 @@
 <section id="features" class="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-24">
   <div class="mx-auto max-w-6xl">
     <div class="max-w-2xl">
-      <p class="eyebrow">Features</p>
-      <h2 class="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-        A pedalboard on your screen.
-      </h2>
+      <h2 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Features</h2>
     </div>
 
-    <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {#each features as feature (feature.title)}
         <article class="surface surface-hover p-6">
-          <!-- One fixed-height icon row on every card, so titles and bodies
-               align across the grid whether the slot holds a 24 px icon or the
-               wider TONE3000 wordmark. -->
-          <div class="flex h-9 items-center" aria-hidden="true">
-            {#if feature.icon}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.75"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="text-accent size-6"
-              >
-                {@html feature.icon}
-              </svg>
+          <!-- One fixed-height vignette row on every card, so titles and bodies
+               align across the grid whatever the slot holds. Decorative: every
+               vignette restates its card's title, so it is hidden from
+               assistive tech rather than described twice. -->
+          <div class="flex h-16 items-center" aria-hidden="true">
+            {#if feature.art === 'latency'}
+              {@render latency()}
+            {:else if feature.art === 'chain'}
+              {@render chain()}
+            {:else if feature.art === 'tone3000'}
+              <img src={tone3000Logo} alt="" class="h-[1.1rem] w-auto select-none" />
+            {:else if feature.art === 'split'}
+              {@render split()}
+            {:else if feature.art === 'knobs'}
+              {@render knobs()}
             {:else}
-              <img src={tone3000Logo} alt="TONE3000" class="h-[1.1rem] w-auto select-none" />
+              {@render rigs()}
             {/if}
           </div>
           <h3 class="text-ink mt-4 text-[1.05rem] font-semibold tracking-tight">{feature.title}</h3>
@@ -199,21 +202,124 @@
   </div>
 </section>
 
+<!-- ── Feature vignettes ────────────────────────────────────────────────────
+     Each is a still of one corner of the rack, in the app's own tokens. Static
+     on purpose, like the Knob: the page is a picture of the product, not a copy
+     of it. -->
+
+<!-- The status bar's readout. 64 samples at 48 kHz is 1.3 ms, so the number is
+     arithmetic rather than a benchmark; the rate is left off, since it is the
+     buffer a guitarist reads. -->
+{#snippet latency()}
+  <div class="flex items-baseline gap-3">
+    <span
+      class="text-accent font-mono text-2xl font-semibold tabular-nums text-shadow-(--text-shadow-glow-accent-sm)"
+    >
+      1.3<span class="ml-1 text-sm">ms</span>
+    </span>
+    <span class="text-control-quiet font-mono text-[0.62rem] tracking-[0.08em] uppercase">
+      64 samples
+    </span>
+  </div>
+{/snippet}
+
+<!-- Three modules in a chain, the middle one lifted mid-drag. -->
+{#snippet chain()}
+  <div class="flex items-center">
+    {@render chip('Drive')}
+    {@render wire()}
+    <span
+      class="rounded-control-xs border-accent text-accent -translate-y-1.5 rotate-[-3deg] border bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] px-2.5 py-1 font-mono text-[0.62rem] font-semibold tracking-[0.08em] uppercase shadow-(--shadow-glow-accent-sm)"
+    >
+      Amp
+    </span>
+    {@render wire()}
+    {@render chip('Reverb')}
+  </div>
+{/snippet}
+
+<!-- One input fanning into two lanes and summing again: the docs' signal-flow
+     diagram, drawn instead of typed. -->
+{#snippet split()}
+  <div class="flex items-center">
+    <svg
+      width="34"
+      height="56"
+      viewBox="0 0 34 56"
+      fill="none"
+      stroke="var(--edge-hover)"
+      stroke-width="1.25"
+    >
+      <path d="M0 28 H10 C18 28 18 12 26 12 H34" />
+      <path d="M10 28 C18 28 18 44 26 44 H34" />
+    </svg>
+    <div class="flex flex-col gap-2">
+      {@render chip('Amp A')}
+      {@render chip('Amp B')}
+    </div>
+    <svg
+      width="34"
+      height="56"
+      viewBox="0 0 34 56"
+      fill="none"
+      stroke="var(--edge-hover)"
+      stroke-width="1.25"
+    >
+      <path d="M0 12 H8 C16 12 16 28 24 28 H34" />
+      <path d="M0 44 H8 C16 44 16 28 24 28" />
+    </svg>
+  </div>
+{/snippet}
+
+<!-- Two mapped knobs: the whole module card, as far as the player is concerned. -->
+{#snippet knobs()}
+  <div class="flex items-end gap-4">
+    <Knob label="Gain" value={0.68} size={40} />
+    <Knob label="Tone" value={0.42} size={40} />
+  </div>
+{/snippet}
+
+<!-- The rig list, one row selected. -->
+{#snippet rigs()}
+  <ul class="flex w-full max-w-[13rem] flex-col gap-1 font-mono text-[0.68rem] tracking-[0.04em]">
+    <li
+      class="rounded-control-xs text-ink flex items-center gap-2 bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] px-2 py-1"
+    >
+      <span class="bg-accent size-1.5 rounded-full shadow-(--shadow-glow-accent-sm)"></span>
+      Clean Twin
+    </li>
+    <li class="text-control-quiet flex items-center gap-2 px-2 py-0.5">
+      <span class="border-control-edge size-1.5 rounded-full border"></span>
+      Doom Stack
+    </li>
+  </ul>
+{/snippet}
+
+{#snippet chip(label: string)}
+  <span
+    class="rounded-control-xs border-control-edge text-control-body border bg-[var(--fill-rest)] px-2.5 py-1 font-mono text-[0.62rem] font-semibold tracking-[0.08em] uppercase"
+  >
+    {label}
+  </span>
+{/snippet}
+
+{#snippet wire()}
+  <span class="bg-control-edge-hover h-px w-3"></span>
+{/snippet}
+
 <!-- ── Practice and stage ───────────────────────────────────────────────── -->
 <section id="practice" class="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-24">
   <div class="mx-auto max-w-6xl">
     <div class="max-w-2xl">
-      <p class="eyebrow">Practice and performance</p>
-      <h2 class="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-        One rig, from bedroom to stage.
+      <h2 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        Practice and performance
       </h2>
     </div>
 
-    <div class="mt-12 grid gap-4 lg:grid-cols-2">
-      {#each occasions as occasion (occasion.kicker)}
+    <div class="mt-8 grid gap-4 lg:grid-cols-2">
+      {#each occasions as occasion (occasion.title)}
         <article class="surface surface-hover flex flex-col p-7">
-          <p class="eyebrow">{occasion.kicker}</p>
-          <h3 class="text-ink mt-3.5 text-xl font-semibold tracking-tight text-balance">
+          <h3 class="text-ink text-xl font-semibold tracking-tight text-balance">
             {occasion.title}
           </h3>
           <p class="text-muted mt-3 leading-relaxed text-pretty">{occasion.body}</p>
@@ -242,11 +348,8 @@
        it replaced: an inconsistent left edge reads as a mistake where a centred
        block reads as a choice. -->
   <div class="mx-auto max-w-6xl">
-    <div class="mb-10 max-w-2xl">
-      <p class="eyebrow">Demo</p>
-      <h2 class="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-        Watch it work.
-      </h2>
+    <div class="mb-6 max-w-2xl">
+      <h2 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Demo</h2>
     </div>
     <VideoEmbed id={VIDEO.youtubeId} title={VIDEO.title} />
   </div>
@@ -272,10 +375,7 @@
 
       <div class="grid gap-10 p-7 sm:p-12 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-16">
         <div class="max-w-xl">
-          <p class="eyebrow">Download</p>
-          <h2 class="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            Free, open source, and yours to keep.
-          </h2>
+          <h2 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Download</h2>
           <p class="text-muted mt-4 leading-relaxed text-pretty">
             {PRODUCT} is free, now and for every future release. Bring your own VST3 plugins, or play
             amp captures from TONE3000.
@@ -299,7 +399,7 @@
         </div>
       </div>
 
-      <div class="border-t border-control-edge-hair px-7 py-4 sm:px-12">
+      <div class="border-control-edge-hair border-t px-7 py-4 sm:px-12">
         <p class="text-muted flex items-center gap-2.5 text-sm">
           <span class="bg-accent size-1.5 shrink-0 rounded-full" aria-hidden="true"></span>
           <span>

@@ -26,7 +26,7 @@ export const TAGLINE = 'Your pedalboard, without the DAW.';
  * padding. The TONE3000 sentence that completes the paragraph lives in
  * +page.svelte because it ends in their wordmark, which is markup.
  */
-export const IDENTITY = 'Chain your VST3 amp sims and pedals, plug in, and play.';
+export const IDENTITY = 'Chain your VST plugins and play.';
 
 /**
  * The `<meta name="description">` text, which is a different job from LEAD: it
@@ -73,8 +73,6 @@ export type Platform = 'windows' | 'macos';
 export interface Download {
   platform: Platform;
   os: string;
-  /** Shown under the button: what the user needs to know before clicking. */
-  requirement: string;
   file: string;
   url: string;
 }
@@ -85,14 +83,12 @@ export const DOWNLOADS: Download[] = [
   {
     platform: 'windows',
     os: 'Windows',
-    requirement: 'Windows 10 or 11, 64-bit',
     file: `${ASSET_BASE}-${VERSION}-win-x64-setup.exe`,
     url: asset(`${ASSET_BASE}-${VERSION}-win-x64-setup.exe`),
   },
   {
     platform: 'macos',
     os: 'macOS',
-    requirement: 'Apple Silicon, macOS 13.3+',
     file: `${ASSET_BASE}-${VERSION}-macos-arm64.pkg`,
     url: asset(`${ASSET_BASE}-${VERSION}-macos-arm64.pkg`),
   },
