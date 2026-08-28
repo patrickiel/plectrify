@@ -180,6 +180,7 @@ export const TEST_TARGETS = [
   'PlectrifyRackTests',
   'PlectrifyLooperTests',
   'PlectrifyCatalogueTests',
+  'PlectrifyBackupTests',
   'PlectrifyNamStateTests',
   'PlectrifyTone3000AuthTests',
   'PlectrifyTone3000LibraryTests',
