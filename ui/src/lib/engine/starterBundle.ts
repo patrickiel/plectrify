@@ -51,7 +51,8 @@ export function decideStarterAutoInstall(
 
   // Skip what this platform is not offered: the bundle is one list of ids for
   // every OS, and queueing an install that cannot succeed would turn a silent
-  // first run into a failed one. (macOS is offered two of the five.)
+  // first run into a failed one. (macOS is offered five of the eight — the two
+  // Lupex pedals publish no mac build at all, so it gets no modulation.)
   const install = catalogue.items
     .filter((item) => bundle.packageIds.includes(item.id) && item.available && !item.installed)
     .map((item) => item.id);
