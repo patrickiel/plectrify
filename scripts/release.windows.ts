@@ -1,12 +1,14 @@
 /**
  * Build and package a local Plectrify Windows x64 release.
  *
+ *   pnpm release:build                          build + package only, publishing nothing
  *   pnpm release                                step 1 — build + publish the pre-release
  *   pnpm release:promote                        step 3 — promote it to latest
- *   pnpm release:windows                        build + package only, publishing nothing
  *
- * The first two are release.ts dispatching here with --pre-release / --promote;
- * this script is what you call directly when you want neither.
+ * All three are release.ts dispatching here — with nothing, --pre-release and
+ * --promote respectively. The commands are named for the job rather than for
+ * the machine (there is no `release:windows` any more): on the Mac the same two
+ * first names reach release.macos.ts instead.
  *
  * Publishing is deliberately opt-in. The normal path builds and packages
  * locally; --pre-release additionally creates an annotated tag and a GitHub
@@ -601,7 +603,7 @@ ${sourceReleaseUrl}
 SHA-256: ${sourceHash}
 
 If this is a locally built package that has not been published, run
-'pnpm release:windows' from the release commit; it creates ${sourceArchiveName}
+'pnpm release' from the release commit; it creates ${sourceArchiveName}
 beside the installer.
 
 THIRD-PARTY PLUGINS

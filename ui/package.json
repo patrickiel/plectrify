@@ -18,7 +18,7 @@
     "app:dist": "pnpm --dir .. app --dist",
     "release": "pnpm --dir .. release",
     "release:promote": "pnpm --dir .. release:promote",
-    "release:build": "pnpm --dir .. release:windows"
+    "release:build": "pnpm --dir .. release:build"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",

@@ -2,14 +2,18 @@
  * Build, sign, notarize and publish the macOS release artifact — the mac
  * counterpart of release.windows.ts, which stays the Windows pipeline untouched.
  *
- *   pnpm release                              build + sign + notarize + upload
- *   pnpm release --ad-hoc                     build + ad-hoc sign + upload (no Apple account)
- *   pnpm release --no-upload                  rehearse locally (still signs/notarizes)
- *   pnpm release --no-notarize --no-upload    fast local packaging check
- *   pnpm release --skip-tests --no-upload     iterate on packaging problems only
+ *   pnpm release:build                        build + ad-hoc sign locally, publishing nothing
+ *   pnpm release                              build + ad-hoc sign + upload (no Apple account)
+ *   pnpm release --developer-id               build + sign + notarize + upload
+ *   pnpm release:build --developer-id         rehearse locally (still signs/notarizes)
+ *   pnpm release:build --skip-tests           iterate on packaging problems only
  *
- * `pnpm release` is release.ts, which dispatches here on macOS and to
- * release.windows.ts on Windows; this file is the mac half of that one command.
+ * Those are release.ts, which dispatches here on macOS and to
+ * release.windows.ts on Windows; this file is the mac half of those commands,
+ * and it is the dispatcher that supplies --ad-hoc (the default while Plectrify
+ * has no Apple Developer Program membership) and the --no-upload that makes a
+ * build local. This script's own flags are unchanged and mean what they always
+ * did: --developer-id is release.ts's, and never reaches here.
  *
  * THE MAC ARTIFACT RIDES THE WINDOWS RELEASE. Step 1 on the Windows box creates
  * the tag, the GitHub pre-release, and the AGPL corresponding-source archive;
