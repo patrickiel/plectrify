@@ -448,10 +448,11 @@ slug, and **no platform is the default**:
 
 Keys are written alphabetically so the file cannot be read as "Windows, plus
 some others". The slugs are `linux-x64`, `macos-arm64` and `windows-x64`
-(`ASSET_PLATFORMS`); no package carries a `linux-x64` asset yet, so Linux sees
-every row greyed until entries gain one — pinned by hand from an upstream
-build that unzips to a `.vst3` (`build-plugin`/`host-plugin` have no Linux
-route). At least one is required — a package offered nowhere is not a
+(`ASSET_PLATFORMS`). A `linux-x64` asset is pinned by hand from an upstream
+build that unzips to a `.vst3` — `build-plugin`/`host-plugin` have no Linux
+route yet, which is why Surge XT and Dragonfly (tarballs upstream) are not
+offered there. No patch pack has a Linux folder yet either: each must be
+authored against `/var/lib/Plectrify`. At least one is required — a package offered nowhere is not a
 package — and a platform with no entry is not offered it: the row renders
 greyed with install disabled, visible rather than hidden, so the catalogue never
 looks quietly thinner per OS. Selection is one map lookup of
