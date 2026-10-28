@@ -2,7 +2,7 @@
 
 #include "PluginManager.h"
 
-#if JUCE_MAC
+#if JUCE_MAC || JUCE_LINUX
  #include <sys/stat.h>
 #endif
 
@@ -128,7 +128,7 @@ bool isAvailableHere (const std::vector<CataloguePackage>& packages,
 
 } // namespace
 
-/** Create a content package's directory, and on macOS give it — and every level
+/** Create a content package's directory, and on macOS and Linux give it — and every level
     of the shared content root above it — the mode /Users/Shared itself carries:
     writable by every account, sticky so each can still only remove what it owns.
 
@@ -138,7 +138,8 @@ bool isAvailableHere (const std::vector<CataloguePackage>& packages,
     installDir beneath it, and no second account could add a package there — or
     another patch beside an existing one — without elevation. ProgramData's
     inherited ACL already gives the Windows build exactly these rights, which is
-    why that branch needs nothing.
+    why that branch needs nothing. Linux behaves like macOS below the root,
+    which its installer has already created 1777 (see contentRootDirectory).
 
     Every level, because a 0755 root blocks a writable child just as thoroughly.
     And only ever widening: chmod on a directory another account created fails,
@@ -150,7 +151,7 @@ void CatalogueInstaller::createSharedContentDirectory (const juce::File& directo
 {
     directory.createDirectory();
 
-   #if JUCE_MAC
+   #if JUCE_MAC || JUCE_LINUX
     const auto root = CatalogueInstaller::contentRootDirectory();
 
     for (auto level = directory; level == root || level.isAChildOf (root);
@@ -570,6 +571,15 @@ juce::File CatalogueInstaller::contentRootDirectory()
     // creates). The plugin dir is per-user on macOS, so this cannot derive
     // from it the way the Windows branch does.
     return juce::File ("/Users/Shared/Plectrify");
+   #elif JUCE_LINUX
+    // The same requirement, and Linux has no stock answer to it at all: no
+    // fixed directory every account may write to without elevation exists
+    // (/tmp is cleared, ~ differs per user). So the installer creates this one
+    // world-writable and sticky, the mode /Users/Shared carries, and the dev
+    // loop asks for it once. Its absence makes content installs fail with a
+    // write error rather than land somewhere a pack's baked paths do not
+    // point.
+    return juce::File ("/var/lib/Plectrify");
    #else
     return installDirectory().getParentDirectory();
    #endif

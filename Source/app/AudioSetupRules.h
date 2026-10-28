@@ -26,10 +26,15 @@ namespace plectrify::audiosetup
         everything else on that list is a shared mixer with a buffer of its own
         on top of ours. macOS has no such split — CoreAudio *is* the low-latency
         path — so its single type is chosen by the fallback below rather than by
-        name. */
+        name. Linux has the Windows split: JACK (served by PipeWire on a current
+        desktop) shares the interface at the latency the player sets, while ALSA
+        either opens the hardware exclusively — failing outright while a desktop
+        sound server holds it — or plays through that server's own buffer. A
+        JACK type with no server behind it fails to open, and the caller's
+        fallback then takes JUCE's default, exactly as a dead ASIO driver does. */
     inline const juce::StringArray& preferredDeviceTypes()
     {
-        static const juce::StringArray types { "ASIO" };
+        static const juce::StringArray types { "ASIO", "JACK" };
         return types;
     }
 
@@ -85,5 +90,23 @@ namespace plectrify::audiosetup
         // Every size on offer is shorter than the target: take the longest,
         // which is the closest this device can come to being safe.
         return sorted.getLast();
+    }
+
+    /** The most input channels a device is ever opened with.
+
+        Opening every input the device lists is what lets the wizard hear
+        which jack the guitar is in — but a device's list is not always a set
+        of jacks. PipeWire's ALSA bridge (the `default` device on a current
+        Linux desktop) advertises 128 virtual channels, and its audioconvert
+        stage handles at most 64 (SPA_AUDIO_MAX_CHANNELS): opening all of them
+        crashes the sound server's thread inside our process. No interface a
+        guitar is plugged into comes near the cap, so it costs nothing real. */
+    constexpr int maxOpenedInputChannels = 32;
+
+    /** How many of a device's listed inputs to switch on: all of them, up to
+        maxOpenedInputChannels. */
+    inline int inputChannelsToOpen (int listedInputs)
+    {
+        return juce::jlimit (0, maxOpenedInputChannels, listedInputs);
     }
 }

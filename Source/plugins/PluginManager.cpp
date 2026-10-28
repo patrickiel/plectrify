@@ -28,6 +28,12 @@ juce::File PluginManager::getManagedPluginDirectory()
     // model — and other hosts still find the plugins here.
     return juce::File::getSpecialLocation (juce::File::userHomeDirectory)
         .getChildFile ("Library/Audio/Plug-Ins/VST3");
+   #elif JUCE_LINUX
+    // The per-user VST3 convention again, for the same reason: the
+    // machine-wide /usr/lib/vst3 needs root, and every Linux host already
+    // searches ~/.vst3.
+    return juce::File::getSpecialLocation (juce::File::userHomeDirectory)
+        .getChildFile (".vst3");
    #else
     return juce::File::getSpecialLocation (juce::File::commonApplicationDataDirectory)
         .getChildFile ("Plectrify")

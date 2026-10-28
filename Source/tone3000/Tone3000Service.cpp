@@ -8,7 +8,7 @@
 #include <memory>
 #include <set>
 
-#if JUCE_MAC
+#if JUCE_MAC || JUCE_LINUX
  #include <sys/stat.h>   // ::chmod — the credentials file is tightened to 0600
 #endif
 
@@ -218,9 +218,9 @@ void Tone3000Service::saveCredentials()
 
     file.replaceWithText (juce::JSON::toString (Tone3000Auth::toVar (current)));
 
-   #if JUCE_MAC
-    // Windows' %APPDATA% is already per-user ACL'd; a mac home directory is
-    // world-readable by default, and a bearer token should not be.
+   #if JUCE_MAC || JUCE_LINUX
+    // Windows' %APPDATA% is already per-user ACL'd; a mac or Linux home
+    // directory is often world-readable, and a bearer token should not be.
     ::chmod (file.getFullPathName().toRawUTF8(), 0600);
    #endif
 }

@@ -62,7 +62,12 @@ public:
             // custom chrome is Windows-only. WindowLookAndFeel is still set on
             // both, but on macOS only its frame colour is ever consulted; the
             // title bar it can draw is never asked for.
-           #if JUCE_MAC
+            //
+            // Linux takes the native decoration too: the window manager's
+            // frame is what tiling, snapping, workspaces and Wayland's
+            // server-side decorations all hang off, and a borderless X11
+            // window opts out of every one of them.
+           #if JUCE_MAC || JUCE_LINUX
             setUsingNativeTitleBar (true);
            #else
             setUsingNativeTitleBar (false);

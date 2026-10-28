@@ -993,7 +993,7 @@ export interface AppInfo {
       places wording must branch (Explorer vs Finder, WebView2 vs WebKit,
       whether ASIO is even a fact worth stating). Absent on an engine older
       than the field — treat absence as 'windows', the only OS those ran on. */
-  platform?: 'windows' | 'macos';
+  platform?: 'windows' | 'macos' | 'linux';
   /** Which binary the engine is: the standalone app or the VST3 plugin inside
       a DAW. Absent means 'standalone' — every engine older than the field. */
   host?: 'standalone' | 'plugin';

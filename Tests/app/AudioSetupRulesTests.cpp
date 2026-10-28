@@ -62,6 +62,10 @@ namespace
         expectEquals (preferredDeviceType ({ "CoreAudio" }),
                       "CoreAudio", "a single type is chosen by the fallback");
 
+        // Linux: JACK (PipeWire's, usually) over raw ALSA, whatever JUCE's order.
+        expectEquals (preferredDeviceType ({ "ALSA", "JACK" }),
+                      "JACK", "JACK wins over ALSA");
+
         expectEquals (preferredDeviceType ({ "Windows Audio", "DirectSound" }),
                       "Windows Audio", "no preferred family: the host's own first choice");
 
@@ -104,12 +108,21 @@ namespace
         expectEquals (preferredBufferSize (typical, 0.0), 2048,
                       "an unknown sample rate falls back to the longest block");
     }
+
+    void testInputChannels()
+    {
+        expectEquals (inputChannelsToOpen (2), 2, "a real interface opens every jack");
+        expectEquals (inputChannelsToOpen (128), maxOpenedInputChannels,
+                      "PipeWire's 128 virtual inputs are capped");
+        expectEquals (inputChannelsToOpen (0), 0, "no inputs, none opened");
+    }
 }
 
 int main()
 {
     testDeviceType();
     testBufferSize();
+    testInputChannels();
 
     if (failures == 0)
         std::cout << "AudioSetupRules tests passed\n";

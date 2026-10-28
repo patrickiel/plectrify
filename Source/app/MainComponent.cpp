@@ -496,7 +496,9 @@ void MainComponent::applyRecommendedDeviceSetup()
         buffer > 0)
         setup.bufferSize = buffer;
 
-    if (const auto inputs = device->getInputChannelNames().size(); inputs > 0)
+    if (const auto inputs = plectrify::audiosetup::inputChannelsToOpen (
+            device->getInputChannelNames().size());
+        inputs > 0)
     {
         setup.inputChannels.clear();
         setup.inputChannels.setRange (0, inputs, true);
@@ -516,7 +518,8 @@ void MainComponent::enableAllInputChannels()
     // than set generously and left to be clamped: JUCE's Windows backends size
     // their channel map from the highest set bit, so a mask claiming channels
     // that are not there is read as channels that are.
-    const auto inputs = device->getInputChannelNames().size();
+    const auto inputs = plectrify::audiosetup::inputChannelsToOpen (
+        device->getInputChannelNames().size());
     auto setup = deviceManager.getAudioDeviceSetup();
     if (inputs <= 0 || setup.inputChannels.countNumberOfSetBits() >= inputs)
         return;   // already all on — and reopening a device costs a dropout
