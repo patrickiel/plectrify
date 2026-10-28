@@ -639,6 +639,12 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "${eigen_SOURCE_DIR}")
         # Upstream's own build switch (NeuralAmpModeler-win.props).
         target_compile_definitions(${nam_target} PRIVATE NAM_ENABLE_A2_FAST)
+        # Optimised in every configuration. A model is Eigen maths that is many
+        # times slower at -O0 with Eigen's asserts on, so a Debug NAM — which
+        # is what the dev loop stages — crackled at any playable buffer size.
+        # This is third-party DSP nobody steps through; Debug is for our code.
+        target_compile_options(${nam_target} PRIVATE $<$<CONFIG:Debug>:-O2>)
+        target_compile_definitions(${nam_target} PRIVATE $<$<CONFIG:Debug>:EIGEN_NO_DEBUG>)
     endforeach()
 
     target_sources(PlectrifyNam PRIVATE
