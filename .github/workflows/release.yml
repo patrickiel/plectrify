@@ -44,6 +44,11 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
+      # Windows runners check out with core.autocrlf=true, and Prettier (like
+      # every other tool here) expects the LF the repository stores.
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # the notes are built from the commits since the last tag
@@ -66,6 +71,11 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 120
     steps:
+      # Windows runners check out with core.autocrlf=true, and Prettier (like
+      # every other tool here) expects the LF the repository stores.
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
         with:
           ref: v${{ inputs.version }}
@@ -91,6 +101,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
+      # Windows runners check out with core.autocrlf=true, and Prettier (like
+      # every other tool here) expects the LF the repository stores.
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
         with:
           ref: v${{ inputs.version }}
