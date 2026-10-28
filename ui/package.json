@@ -15,10 +15,7 @@
     "app": "pnpm --dir .. app",
     "app:ui": "pnpm --dir .. app --ui-only",
     "app:clean": "pnpm --dir .. app --clean",
-    "app:dist": "pnpm --dir .. app --dist",
-    "release": "pnpm --dir .. release",
-    "release:promote": "pnpm --dir .. release:promote",
-    "release:build": "pnpm --dir .. release:build"
+    "app:dist": "pnpm --dir .. app --dist"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",

@@ -4,10 +4,9 @@
  * release.macos.ts, and the same step in the same order — run at the tagged
  * commit, after the Windows step, before promotion:
  *
- *   pnpm release:build   build and test locally, publishing nothing
- *   pnpm release         ...and upload the .deb, its checksum and the manifest
- *
- * In CI this is the `linux` job of .github/workflows/release.yml.
+ * It is the `linux` job of .github/workflows/release.yml, reached through
+ * `pnpm release` (release.ts), which refuses to run outside GitHub Actions.
+ * --no-upload builds and packages without publishing.
  *
  * WHAT THE PACKAGE INSTALLS
  *

@@ -53,10 +53,11 @@ CMakeLists.txt        # native app target, JUCE FetchContent, WebView2 wiring (W
 scripts/              # root dev/release tooling — every entry point `pnpm` runs
   run.ts              # `pnpm app` — dispatches to run.windows.ts / run.macos.ts
   run.windows.ts      # Windows dev loop; run.macos.ts is its mac twin
-  release.ts          # `pnpm release:build` / `pnpm release` — dispatch by platform;
-                      #   `pnpm release:promote` is step 3
+  release.ts          # `pnpm release` — GitHub Actions only (.github/workflows/);
+                      #   dispatches by platform, `--promote` is step 3
   release.windows.ts  # Windows release pipeline (Inno Setup installer)
   release.macos.ts    # macOS release pipeline (signed/notarized installer pkg)
+  release.linux.ts    # Linux release pipeline (.deb)
   uninstall.ts        # `pnpm purge` — remove every install and trace, both OSes in one file
   shared.ts           # helpers: OS-neutral (shared.ts) and per-OS (windows.ts, macos.ts)
 Source/               # C++ — vertical slices, each folder is on the include path

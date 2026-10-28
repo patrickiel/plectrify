@@ -1,0 +1,51 @@
+# Everything a runner needs before `pnpm app` or `pnpm release` can start, per
+# OS — shared by the CI and release workflows so the two cannot drift. The
+# scripts find the rest themselves: Visual Studio's bundled CMake on Windows,
+# Xcode's toolchain on macOS, and on Linux they name any missing apt package.
+name: Set up the Plectrify toolchain
+description: Node, pnpm, the root tooling and the per-OS build dependencies.
+
+inputs:
+  native:
+    description: Install the native build dependencies (false for jobs that build nothing)
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 12.15.0
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+
+    - name: Linux build dependencies
+      if: runner.os == 'Linux' && inputs.native == 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          cmake ninja-build pkg-config build-essential unzip \
+          libwebkit2gtk-4.1-dev libgtk-3-dev libasound2-dev libjack-jackd2-dev \
+          libcurl4-openssl-dev libfreetype-dev libfontconfig-dev \
+          libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev \
+          libxcomposite-dev libgl-dev
+
+    - name: macOS build dependencies
+      if: runner.os == 'macOS' && inputs.native == 'true'
+      shell: bash
+      run: brew install ninja || true
+
+    # Git identity for the tag the Windows release step creates and the site
+    # commit promotion pushes. Harmless everywhere else.
+    - name: Git identity
+      shell: bash
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Root tooling
+      shell: bash
+      run: pnpm install --frozen-lockfile

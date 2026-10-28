@@ -2,12 +2,10 @@
   "name": "plectrify-tools",
   "private": true,
   "type": "module",
-  "description": "Root dev/release tooling, one language on both OSes: `pnpm app` dispatches to scripts/run.windows.ts / run.macos.ts, and `pnpm release:build` / `pnpm release` dispatch to scripts/release.windows.ts / release.macos.ts — commands named for the job, never for the machine you are sitting at — with `pnpm release:promote` the separate third step. One `pnpm install` here fetches tsx; ui/ and packaging/ stay their own packages.",
+  "description": "Root dev/release tooling, one language on every OS: `pnpm app` dispatches to scripts/run.<os>.ts, and `pnpm release` — run by GitHub Actions only — dispatches to scripts/release.<os>.ts. One `pnpm install` here fetches tsx; ui/ and packaging/ stay their own packages.",
   "scripts": {
     "app": "tsx scripts/run.ts",
-    "release:build": "tsx scripts/release.ts --local",
     "release": "tsx scripts/release.ts",
-    "release:promote": "tsx scripts/release.windows.ts --promote",
     "purge": "tsx scripts/uninstall.ts",
     "check": "tsc --noEmit"
   },
