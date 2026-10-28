@@ -172,7 +172,7 @@
     "by 'the other platform'."
   ],
   "schemaVersion": 4,
-  "revision": 19,
+  "revision": 20,
   "_noticesComment": [
     "Licence disclosure travels WITH the catalogue rather than shipping in the",
     "installer. If the offered plugins change, the notices change with them - no new",
