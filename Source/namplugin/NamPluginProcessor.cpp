@@ -287,7 +287,8 @@ juce::String NamPluginProcessor::loadModel (const juce::File& file)
 {
     try
     {
-        auto dsp = nam::get_dsp (std::filesystem::u8path (file.getFullPathName().toStdString()));
+        // Linux only, where a path is narrow and UTF-8 already.
+        auto dsp = nam::get_dsp (std::filesystem::path (file.getFullPathName().toStdString()));
 
         if (dsp->NumInputChannels() != 1 || dsp->NumOutputChannels() != 1)
             return "A model must have one input and one output channel.";
