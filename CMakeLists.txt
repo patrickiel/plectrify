@@ -553,6 +553,103 @@ if (WIN32)
     target_link_options(PlectrifyPlugin_VST3 PRIVATE $<$<CONFIG:Release>:/DEBUG /OPT:REF /OPT:ICF>)
 endif()
 
+# ---------------------------------------------------------------------------
+# Neural Amp Modeler for Linux (Source/namplugin/). Upstream's plugin is built on
+# iPlug2, which has no Linux target, and Plectrify ships NAM because every
+# TONE3000 tone is a capture for it — so on Linux the same DSP is wrapped in a
+# JUCE VST3 of our own. It is a separate plugin with no engine sources, built
+# here only so one configure produces everything a Linux release stages.
+#
+# The DSP is fetched at exactly the commits NAM v0.7.15 pins as submodules, as
+# hash-checked archives (no submodule recursion, nothing floating). SOURCE_SUBDIR
+# names a directory that does not exist so FetchContent only unpacks: their own
+# CMakeLists build test tools we have no use for.
+#
+# PRODUCT_NAME is upstream's PLUG_NAME on purpose: patches, the drawer and the
+# TONE3000 slice find NAM by name, so this is the name that makes every one of
+# them work unchanged. Manufacturer and class id are ours.
+# ---------------------------------------------------------------------------
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    FetchContent_Declare(NeuralAmpModelerCore
+        URL      https://github.com/sdatkinson/NeuralAmpModelerCore/archive/9c7b185de346fe0725dea537bcee4bc38b5bb6d6.tar.gz
+        URL_HASH SHA256=e10ab1f1bb3b28623508c26cd143c8f10bdd5571b3cf725c56c70dc67cde3398
+        SOURCE_SUBDIR plectrify-unpack-only)
+    FetchContent_Declare(AudioDSPTools
+        URL      https://github.com/sdatkinson/AudioDSPTools/archive/0827c6c2fc0deced568536142ea86f189e0b98a1.tar.gz
+        URL_HASH SHA256=2557d2ee58481b1bafa63e528b9c6f2b2ae67adb2f55e2c1d13c90ea99b420d5
+        SOURCE_SUBDIR plectrify-unpack-only)
+    FetchContent_Declare(Eigen
+        URL      https://gitlab.com/libeigen/eigen/-/archive/ed8cda3ce4cb9d12640f9236fed968655a93b604/eigen-ed8cda3ce4cb9d12640f9236fed968655a93b604.tar.gz
+        URL_HASH SHA256=64a7514025aafeaa8c613870f3cd395fb98b8687fe3d2b64b1392fba59c4d9e2
+        SOURCE_SUBDIR plectrify-unpack-only)
+    FetchContent_MakeAvailable(NeuralAmpModelerCore AudioDSPTools Eigen)
+
+    juce_add_plugin(PlectrifyNam
+        PRODUCT_NAME "NeuralAmpModeler"
+        COMPANY_NAME "Plectrify"
+        VERSION      "0.7.15"
+        FORMATS VST3
+        PLUGIN_MANUFACTURER_CODE Plct
+        PLUGIN_CODE Pnam
+        VST3_CATEGORIES Fx Distortion
+        IS_SYNTH FALSE
+        NEEDS_MIDI_INPUT FALSE
+        NEEDS_MIDI_OUTPUT FALSE
+        IS_MIDI_EFFECT FALSE
+        COPY_PLUGIN_AFTER_BUILD FALSE
+        VST3_AUTO_MANIFEST FALSE)
+    juce_generate_juce_header(PlectrifyNam)
+
+    # NAM's own DSP as an OBJECT library whose objects go straight into the
+    # VST3 module. Not merely into PlectrifyNam: that is JUCE's shared-code
+    # *static* library, and NAM registers its model architectures (WaveNet,
+    # LSTM, ...) from static initialisers nothing references — so the linker
+    # drops them from an archive and every capture then fails to load with
+    # "No config parser registered for architecture".
+    file(GLOB PLECTRIFY_NAM_CORE_SOURCES CONFIGURE_DEPENDS
+        "${neuralampmodelercore_SOURCE_DIR}/NAM/*.cpp"
+        "${neuralampmodelercore_SOURCE_DIR}/NAM/wavenet/*.cpp")
+    add_library(PlectrifyNamDsp OBJECT
+        Source/namplugin/ToneStack.cpp
+        ${PLECTRIFY_NAM_CORE_SOURCES}
+        "${audiodsptools_SOURCE_DIR}/dsp/dsp.cpp"
+        "${audiodsptools_SOURCE_DIR}/dsp/ImpulseResponse.cpp"
+        "${audiodsptools_SOURCE_DIR}/dsp/NoiseGate.cpp"
+        "${audiodsptools_SOURCE_DIR}/dsp/RecursiveLinearFilter.cpp"
+        "${audiodsptools_SOURCE_DIR}/dsp/wav.cpp")
+    set_target_properties(PlectrifyNamDsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    # NeuralAmpModelerCore is C++20; neither target shares sources with the
+    # C++17 engine, so they can simply have their own standard.
+    foreach(nam_target PlectrifyNam PlectrifyNamDsp)
+        target_compile_features(${nam_target} PRIVATE cxx_std_20)
+        target_include_directories(${nam_target} PRIVATE
+            Source/namplugin
+            "${neuralampmodelercore_SOURCE_DIR}"
+            "${audiodsptools_SOURCE_DIR}")
+        # Third-party headers: SYSTEM, so our warning flags do not judge them.
+        target_include_directories(${nam_target} SYSTEM PRIVATE
+            "${neuralampmodelercore_SOURCE_DIR}/Dependencies/nlohmann"
+            "${eigen_SOURCE_DIR}")
+        # Upstream's own build switch (NeuralAmpModeler-win.props).
+        target_compile_definitions(${nam_target} PRIVATE NAM_ENABLE_A2_FAST)
+    endforeach()
+
+    target_sources(PlectrifyNam PRIVATE
+        Source/namplugin/NamPluginProcessor.cpp
+        Source/namplugin/NamPluginEditor.cpp)
+    target_sources(PlectrifyNam_VST3 PRIVATE $<TARGET_OBJECTS:PlectrifyNamDsp>)
+    target_compile_definitions(PlectrifyNam PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0
+        JUCE_VST3_CAN_REPLACE_VST2=0)
+    target_link_libraries(PlectrifyNam PRIVATE
+        juce::juce_audio_utils
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags)
+endif()
+
 # Focused synthetic-signal coverage for the tuner DSP. This remains a separate
 # target so normal application builds do not pull test code into the host.
 include(CTest)

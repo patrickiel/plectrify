@@ -31,6 +31,18 @@ export function appBinary(config: string): string {
   return join(buildDir(config), 'Plectrify_artefacts', config, 'Plectrify');
 }
 
+/** Shipped plugins that Linux builds from this tree rather than downloads,
+    keyed by their packaging/bundled-plugins.json id. Neural Amp Modeler is the
+    one: upstream's iPlug2 build has no Linux target, so Source/namplugin wraps
+    the same DSP in a JUCE VST3 (see CMakeLists.txt). */
+export const IN_TREE_PLUGINS: Record<string, { target: string; bundle: string }> = {
+  'neural-amp-modeler': { target: 'PlectrifyNam_VST3', bundle: 'NeuralAmpModeler.vst3' },
+};
+
+export function inTreePluginBundle(config: string, bundle: string): string {
+  return join(buildDir(config), 'PlectrifyNam_artefacts', config, 'VST3', bundle);
+}
+
 export function pluginBundle(config: string): string {
   return join(buildDir(config), 'PlectrifyPlugin_artefacts', config, 'VST3', 'Plectrify.vst3');
 }
