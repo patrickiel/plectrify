@@ -4,8 +4,8 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-Plectrify is a **guitar-rig VST3 host** for Windows and macOS (Apple
-Silicon): a JUCE (C++17) engine that runs a user-ordered chain of VST3
+Plectrify is a **guitar-rig VST3 host** for Windows, macOS (Apple
+Silicon) and Linux (x86-64): a JUCE (C++17) engine that runs a user-ordered chain of VST3
 plugins (amp sims, effects) live from a guitar input. It ships in two
 shapes from one engine: the standalone application, and a VST3 plugin that
 runs the same rig inside a DAW (`Source/plugin/`; core support — release
@@ -38,10 +38,13 @@ working rack autosaves so it restores on the next launch.
   (`JUCE_PLUGINHOST_VST3=1`; VST2/LADSPA are disabled in `CMakeLists.txt`).
   ASIO is on for Windows builds only (`JUCE_ASIO=1` behind `if(WIN32)`) using
   the ASIO 2.3 headers bundled with JUCE — no external SDK, no configure-time
-  detection; macOS talks CoreAudio natively and has no ASIO at all.
+  detection; macOS talks CoreAudio natively and has no ASIO at all. Linux:
+  Ninja + GCC/Clang, x86-64 only, WebKitGTK 4.1 for the web view, libcurl for
+  HTTPS (`JUCE_USE_CURL=1` there only), JACK preferred and ALSA as fallback
+  (`JUCE_JACK=1`).
 - **UI**: Svelte 5 (runes) + TypeScript + TailwindCSS v4, built with Vite 6,
   packaged with **pnpm** (not npm).
-- **Bridge**: JUCE web-view backend (WebView2 / WKWebView) with native
+- **Bridge**: JUCE web-view backend (WebView2 / WKWebView / WebKitGTK) with native
   integration; events over `window.__JUCE__` (no direct method calls across
   the boundary). The UI never learns which backend it is in beyond
   `AppInfo.platform`, a wording-only discriminator.
@@ -52,14 +55,14 @@ working rack autosaves so it restores on the next launch.
 CMakeLists.txt        # native app target, JUCE FetchContent, WebView2 wiring (Windows)
 scripts/              # root dev/release tooling — every entry point `pnpm` runs
   run.ts              # `pnpm app` — dispatches to run.windows.ts / run.macos.ts
-  run.windows.ts      # Windows dev loop; run.macos.ts is its mac twin
+  run.windows.ts      # Windows dev loop; run.macos.ts / run.linux.ts are its twins
   release.ts          # `pnpm release` — GitHub Actions only (.github/workflows/);
                       #   dispatches by platform, `--promote` is step 3
   release.windows.ts  # Windows release pipeline (Inno Setup installer)
   release.macos.ts    # macOS release pipeline (signed/notarized installer pkg)
   release.linux.ts    # Linux release pipeline (.deb)
-  uninstall.ts        # `pnpm purge` — remove every install and trace, both OSes in one file
-  shared.ts           # helpers: OS-neutral (shared.ts) and per-OS (windows.ts, macos.ts)
+  uninstall.ts        # `pnpm purge` — remove every install and trace, every OS in one file
+  shared.ts           # helpers: OS-neutral (shared.ts) and per-OS (windows.ts, macos.ts, linux.ts)
 Source/               # C++ — vertical slices, each folder is on the include path
   backup/             # BackupArchive (the *.plectrifybackup zip; standalone-only)
   app/                # Main.cpp (app entry), MainComponent (standalone shell),
@@ -69,6 +72,7 @@ Source/               # C++ — vertical slices, each folder is on the include p
   plugin/             # the VST3 build: PluginProcessor (AudioProcessor + HostServices),
                       #   PluginEditor (the shared web view in a DAW's window)
   plugins/            # PluginManager (VST3 scan / cache / async instantiation)
+  namplugin/          # Linux only: our JUCE build of Neural Amp Modeler (see Linux below)
   rackui/             # PluginEditorWindow (hosts a plugin's own editor)
   tone3000/             # TONE3000 account, its own browser window, downloads, NAM state codec
 ui/                   # Svelte front-end
@@ -82,16 +86,21 @@ site/                 # plectrify.com — static marketing + docs site (see site
 third_party/          # vendored, gitignored: Microsoft.Web.WebView2 NuGet package (Windows)
 build/                # CMake output (gitignored); exe at build/Plectrify_artefacts/<Config>/Plectrify.exe
 build-macos-*/        # macOS CMake trees (one per config; single-config generators)
+build-linux-*/        # Linux CMake trees, likewise
+.github/workflows/    # CI (all three OSes) and the Release/Promote workflows
 ```
 
 ## Build and run
 
-One dev-loop command on both OSes. `scripts/run.ts` dispatches to the platform
+One dev-loop command on every OS. `scripts/run.ts` dispatches to the platform
 implementation; the tooling is all TypeScript run through tsx, so a single
 `pnpm install` at the repo root is the whole setup. Prereqs beyond Node+pnpm:
 Visual Studio 2022/18 with the C++ workload on Windows (`cmake` and `cl` need
 **not** be on PATH — the script finds the VS-bundled binaries), Xcode Command
-Line Tools + CMake (optionally Ninja) on macOS.
+Line Tools + CMake (optionally Ninja) on macOS; on Linux CMake, Ninja, a C++
+compiler and the `-dev` packages `scripts/linux.ts` names when one is missing
+(WebKitGTK 4.1, GTK 3, ALSA, JACK, curl, FreeType, fontconfig, X11 — the list
+in `.github/actions/setup/action.yml` is the canonical one).
 
 ```sh
 pnpm install         # once, at the repo root — fetches tsx
@@ -121,15 +130,16 @@ pnpm app --plugin    # build the Debug VST3 and install it for this user's DAWs
 
 `pnpm purge` uninstalls Plectrify and clears every trace it left — the
 application, the VST3 and (on macOS) the AU, the per-user data root, the
-machine-wide content root, the Windows Add/Remove Programs entry and the macOS
-installer receipts. Unlike the rest of `scripts/`, it is **one file for both
-OSes** (`scripts/uninstall.ts`): a purge is a list of paths, not a build, so the
-two halves differ in nothing but the paths. It prints what it would remove and
-deletes nothing without `--yes`; `--keep-user-data` spares rigs and patches and
-`--keep-packages` spares plugins installed from the Packages panel, which is
-what the shipped uninstallers already do. On macOS the managed plugin directory
-is shared with every other VST3 vendor, so only the files the install markers
-name are removed there — never the folder.
+machine-wide content root, the Windows Add/Remove Programs entry, the macOS
+installer receipts and the Linux .deb (through `dpkg --purge`). Unlike the rest
+of `scripts/`, it is **one file for every OS** (`scripts/uninstall.ts`): a purge
+is a list of paths, not a build, so the branches differ in nothing but the
+paths. It prints what it would remove and deletes nothing without `--yes`;
+`--keep-user-data` spares rigs and patches and `--keep-packages` spares plugins
+installed from the Packages panel, which is what the shipped uninstallers
+already do. On macOS and Linux the managed plugin directory is shared with
+every other VST3 vendor, so only the files the install markers name are removed
+there — never the folder.
 
 Platform notes: Windows builds into `build/` (VS generator, multi-config) and
 carries two hazards the script owns — the MSBuild `.tlog` interrupted-build
@@ -137,8 +147,30 @@ marker and killing WebView2 orphans that hold the profile lock (see
 `scripts/windows.ts`). macOS builds into per-config trees (`build-macos-debug`,
 `build-macos-release`; Ninja/Makefiles are single-config) and must serve the
 UI from `Contents/Resources/ui` in Release (see `provideResource`); Debug
-keeps the source-tree `ui/dist` fallback on both OSes, so the dev loop copies
-nothing.
+keeps the source-tree `ui/dist` fallback on every OS, so the dev loop copies
+nothing. Linux builds into `build-linux-debug`/`build-linux-release` like the
+Mac and serves Release's UI from `ui/` beside the binary like Windows; a
+plugin's resources live in `Contents/Resources`, which `moduleResourceDir`
+maps from the `.vst3`'s `Contents/x86_64-linux`.
+
+**Linux specifics.** It is the third target, not a replacement, and it uses
+the native title bar like macOS. Its paths: data root `~/.config/Plectrify`,
+managed plugins `~/.vst3` (shared with other vendors, so non-exclusive exactly
+as on macOS), content root `/var/lib/Plectrify`, created mode 1777 by the
+.deb's postinst — a dev machine needs `sudo install -d -m 1777
+/var/lib/Plectrify` once, which the dev loop warns about. A first run opens at
+most 32 input channels (`inputChannelsToOpen`): PipeWire's ALSA `default`
+device advertises 128 and its converter crashes beyond 64. Upstream Neural Amp
+Modeler is iPlug2 with no Linux target, so `Source/namplugin/` is our own JUCE
+VST3 around NeuralAmpModelerCore and AudioDSPTools (pinned in
+`CMakeLists.txt`), built in-tree as `PlectrifyNam` rather than fetched through
+`bundled-plugins.json`. It is deliberately named `NeuralAmpModeler` and keeps
+upstream's parameter order and iPlug2 state layout, so `NamStateCodec`, the
+TONE3000 knob template and every patch work unchanged — keep both in step with
+upstream. The core is C++20 and compiled as an OBJECT library, because its
+architecture registry lives in static initialisers a static archive drops.
+The release is a .deb (`scripts/release.linux.ts`, which explains why not an
+AppImage), asset slug `linux-x64`.
 
 **Window chrome is per-platform.** Windows gets Plectrify's own title bar, the
 themed surface `WindowLookAndFeel` draws, with square caption buttons; macOS
@@ -415,7 +447,11 @@ slug, and **no platform is the default**:
 ```
 
 Keys are written alphabetically so the file cannot be read as "Windows, plus
-some others". At least one is required — a package offered nowhere is not a
+some others". The slugs are `linux-x64`, `macos-arm64` and `windows-x64`
+(`ASSET_PLATFORMS`); no package carries a `linux-x64` asset yet, so Linux sees
+every row greyed until entries gain one — pinned by hand from an upstream
+build that unzips to a `.vst3` (`build-plugin`/`host-plugin` have no Linux
+route). At least one is required — a package offered nowhere is not a
 package — and a platform with no entry is not offered it: the row renders
 greyed with install disabled, visible rather than hidden, so the catalogue never
 looks quietly thinner per OS. Selection is one map lookup of
@@ -1103,11 +1139,12 @@ between two lanes; no lane can be emptied or born by one. The TS mirror is
 
 ### Persistence (all under the per-user data root)
 
-The per-user root is `%APPDATA%/Plectrify/` on Windows and
-`~/Library/Application Support/Plectrify/` on macOS — one definition,
+The per-user root is `%APPDATA%/Plectrify/` on Windows,
+`~/Library/Application Support/Plectrify/` on macOS and `~/.config/Plectrify/`
+on Linux — one definition,
 `plectrify::appDataDir()` in `Source/app/AppPaths.h`, which is also the web
-page's file sandbox. The `%APPDATA%` shorthand below means that root on both
-OSes.
+page's file sandbox. The `%APPDATA%` shorthand below means that root on every
+OS.
 
 - `rigs/` + `rigs/index.json` — saved full-chain rigs. TS owns the format,
   naming and listing; C++ only captures/applies plugin state (`captureRig` /
@@ -1153,12 +1190,13 @@ OSes.
   leaves behind; see *Backup and restore* below.
 
 Outside the per-user root, under the machine-wide content root —
-`%PROGRAMDATA%/Plectrify/` on Windows, `/Users/Shared/Plectrify/` on macOS
-(`CatalogueInstaller::contentRootDirectory`) — with one exception: on macOS
-the managed plugin directory is `~/Library/Audio/Plug-Ins/VST3` (the per-user
-VST3 convention; machine-wide `/Library` is admin-owned there, which would
-break the no-elevation install model), and the install markers live inside it
-at `.plectrify-installed/`:
+`%PROGRAMDATA%/Plectrify/` on Windows, `/Users/Shared/Plectrify/` on macOS,
+`/var/lib/Plectrify/` on Linux (`CatalogueInstaller::contentRootDirectory`) —
+with one exception: on macOS the managed plugin directory is
+`~/Library/Audio/Plug-Ins/VST3` (the per-user VST3 convention; machine-wide
+`/Library` is admin-owned there, which would break the no-elevation install
+model), and on Linux likewise `~/.vst3`; the install markers live inside it at
+`.plectrify-installed/`:
 
 - `plugins/` — VST3s the user installed from the **Packages** panel
   (`CatalogueInstaller`), plus `.plectrify-installed/<id>.json` install markers

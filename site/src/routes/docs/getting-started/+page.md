@@ -18,6 +18,10 @@ Grab the build for your machine from the [download section](/#download).
   standalone. The build is not notarized, so macOS refuses to open the installer at first:
   see [Opening it on macOS](/docs/opening-on-macos), which is a two-minute detour you do
   once.
+- **Linux** (x86-64; Ubuntu 24.04, Debian 13 or newer): install the `.deb`, for example with
+  `sudo apt install ./Plectrify-<version>-linux-x64.deb`. It installs the app (launch it from
+  your app menu, or run `plectrify`), and **Plectrify as a VST3 plug-in** in `/usr/lib/vst3`,
+  where every Linux DAW looks.
 
 Plectrify is a host, not a plugin collection: you bring the amp sims and effects, and it runs
 them. If you have none yet, the built-in [Packages panel](/docs/packages) can install a starter
@@ -29,7 +33,8 @@ Open **Audio Settings** from the toolbar.
 
 1. Pick your **device type** first. On Windows choose **ASIO** if your interface offers it;
    it is the difference between a rig you can play and one you can only hear. On macOS,
-   CoreAudio is already the native low-latency path and there is nothing to choose.
+   CoreAudio is already the native low-latency path and there is nothing to choose. On Linux,
+   choose JACK if it is listed, otherwise ALSA.
 2. Set your interface as the **input** and your speakers or headphones as the **output**.
 3. Enable the input channel your guitar is plugged into.
 

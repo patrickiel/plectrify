@@ -23,7 +23,7 @@
          buttons a beat after the page appears.
 
          Only a confident desktop answer is stamped. A phone, a tablet or a
-         Linux box leaves the attribute unset, and the buttons stay evenly
+         non-x86 Linux box (an Android phone says "Linux" too) leaves it unset, and the buttons stay evenly
          weighted, the honest state when we cannot tell, since a reader on a
          phone is choosing for a machine that is somewhere else. -->
     <script>
@@ -40,6 +40,9 @@
             // An iPhone says "Mobile", and an iPad in desktop mode is a Mac in
             // every respect but its touch points. Neither can run a .dmg.
             if (!/Mobile/.test(ua) && touch <= 1) os = 'macos';
+          } else if (uaPlatform === 'Linux' || (/Linux/.test(ua) && !/Android|CrOS/.test(ua))) {
+            // The .deb is x86-64 only, so an ARM board is not promoted to it.
+            if (!/aarch64|arm/i.test(ua) && touch <= 1) os = 'linux';
           }
 
           if (os) document.documentElement.dataset.os = os;

@@ -2,7 +2,7 @@
   import { DOWNLOADS } from '$lib/site';
 
   /**
-   * Both platforms, always both shown, but the one that will actually run on
+   * Every platform, always all shown, but the one that will actually run on
    * this machine leads.
    *
    * The ranking is done in CSS off `<html data-os>`, which the inline probe in
@@ -13,12 +13,13 @@
    *
    * Three states, and the third is the point:
    *
-   *   windows  : the Windows build is the filled accent button, macOS is quiet
-   *   macos    : the mirror image
-   *   unknown  : both keep equal weight
+   *   windows  : the Windows build is the filled accent button, the others quiet
+   *   macos    : the same for macOS
+   *   linux    : the same for Linux
+   *   unknown  : all keep equal weight
    *
-   * "Unknown" is not a failure case to be papered over. A phone, a tablet or a
-   * Linux box gets it, and a reader on a phone is choosing what to install on a
+   * "Unknown" is not a failure case to be papered over. A phone or a tablet
+   * gets it, and a reader on a phone is choosing what to install on a
    * machine that is somewhere else, exactly the case a guess gets wrong. The
    * demoted button is also never *dimmed*: it keeps a full border and body-weight
    * text, because someone downloading for their other machine must not be told
@@ -41,6 +42,22 @@
             <path
               d="M3 5.6 10.2 4.6v6.9H3V5.6Zm0 12.8 7.2 1v-6.8H3v5.8Zm8.1 1.1L21 21V12.5h-9.9v7Zm0-15.1v7h9.9V3l-9.9 1.4Z"
             />
+          </svg>
+        {:else if dl.platform === 'linux'}
+          <!-- A terminal prompt rather than Tux: no trademark to mind, and it
+               reads as "Linux" next to the other two at this size. -->
+          <svg
+            class="glyph"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="2.5" y="4" width="19" height="16" rx="2.5" />
+            <path d="m7 9.5 3 2.5-3 2.5M12.5 15H17" />
           </svg>
         {:else}
           <svg class="glyph" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -65,11 +82,11 @@
        concludes the download is broken and leaves. Said here, before the click,
        it is a known one-time step instead.
 
-       Shown to everyone *except* a detected Windows machine, using the same
-       data-os hook the ranking uses: on an unknown OS (a phone, a tablet,
-       Linux) the reader is very likely choosing what to install on some other
-       machine, and that machine may well be the Mac. Only Windows can be ruled
-       out, so only Windows is. -->
+       Shown to everyone *except* a detected Windows or Linux machine, using the
+       same data-os hook the ranking uses: on an unknown OS (a phone, a tablet)
+       the reader is very likely choosing what to install on some other
+       machine, and that machine may well be the Mac. Only a detected desktop
+       that is not a Mac can be ruled out. -->
   <p class="macnote">
     <a href="/docs/opening-on-macos">macOS blocks the first launch: how to open it</a>
   </p>
@@ -148,7 +165,8 @@
      the stacked column. Colour alone is never the signal: the button says
      which OS it is, and it moves to the front. */
   :global(:root[data-os='windows']) .dl[data-platform='windows'],
-  :global(:root[data-os='macos']) .dl[data-platform='macos'] {
+  :global(:root[data-os='macos']) .dl[data-platform='macos'],
+  :global(:root[data-os='linux']) .dl[data-platform='linux'] {
     order: -1;
     grid-column: 1 / -1;
     justify-self: center;
@@ -158,7 +176,8 @@
   }
 
   :global(:root[data-os='windows']) .dl[data-platform='windows']:hover,
-  :global(:root[data-os='macos']) .dl[data-platform='macos']:hover {
+  :global(:root[data-os='macos']) .dl[data-platform='macos']:hover,
+  :global(:root[data-os='linux']) .dl[data-platform='linux']:hover {
     background: color-mix(in srgb, var(--color-accent) 88%, #fff);
     box-shadow: var(--shadow-glow-accent);
   }
@@ -167,14 +186,16 @@
      black here, and defined as a token so it stays right if the accent moves. */
   :global(:root[data-os='windows']) .dl[data-platform='windows'] .glyph,
   :global(:root[data-os='macos']) .dl[data-platform='macos'] .glyph,
+  :global(:root[data-os='linux']) .dl[data-platform='linux'] .glyph,
   :global(:root[data-os='windows']) .dl[data-platform='windows'] .title,
-  :global(:root[data-os='macos']) .dl[data-platform='macos'] .title {
+  :global(:root[data-os='macos']) .dl[data-platform='macos'] .title,
+  :global(:root[data-os='linux']) .dl[data-platform='linux'] .title {
     color: var(--color-accent-ink);
   }
 
   /* ── Demoted: the other platform, reduced to a link underneath ───────────
-     Once we know which build runs on this machine, the other one is a footnote
-     rather than a second call to action. The non-matching entry drops its
+     Once we know which build runs on this machine, the others are footnotes
+     rather than more calls to action. Each non-matching entry drops its
      border, fill and padding to read as a plain quiet link below the button.
 
      It keeps its glyph, because this is still the control someone downloading
@@ -185,9 +206,10 @@
      same box size, so switching states never nudges the layout.
 
      A grid rather than a column: the promoted button sets the column, and the
-     demoted link is centred under it rather than hugging its left edge. */
+     demoted links are centred under it rather than hugging its left edge. */
   :global(:root[data-os='windows']) .row,
-  :global(:root[data-os='macos']) .row {
+  :global(:root[data-os='macos']) .row,
+  :global(:root[data-os='linux']) .row {
     display: grid;
     grid-template-columns: auto;
     align-items: center;
@@ -196,8 +218,9 @@
     gap: 0.85rem;
   }
 
-  :global(:root[data-os='windows']) .dl[data-platform='macos'],
-  :global(:root[data-os='macos']) .dl[data-platform='windows'] {
+  :global(:root[data-os='windows']) .dl:not([data-platform='windows']),
+  :global(:root[data-os='macos']) .dl:not([data-platform='macos']),
+  :global(:root[data-os='linux']) .dl:not([data-platform='linux']) {
     gap: 0.45rem;
     padding: 0.15rem 0.25rem;
     border-color: transparent;
@@ -205,36 +228,41 @@
     box-shadow: none;
   }
 
-  :global(:root[data-os='windows']) .dl[data-platform='macos'] .glyph,
-  :global(:root[data-os='macos']) .dl[data-platform='windows'] .glyph {
+  :global(:root[data-os='windows']) .dl:not([data-platform='windows']) .glyph,
+  :global(:root[data-os='macos']) .dl:not([data-platform='macos']) .glyph,
+  :global(:root[data-os='linux']) .dl:not([data-platform='linux']) .glyph {
     width: 0.85rem;
     height: 0.85rem;
     color: var(--ink-off);
   }
 
-  :global(:root[data-os='windows']) .dl[data-platform='macos'] .title,
-  :global(:root[data-os='macos']) .dl[data-platform='windows'] .title {
+  :global(:root[data-os='windows']) .dl:not([data-platform='windows']) .title,
+  :global(:root[data-os='macos']) .dl:not([data-platform='macos']) .title,
+  :global(:root[data-os='linux']) .dl:not([data-platform='linux']) .title {
     font-size: 0.78rem;
     font-weight: 500;
     color: var(--ink-quiet);
   }
 
-  :global(:root[data-os='windows']) .dl[data-platform='macos']:hover,
-  :global(:root[data-os='macos']) .dl[data-platform='windows']:hover {
+  :global(:root[data-os='windows']) .dl:not([data-platform='windows']):hover,
+  :global(:root[data-os='macos']) .dl:not([data-platform='macos']):hover,
+  :global(:root[data-os='linux']) .dl:not([data-platform='linux']):hover {
     border-color: transparent;
     background: none;
     box-shadow: none;
   }
 
-  :global(:root[data-os='windows']) .dl[data-platform='macos']:hover .title,
-  :global(:root[data-os='macos']) .dl[data-platform='windows']:hover .title {
+  :global(:root[data-os='windows']) .dl:not([data-platform='windows']):hover .title,
+  :global(:root[data-os='macos']) .dl:not([data-platform='macos']):hover .title,
+  :global(:root[data-os='linux']) .dl:not([data-platform='linux']):hover .title {
     color: var(--color-accent);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
-  :global(:root[data-os='windows']) .dl[data-platform='macos']:hover .glyph,
-  :global(:root[data-os='macos']) .dl[data-platform='windows']:hover .glyph {
+  :global(:root[data-os='windows']) .dl:not([data-platform='windows']):hover .glyph,
+  :global(:root[data-os='macos']) .dl:not([data-platform='macos']):hover .glyph,
+  :global(:root[data-os='linux']) .dl:not([data-platform='linux']):hover .glyph {
     color: var(--color-accent);
   }
 
@@ -261,7 +289,8 @@
     text-decoration-color: currentColor;
   }
 
-  :global(:root[data-os='windows']) .macnote {
+  :global(:root[data-os='windows']) .macnote,
+  :global(:root[data-os='linux']) .macnote {
     display: none;
   }
 </style>

@@ -58,6 +58,7 @@ function isAssetFor(platform: string, name: string): boolean {
 
   if (platform === 'windows-x64') return /win|windows/.test(n) && /\.(zip|exe)$/.test(n);
   if (platform === 'macos-arm64') return /mac|osx|darwin/.test(n) && /\.(zip|dmg|pkg)$/.test(n);
+  if (platform === 'linux-x64') return /linux/.test(n) && !/arm|aarch64/.test(n) && /\.zip$/.test(n);
   return false;
 }
 

@@ -56,6 +56,7 @@ Captures and impulse responses land in a `tone3000` folder under the same shared
 | ----------- | ---------------------------------- |
 | **Windows** | `%PROGRAMDATA%\Plectrify\tone3000` |
 | **macOS**   | `/Users/Shared/Plectrify/tone3000` |
+| **Linux**   | `/var/lib/Plectrify/tone3000`      |
 
 They are files on your disk, downloaded under your own account and TONE3000's terms. Plectrify does
 not redistribute them and never bundles them into anything you export.

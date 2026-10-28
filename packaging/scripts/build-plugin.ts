@@ -45,7 +45,7 @@ const platforms: Record<string, () => Promise<Record<string, unknown>>> = {
 const load = platforms[process.platform];
 if (!load) {
   fail(
-    `there is no build route for ${process.platform}. Plectrify's catalogue offers windows-x64 and macos-arm64; run this on one of those.`,
+    `there is no build route for ${process.platform}: only windows-x64 and macos-arm64 have one; a linux-x64 asset is pinned by hand from an upstream build that unzips to a .vst3.`,
   );
 }
 

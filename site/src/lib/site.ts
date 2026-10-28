@@ -35,7 +35,7 @@ export const IDENTITY = 'Chain your VST plugins and play.';
  * "amp sim"), because they are what someone looking for this actually types.
  */
 export const DESCRIPTION =
-  'A free guitar rig for Windows and macOS. Plug in and play through your own VST3 amp sims ' +
+  'A free guitar rig for Windows, macOS and Linux. Plug in and play through your own VST3 amp sims ' +
   'and pedals, chained like a real pedalboard, or load thousands of real amp captures from ' +
   'TONE3000. Tuner, metronome, looper and setlists for practice and for playing live.';
 
@@ -62,13 +62,13 @@ export const DISCORD_URL = 'https://discord.gg/dxQBanJr2X';
 export const VERSION = '0.1.0';
 
 /** Release-asset naming, as produced by scripts/release.windows.ts and its mac
-    twin. These still say "Plectrify" because the built artefacts do. */
+    and Linux twins. These still say "Plectrify" because the built artefacts do. */
 const ASSET_BASE = 'Plectrify';
 
-/** The two desktop platforms, in the spelling the pre-paint OS probe in
+/** The three desktop platforms, in the spelling the pre-paint OS probe in
     app.html stamps onto `<html data-os>`. One concept, used for the glyph, the
     styling hook and the detection match, so they cannot drift apart. */
-export type Platform = 'windows' | 'macos';
+export type Platform = 'windows' | 'macos' | 'linux';
 
 export interface Download {
   platform: Platform;
@@ -91,6 +91,12 @@ export const DOWNLOADS: Download[] = [
     os: 'macOS',
     file: `${ASSET_BASE}-${VERSION}-macos-arm64.pkg`,
     url: asset(`${ASSET_BASE}-${VERSION}-macos-arm64.pkg`),
+  },
+  {
+    platform: 'linux',
+    os: 'Linux',
+    file: `${ASSET_BASE}-${VERSION}-linux-x64.deb`,
+    url: asset(`${ASSET_BASE}-${VERSION}-linux-x64.deb`),
   },
 ];
 

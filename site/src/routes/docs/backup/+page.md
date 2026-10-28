@@ -51,6 +51,7 @@ as `backup-before-restore.plectrifybackup` in its data folder:
 
 - **Windows** — `%APPDATA%\Plectrify\`
 - **macOS** — `~/Library/Application Support/Plectrify/`
+- **Linux** — `~/.config/Plectrify/`
 
 If a restore turns out to be the wrong one, restore that file instead.
 
@@ -67,7 +68,7 @@ into view, and it takes a second or two.
 Do the packages before the restore rather than after, and your rigs will have their plugins
 waiting when they load.
 
-A backup made on Windows restores on a Mac and the other way round. Rigs and patches carry over
+A backup made on one system restores on any other — Windows, macOS or Linux. Rigs and patches carry over
 whole; the one thing that does not is a patch's link to a downloaded capture or impulse
 response, because those are stored in a different place on each system. Plectrify says so when
 it notices, and picking the tone again from TONE3000 repairs it.
