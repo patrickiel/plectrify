@@ -149,7 +149,7 @@ juce::Array<juce::Rectangle<int>> attachedDisplays()
     for (const auto& display : juce::Desktop::getInstance().getDisplays().displays)
         // The *user* area, so a window is never restored underneath the Windows
         // taskbar or the mac menu bar, where its title bar cannot be grabbed.
-        areas.add (display.userArea);
+        areas.add (display.userBounds.toNearestInt());
 
     return areas;
 }
@@ -199,7 +199,7 @@ Tone3000BrowserWindow::Tone3000BrowserWindow (const juce::String& startUrl,
     // the second opening onwards it is whatever the user left it at.
     const auto fallback = juce::Rectangle<int> { 1100, 820 }.withCentre (
         juce::Desktop::getInstance().getDisplays().getPrimaryDisplay() != nullptr
-            ? juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea.getCentre()
+            ? juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt().getCentre()
             : juce::Point<int> { 700, 450 });
 
     restoredBounds = Tone3000WindowState::place (saved, attachedDisplays(), fallback);

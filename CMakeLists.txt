@@ -573,14 +573,17 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     FetchContent_Declare(NeuralAmpModelerCore
         URL      https://github.com/sdatkinson/NeuralAmpModelerCore/archive/9c7b185de346fe0725dea537bcee4bc38b5bb6d6.tar.gz
         URL_HASH SHA256=e10ab1f1bb3b28623508c26cd143c8f10bdd5571b3cf725c56c70dc67cde3398
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         SOURCE_SUBDIR plectrify-unpack-only)
     FetchContent_Declare(AudioDSPTools
         URL      https://github.com/sdatkinson/AudioDSPTools/archive/0827c6c2fc0deced568536142ea86f189e0b98a1.tar.gz
         URL_HASH SHA256=2557d2ee58481b1bafa63e528b9c6f2b2ae67adb2f55e2c1d13c90ea99b420d5
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         SOURCE_SUBDIR plectrify-unpack-only)
     FetchContent_Declare(Eigen
         URL      https://gitlab.com/libeigen/eigen/-/archive/ed8cda3ce4cb9d12640f9236fed968655a93b604/eigen-ed8cda3ce4cb9d12640f9236fed968655a93b604.tar.gz
         URL_HASH SHA256=64a7514025aafeaa8c613870f3cd395fb98b8687fe3d2b64b1392fba59c4d9e2
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         SOURCE_SUBDIR plectrify-unpack-only)
     FetchContent_MakeAvailable(NeuralAmpModelerCore AudioDSPTools Eigen)
 
@@ -619,16 +622,19 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         "${audiodsptools_SOURCE_DIR}/dsp/wav.cpp")
     set_target_properties(PlectrifyNamDsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-    # NeuralAmpModelerCore is C++20; neither target shares sources with the
-    # C++17 engine, so they can simply have their own standard.
+    # NeuralAmpModelerCore is C++20; none of these targets shares sources with
+    # the C++17 engine, so they can simply have their own standard. That has to
+    # include JUCE's VST3 wrapper target: it compiles JUCE headers into the same
+    # module, and std::atomic<float> is a different type under C++17 and C++20,
+    # which made every JUCE parameter class an ODR violation at link time.
+    target_compile_features(PlectrifyNam_VST3 PRIVATE cxx_std_20)
     foreach(nam_target PlectrifyNam PlectrifyNamDsp)
         target_compile_features(${nam_target} PRIVATE cxx_std_20)
-        target_include_directories(${nam_target} PRIVATE
-            Source/namplugin
-            "${neuralampmodelercore_SOURCE_DIR}"
-            "${audiodsptools_SOURCE_DIR}")
+        target_include_directories(${nam_target} PRIVATE Source/namplugin)
         # Third-party headers: SYSTEM, so our warning flags do not judge them.
         target_include_directories(${nam_target} SYSTEM PRIVATE
+            "${neuralampmodelercore_SOURCE_DIR}"
+            "${audiodsptools_SOURCE_DIR}"
             "${neuralampmodelercore_SOURCE_DIR}/Dependencies/nlohmann"
             "${eigen_SOURCE_DIR}")
         # Upstream's own build switch (NeuralAmpModeler-win.props).
