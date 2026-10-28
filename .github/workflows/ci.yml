@@ -34,6 +34,11 @@ jobs:
           - name: Linux
             os: ubuntu-24.04
     steps:
+      # Windows runners check out with core.autocrlf=true, and Prettier (like
+      # every other tool here) expects the LF the repository stores.
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
