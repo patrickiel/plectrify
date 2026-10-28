@@ -7,7 +7,7 @@
   import { FolderOpenIcon, PencilSimpleIcon, PushPinIcon, TrashSimpleIcon } from 'phosphor-svelte';
   import type { EngineBridge } from '../../lib/engine/EngineBridge';
   import type { LooperSession, StatusState } from '../../lib/engine/types';
-  import { isMac } from '../../lib/platform';
+  import { fileManagerName } from '../../lib/platform';
   import { formatLoopSeconds } from './looperPosition';
   import Button from '../../lib/components/Button.svelte';
   import Card from '../../lib/components/Card.svelte';
@@ -117,7 +117,7 @@
       <span class="flex items-center" transition:fade={reveal.fade()}>
         <IconButton
           label="Open the sessions folder"
-          tip="Open the sessions folder in {isMac ? 'Finder' : 'Explorer'}"
+          tip="Open the sessions folder in {fileManagerName}"
           onclick={() => engine.revealLooperSessions()}
         >
           <FolderOpenIcon size={14} aria-hidden="true" />

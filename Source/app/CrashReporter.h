@@ -91,11 +91,16 @@ namespace plectrify
        #if JUCE_WINDOWS
         SetUnhandledExceptionFilter (detail::writeCrashDump);
        #else
-        // No minidump machinery on macOS — the OS writes a .ips crash report
-        // itself. A log line still marks that we went down abnormally.
+        // No minidump machinery off Windows — macOS writes a .ips crash report
+        // itself, and Linux leaves a core to systemd-coredump or apport. A log
+        // line still marks that we went down abnormally.
         juce::SystemStats::setApplicationCrashHandler ([] (void*)
         {
+           #if JUCE_MAC
             juce::Logger::writeToLog ("CRASH: fatal signal — see the macOS crash report");
+           #else
+            juce::Logger::writeToLog ("CRASH: fatal signal - see coredumpctl or /var/crash");
+           #endif
         });
        #endif
     }

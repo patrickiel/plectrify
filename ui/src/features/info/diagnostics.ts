@@ -196,12 +196,13 @@ function appSection(input: DiagnosticsInput): DiagSection {
       {
         label: 'Formats',
         // "no ASIO" is a Windows fact — its absence there explains a missing
-        // device type. On macOS ASIO does not exist, so stating it would be
-        // noise in every report.
+        // device type. On macOS and Linux ASIO does not exist, so stating it
+        // would be noise in every report.
         value: build
           ? facts(
               build.vst3 ? 'VST3' : 'no VST3',
-              info.platform !== 'macos' && (build.asio ? 'ASIO built in' : 'no ASIO'),
+              (info.platform ?? 'windows') === 'windows' &&
+                (build.asio ? 'ASIO built in' : 'no ASIO'),
             )
           : DASH,
       },

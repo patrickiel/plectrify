@@ -85,7 +85,8 @@
   // Only ever ASIO, and only on Windows — see betterDriverAvailable.
   const betterDriver = $derived(betterDriverAvailable(devices));
   const noAsioAtAll = $derived(
-    appInfo.platform !== 'macos' && !devices.drivers.some((d) => d.name.toUpperCase() === 'ASIO'),
+    (appInfo.platform ?? 'windows') === 'windows' &&
+      !devices.drivers.some((d) => d.name.toUpperCase() === 'ASIO'),
   );
 
   const asOptions = (values: readonly string[]) => values.map((value) => ({ value, label: value }));

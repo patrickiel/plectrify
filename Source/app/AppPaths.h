@@ -6,7 +6,10 @@ namespace plectrify
 {
     /** Per-user Plectrify data root — %APPDATA%\Plectrify on Windows,
         ~/Library/Application Support/Plectrify on macOS (JUCE's
-        userApplicationDataDirectory is bare ~/Library there).
+        userApplicationDataDirectory is bare ~/Library there), and
+        ~/.config/Plectrify on Linux (JUCE's answer there, honouring neither
+        XDG_CONFIG_HOME nor XDG_DATA_HOME — one fixed place is what
+        `pnpm purge` and a backup can name).
 
         This tree doubles as the web page's file sandbox
         (MainComponent::resolveAppFile), so nothing that must stay out of the
@@ -38,7 +41,10 @@ namespace plectrify
         <bundle>/Contents/x86_64-win/, and the resources mirror the mac layout
         at the sibling Contents/Resources. currentExecutableFile resolves the
         module that contains this code (the DLL, in a plugin), never the host
-        exe. */
+        exe.
+
+        Linux: the same as Windows, with the VST3 module directory named
+        x86_64-linux instead — the bundle layout is the SDK's on both. */
     inline juce::File moduleResourceDir()
     {
        #if JUCE_MAC
@@ -48,7 +54,8 @@ namespace plectrify
         const auto moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile)
                                    .getParentDirectory();
 
-        if (moduleDir.getFileName().equalsIgnoreCase ("x86_64-win")
+        if ((moduleDir.getFileName().equalsIgnoreCase ("x86_64-win")
+             || moduleDir.getFileName().equalsIgnoreCase ("x86_64-linux"))
             && moduleDir.getParentDirectory().getFileName().equalsIgnoreCase ("Contents"))
             return moduleDir.getParentDirectory().getChildFile ("Resources");
 

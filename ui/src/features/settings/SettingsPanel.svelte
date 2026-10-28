@@ -59,7 +59,7 @@
     /** Which OS this build runs on, for the restore dialog's note about an
         archive made on the other one. Absent on an engine older than the
         field, which simply means the note is not offered. */
-    platform?: 'windows' | 'macos';
+    platform?: 'windows' | 'macos' | 'linux';
     /** Which view the panel shows: the settings list, or the MIDI learn
         table it links to. Owned by ToolSidebar so it can reset to 'main'
         whenever the panel closes. */

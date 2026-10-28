@@ -630,6 +630,8 @@ juce::var PlectrifyEngine::buildAppInfoState()
     // worth stating) can branch without parsing a display string.
    #if JUCE_MAC
     info->setProperty ("platform", "macos");
+   #elif JUCE_LINUX
+    info->setProperty ("platform", "linux");
    #else
     info->setProperty ("platform", "windows");
    #endif

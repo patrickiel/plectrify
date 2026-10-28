@@ -39,9 +39,11 @@ public:
         the same machine can add packages but not overwrite the first
         account's. On macOS the machine-wide /Library is admin-owned, so the
         per-user VST3 convention keeps installs elevation-free while other
-        hosts still find the plugins. Both are deliberately outside the web
-        view's file sandbox (%APPDATA%/Plectrify resp. ~/Library/Application
-        Support/Plectrify), which the page can read and delete within.
+        hosts still find the plugins. Linux follows macOS for the same reason:
+        /usr/lib/vst3 is root's, so it is the per-user ~/.vst3 every Linux host
+        searches. All are deliberately outside the web view's file sandbox
+        (%APPDATA%/Plectrify resp. ~/Library/Application Support/Plectrify
+        resp. ~/.config/Plectrify), which the page can read and delete within.
 
         Created on demand: the scanner needs the directory to exist before it
         will search it. */
@@ -49,14 +51,15 @@ public:
 
     /** Whether that directory is Plectrify's alone. It is on Windows, where it
         is a folder under Plectrify's own ProgramData root that nothing else
-        writes to; it is not on macOS, where it is the user's
-        ~/Library/Audio/Plug-Ins/VST3, shared with every other VST3 installer.
+        writes to; it is not on macOS or Linux, where it is the user's
+        ~/Library/Audio/Plug-Ins/VST3 resp. ~/.vst3, shared with every other
+        VST3 installer.
 
         The distinction decides what an unaccounted-for bundle in there means —
         our own debris, or somebody else's plugin — which is the whole of
         mayReplaceManagedPlugin()'s `directoryIsExclusive`. */
     static constexpr bool managedPluginDirectoryIsExclusive =
-       #if JUCE_MAC
+       #if JUCE_MAC || JUCE_LINUX
         false;
        #else
         true;

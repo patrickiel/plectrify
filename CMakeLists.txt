@@ -24,7 +24,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # CI-friendly builds. First configure downloads JUCE (a few minutes).
 # ---------------------------------------------------------------------------
 # The WebView2 SDK is Windows-only: macOS uses the OS-provided WKWebView, which
-# needs no SDK package and no runtime installer.
+# needs no SDK package and no runtime installer, and Linux uses WebKitGTK from
+# the distribution (libwebkit2gtk-4.1-dev at build time, the runtime library at
+# run time).
 if (WIN32)
     # Where JUCE's FindWebView2 looks for the Microsoft.Web.WebView2 NuGet package
     # (fetched into third_party/). A plain (non-cache) variable so it reliably
@@ -67,7 +69,7 @@ FetchContent_Declare(
     # cycle on every configure; clean build trees still clone and patch once.
     UPDATE_DISCONNECTED TRUE
     # Small guarded host-side fixes JUCE 8.0.14 needs, applied at fetch
-    # time. Each platform-specific patch is applied on both OSes anyway,
+    # time. Each platform-specific patch is applied on every OS anyway,
     # because the patched tree is what the release scripts publish as
     # corresponding source: one tree, one answer to "what was this built from".
     #   - webview2-zoom: 8.0.14 does not expose WebView2's zoom settings
@@ -119,7 +121,11 @@ FetchContent_MakeAvailable(JUCE)
 # entry (without which macOS silently denies audio input — a guitar rig's whole
 # point), and the hardened runtime notarization requires. The
 # disable-library-validation entitlement is what lets a hardened-runtime
-# process load third-party VST3 code not signed by our team.
+# process load third-party VST3 code not signed by our team. Linux asks JUCE
+# for its two optional system libraries: WebKitGTK for the embedded UI (without
+# NEEDS_WEB_BROWSER JUCE compiles the browser out there) and libcurl, because
+# JUCE's own socket fallback speaks plain HTTP and every URL Plectrify fetches —
+# catalogue, packages, TONE3000 — is HTTPS.
 if (WIN32)
     set(PLECTRIFY_PLATFORM_APP_ARGS NEEDS_WEBVIEW2 TRUE)
 elseif (APPLE)
@@ -130,7 +136,7 @@ elseif (APPLE)
         HARDENED_RUNTIME_ENABLED TRUE
         HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input com.apple.security.cs.disable-library-validation)
 else()
-    set(PLECTRIFY_PLATFORM_APP_ARGS "")
+    set(PLECTRIFY_PLATFORM_APP_ARGS NEEDS_WEB_BROWSER TRUE NEEDS_CURL TRUE)
 endif()
 
 juce_add_gui_app(Plectrify
@@ -357,12 +363,19 @@ function(plectrify_configure_target target)
             JUCE_USE_WINRT_MIDI=0)
     endif()
 
+    # JUCE's URL is curl-backed on Linux or HTTP-only; Windows and macOS use
+    # the OS stack and keep curl out (see NEEDS_CURL above).
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_compile_definitions(${target} PRIVATE JUCE_USE_CURL=1)
+    else()
+        target_compile_definitions(${target} PRIVATE JUCE_USE_CURL=0)
+    endif()
+
     target_compile_definitions(${target} PRIVATE
         JUCE_PLUGINHOST_VST3=1          # host VST3 plugins
         JUCE_PLUGINHOST_VST=0           # legacy VST2 needs the Steinberg SDK/licence
         JUCE_PLUGINHOST_LADSPA=0
         JUCE_WEB_BROWSER=1              # host the embedded Svelte UI
-        JUCE_USE_CURL=0
         # Debug-only source-tree fallback for serving ui/dist. Release binaries
         # must not bake a dev-machine path; they serve only the staged ui/
         # directory — next to the executable on Windows (scripts/run.windows.ts
@@ -445,6 +458,15 @@ if (WIN32)
     target_compile_definitions(Plectrify PRIVATE JUCE_ASIO=1)
 endif()
 
+# JACK — Linux's ASIO, for the same reason and with the same app-only scope.
+# JUCE dlopens libjack at run time, so a machine without it simply lists ALSA
+# alone; on a current desktop the library is PipeWire's, which serves JACK
+# clients alongside everything else on the sound server. ALSA is JUCE's
+# default and needs no switch.
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_compile_definitions(Plectrify PRIVATE JUCE_JACK=1)
+endif()
+
 # The window-chrome assets (title-bar wordmark font, icons) are the shell's
 # alone — the plugin has no JUCE-drawn chrome.
 target_link_libraries(Plectrify PRIVATE PlectrifyAssets)
@@ -469,11 +491,12 @@ elseif (APPLE)
         HARDENED_RUNTIME_ENABLED TRUE
         HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input com.apple.security.cs.disable-library-validation)
 else()
-    set(PLECTRIFY_PLATFORM_PLUGIN_ARGS "")
+    # The app's two Linux system libraries, for the same reasons.
+    set(PLECTRIFY_PLATFORM_PLUGIN_ARGS NEEDS_WEB_BROWSER TRUE NEEDS_CURL TRUE)
 endif()
 
 # AU exists for Logic and GarageBand, the mainstream hosts that load no other
-# format; every other mac DAW takes the VST3. Windows has no AU at all.
+# format; every other mac DAW takes the VST3. Windows and Linux have no AU at all.
 if (APPLE)
     set(PLECTRIFY_PLUGIN_FORMATS VST3 AU)
 else()

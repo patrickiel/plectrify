@@ -131,8 +131,9 @@ export function describeRestoreOutcome(state: BackupState, thisPlatform: string)
 
 /** The slug the engine stamps into an archive, for the platform comparison
     above. AppInfo.platform is the page's only view of which OS this is. */
-export function platformSlug(platform: 'windows' | 'macos' | undefined): string {
+export function platformSlug(platform: 'windows' | 'macos' | 'linux' | undefined): string {
   if (platform === 'macos') return 'macos-arm64';
+  if (platform === 'linux') return 'linux-x64';
   if (platform === 'windows') return 'windows-x64';
   return '';
 }

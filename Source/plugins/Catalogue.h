@@ -56,6 +56,8 @@ enum class PackageKind
     the compiler proves every build has exactly one answer. */
 #if JUCE_MAC
 inline const char* const catalogueRuntimePlatform = "macos-arm64";
+#elif JUCE_LINUX
+inline const char* const catalogueRuntimePlatform = "linux-x64";
 #else
 inline const char* const catalogueRuntimePlatform = "windows-x64";
 #endif

@@ -205,6 +205,19 @@ export interface BundledPlugin {
   assets: Record<string, { url: string; sha256: string; downloadBytes?: number }>;
 }
 
+function readBundledPlugins(): BundledPlugin[] {
+  const path = join(ROOT, 'packaging', 'bundled-plugins.json');
+  return (JSON.parse(readFileSync(path, 'utf8')) as { plugins?: BundledPlugin[] }).plugins ?? [];
+}
+
+/** The shipped plugins that have no build for a platform yet. The dev loop asks
+    this so it can say what is missing and carry on, where a release must refuse
+    (see bundledPluginsFor). Linux is the case it exists for: Neural Amp
+    Modeler's iPlug2 source has no Linux VST3 target. */
+export function bundledPluginsMissingFor(platformSlug: string): BundledPlugin[] {
+  return readBundledPlugins().filter((plugin) => !plugin.assets?.[platformSlug]?.url);
+}
+
 /** The shipped-plugin manifest, for the platform a release is being built on.
 
     Both release scripts read this rather than the catalogue: these are not
@@ -214,10 +227,7 @@ export interface BundledPlugin {
 export function bundledPluginsFor(platformSlug: string): (BundledPlugin & {
   asset: { url: string; sha256: string; downloadBytes?: number };
 })[] {
-  const path = join(ROOT, 'packaging', 'bundled-plugins.json');
-  const manifest = JSON.parse(readFileSync(path, 'utf8')) as { plugins?: BundledPlugin[] };
-
-  return (manifest.plugins ?? []).map((plugin) => {
+  return readBundledPlugins().map((plugin) => {
     const asset = plugin.assets?.[platformSlug];
     // A shipped plugin with no build for this platform is not a smaller
     // release, it is a broken one: the app assumes it is there. Refuse rather

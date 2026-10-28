@@ -7,6 +7,8 @@
  #include <psapi.h>
 #elif JUCE_MAC
  #include <mach/mach.h>
+#elif JUCE_LINUX
+ #include <unistd.h>
 #endif
 
 namespace plectrify
@@ -26,6 +28,13 @@ namespace plectrify
         if (task_info (mach_task_self(), MACH_TASK_BASIC_INFO,
                        reinterpret_cast<task_info_t> (&info), &count) == KERN_SUCCESS)
             return static_cast<double> (info.resident_size) / (1024.0 * 1024.0);
+       #elif JUCE_LINUX
+        // statm's second field is the resident set, in pages.
+        const auto fields = juce::StringArray::fromTokens (
+            juce::File ("/proc/self/statm").loadFileAsString(), true);
+        if (fields.size() >= 2)
+            return fields[1].getDoubleValue() * static_cast<double> (::sysconf (_SC_PAGESIZE))
+                   / (1024.0 * 1024.0);
        #endif
         return 0.0;
     }
