@@ -79,7 +79,23 @@ export interface Download {
 
 const asset = (file: string) => `${REPO}/releases/download/v${VERSION}/${file}`;
 
-export const DOWNLOADS: Download[] = [
+/** The first release that carries a Linux .deb. The site's VERSION trails the
+    newest promoted release, so until that release is promoted the Linux button
+    would deep-link to a file that does not exist; it is left out instead, and
+    appears by itself with the promotion that makes it real. */
+const LINUX_SINCE = '0.1.1';
+
+/** Numeric MAJOR.MINOR.PATCH comparison; `'0.10.0'` is newer than `'0.9.0'`. */
+function atLeast(version: string, floor: string): boolean {
+  const a = version.split('.').map(Number);
+  const b = floor.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  }
+  return true;
+}
+
+const ALL_DOWNLOADS: Download[] = [
   {
     platform: 'windows',
     os: 'Windows',
@@ -99,6 +115,10 @@ export const DOWNLOADS: Download[] = [
     url: asset(`${ASSET_BASE}-${VERSION}-linux-x64.deb`),
   },
 ];
+
+export const DOWNLOADS: Download[] = ALL_DOWNLOADS.filter(
+  (dl) => dl.platform !== 'linux' || atLeast(VERSION, LINUX_SINCE),
+);
 
 export const RELEASES_URL = `${REPO}/releases`;
 
