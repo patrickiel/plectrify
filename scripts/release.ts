@@ -117,7 +117,7 @@ if (process.platform === 'win32') {
     announce('Release step 3 of 3', 'promoting the verified pre-release to latest');
   } else {
     announce('Release step 1 of 3', 'Windows installer + GitHub pre-release');
-    console.log('Next: pnpm release on the Mac, at this same commit.\n');
+    console.log('Next: pnpm release on the Mac and on Linux, at this same commit.\n');
   }
 
   await run('./release.windows.ts', flags);
@@ -141,7 +141,21 @@ if (process.platform === 'win32') {
   }
 
   await run('./release.macos.ts', flags);
+} else if (process.platform === 'linux') {
+  // Linux has no signing to choose between, so its only switch is the
+  // local/publish one, spelled the way release.macos.ts spells it.
+  const flags = local && !forwarded.includes('--no-upload') ? ['--no-upload', ...forwarded] : forwarded;
+
+  if (local) {
+    announce('Build and test locally', 'Linux .deb, publishing nothing');
+    console.log('Install it and play through it before publishing anything.\n');
+  } else {
+    announce('Release step 2 of 3', 'Linux .deb');
+    console.log('Next: pnpm release:promote on Windows, once the Mac and Linux builds are tested.\n');
+  }
+
+  await run('./release.linux.ts', flags);
 } else {
-  console.error('error: Plectrify releases from Windows and macOS only.');
+  console.error('error: Plectrify releases from Windows, macOS and Linux only.');
   process.exit(1);
 }

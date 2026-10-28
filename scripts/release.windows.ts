@@ -129,11 +129,12 @@ if (values.promote) {
     fail(`no published GitHub release ${tag} exists to promote. Run 'pnpm release' first, and check that gh is authenticated.`);
   }
 
-  // One release, two artifacts, in order (RELEASING.md): this command is the
-  // third step, and running it before the Mac has uploaded — or after it half
-  // has — publishes a "latest" release with no macOS download on it. The names
-  // are release.macos.ts's, so a mac artifact that was never built and one
-  // whose upload was interrupted read the same way here: not promotable yet.
+  // One release, three artifacts, in order (RELEASING.md): this command is the
+  // third step, and running it before the Mac or Linux has uploaded — or after
+  // one half has — publishes a "latest" release missing a download. The names
+  // are release.macos.ts's and release.linux.ts's, so an artifact that was never
+  // built and one whose upload was interrupted read the same way here: not
+  // promotable yet.
   const releaseAssets = (() => {
     try {
       return (JSON.parse(assets) as { assets?: { name?: string }[] }).assets ?? [];
@@ -142,14 +143,31 @@ if (values.promote) {
     }
   })();
   const published = new Set(releaseAssets.map((asset) => asset.name));
-  const macArtifacts = [
-    `Plectrify-${version}-macos-arm64.pkg`,
-    `Plectrify-${version}-macos-arm64.pkg.sha256`,
-    'release-manifest-macos.json',
+  const platformArtifacts = [
+    {
+      os: 'macOS',
+      where: 'on the Mac',
+      names: [
+        `Plectrify-${version}-macos-arm64.pkg`,
+        `Plectrify-${version}-macos-arm64.pkg.sha256`,
+        'release-manifest-macos.json',
+      ],
+    },
+    {
+      os: 'Linux',
+      where: 'on Linux',
+      names: [
+        `Plectrify-${version}-linux-x64.deb`,
+        `Plectrify-${version}-linux-x64.deb.sha256`,
+        'release-manifest-linux.json',
+      ],
+    },
   ];
-  const missing = macArtifacts.filter((name) => !published.has(name));
-  if (missing.length > 0) {
-    fail(`the ${tag} release is missing its macOS artifact (${missing.join(', ')}). Run 'pnpm release' on the Mac at this commit before promoting.`);
+  for (const { os, where, names } of platformArtifacts) {
+    const missing = names.filter((name) => !published.has(name));
+    if (missing.length > 0) {
+      fail(`the ${tag} release is missing its ${os} artifact (${missing.join(', ')}). Run 'pnpm release' ${where} at this commit before promoting.`);
+    }
   }
 
   // Notes are not touched here: they were generated at publish time and may
