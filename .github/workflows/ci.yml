@@ -1,0 +1,42 @@
+# Build and test on every platform Plectrify ships for, on every push to main and
+# every pull request. Runs the same gate a developer runs locally —
+# `pnpm app --dist --no-run`: UI format/check/test/build, the native app, every
+# CTest target — so CI and the dev loop cannot disagree about what "green" means.
+# Publishes nothing and needs no secrets.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2022
+          - name: macOS
+            os: macos-15
+          - name: Linux
+            os: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Build and test
+        run: pnpm app --dist --no-run

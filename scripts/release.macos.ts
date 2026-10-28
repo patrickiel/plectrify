@@ -2,26 +2,22 @@
  * Build, sign, notarize and publish the macOS release artifact — the mac
  * counterpart of release.windows.ts, which stays the Windows pipeline untouched.
  *
- *   pnpm release:build                        build + ad-hoc sign locally, publishing nothing
  *   pnpm release                              build + ad-hoc sign + upload (no Apple account)
  *   pnpm release --developer-id               build + sign + notarize + upload
- *   pnpm release:build --developer-id         rehearse locally (still signs/notarizes)
- *   pnpm release:build --skip-tests           iterate on packaging problems only
  *
- * Those are release.ts, which dispatches here on macOS and to
- * release.windows.ts on Windows; this file is the mac half of those commands,
- * and it is the dispatcher that supplies --ad-hoc (the default while Plectrify
- * has no Apple Developer Program membership) and the --no-upload that makes a
- * build local. This script's own flags are unchanged and mean what they always
- * did: --developer-id is release.ts's, and never reaches here.
+ * Those are release.ts, run by the `macos` job of .github/workflows/release.yml
+ * and refused anywhere else; this file is the mac half of that command, and it
+ * is the dispatcher that supplies --ad-hoc (the default while Plectrify has no
+ * Apple Developer Program membership). --developer-id is release.ts's, and never
+ * reaches here; --no-upload builds without publishing.
  *
  * THE MAC ARTIFACT RIDES THE WINDOWS RELEASE. Step 1 on the Windows box creates
  * the tag, the GitHub pre-release, and the AGPL corresponding-source archive;
  * this script verifies it is building the very same commit, then uploads
  * Plectrify-<version>-macos-arm64.pkg beside the Windows installer. Update
  * discovery reads only the release tag, so a second asset needs no app change.
- * Run order per release: pnpm release (Windows box) → pnpm release (Mac) →
- * pnpm release:promote (Windows box).
+ * Run order per release: the Release workflow (Windows job, then Mac and
+ * Linux), then the Promote workflow.
  *
  * THE ARTIFACT IS AN INSTALLER PACKAGE, NOT A DISK IMAGE. A DMG can only offer
  * drag targets, and the plugin's — /Library/Audio/Plug-Ins/VST3 — does not
@@ -233,7 +229,7 @@ if (!values['no-upload']) {
   const taggedCommit = refCommit(`refs/tags/${tag}^{}`) || refCommit(`refs/tags/${tag}`);
 
   if (taggedCommit === '') {
-    fail(`no remote tag ${tag}. Publish the Windows pre-release first ('pnpm release' on the Windows box) — it creates the tag, the GitHub release and the corresponding-source archive this artifact rides with.`);
+    fail(`no remote tag ${tag}. Publish the Windows pre-release first (the Windows job of the Release workflow) — it creates the tag, the GitHub release and the corresponding-source archive this artifact rides with.`);
   }
   if (taggedCommit.toLowerCase() !== commit.toLowerCase()) {
     fail(`remote tag ${tag} names ${taggedCommit}, but this checkout is at ${commit}. Check out the release commit.`);
@@ -247,7 +243,7 @@ if (!values['no-upload']) {
   const release = (() => {
     const json = capture('gh', ['release', 'view', tag, '--repo', repoSlug, '--json', 'isPrerelease']);
     if (json.trim() === '') {
-      fail(`could not read a GitHub release for ${tag} — publish the Windows pre-release first ('pnpm release' on the Windows box), and check that gh is authenticated.`);
+      fail(`could not read a GitHub release for ${tag} — publish the Windows pre-release first (the Windows job of the Release workflow), and check that gh is authenticated.`);
     }
     try {
       return JSON.parse(json) as { isPrerelease?: boolean };
@@ -704,4 +700,4 @@ if (adHoc) {
       'release notes and the site\'s download page still carry the Open Anyway instructions.',
   );
 }
-console.log('Once both platforms are verified, promote with: pnpm release:promote (Windows box).');
+console.log('Once every platform is verified, run the Promote workflow.');

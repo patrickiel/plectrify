@@ -1,0 +1,111 @@
+# Steps 1 and 2 of a release (RELEASING.md), on GitHub's runners instead of
+# three machines. Started by hand with the version from VERSION, which the
+# scripts check against the file — this can confirm the version, never set it.
+#
+#   windows  pnpm release   builds the installer, tags vX.Y.Z, creates the
+#                           GitHub pre-release with the source archive
+#   macos    pnpm release   builds the pkg at that tag and uploads it
+#   linux    pnpm release   builds the .deb at that tag and uploads it
+#
+# The Mac and Linux jobs check out the tag the Windows job pushed, and their
+# scripts refuse to upload unless it names the commit they built — the same gate
+# that held when this was three machines. Promotion stays a separate, manual
+# workflow (promote.yml): it is the sign-off that someone installed the build
+# and played through it. This is the only way a release is built: `pnpm
+# release` refuses to run outside GitHub Actions.
+#
+# Needs no secrets beyond the built-in GITHUB_TOKEN: everything published here
+# goes to this repository's GitHub release. Release notes are the commit bullets
+# (the claude CLI that drafts them locally is not on the runners); edit them on
+# GitHub before promoting. Each job also keeps its artifacts on the run for a
+# while, for installing before promotion.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release — must equal the VERSION file (e.g. 0.2.0)
+        required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  windows:
+    name: Windows — installer + pre-release
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the notes are built from the commits since the last tag
+
+      - uses: ./.github/actions/setup
+
+      - name: Release
+        run: pnpm release --version ${{ inputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows
+          path: artifacts/
+          if-no-files-found: ignore
+
+  macos:
+    name: macOS — pkg
+    needs: windows
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+
+      - uses: ./.github/actions/setup
+
+      - name: Release
+        run: pnpm release --version ${{ inputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos
+          path: |
+            artifacts/*.pkg
+            artifacts/*.sha256
+            artifacts/*.json
+          if-no-files-found: ignore
+
+  linux:
+    name: Linux — .deb
+    needs: windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+
+      - uses: ./.github/actions/setup
+
+      - name: Release
+        run: pnpm release --version ${{ inputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux
+          path: |
+            artifacts/*.deb
+            artifacts/*.sha256
+            artifacts/*.json
+          if-no-files-found: ignore

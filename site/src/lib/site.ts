@@ -49,8 +49,8 @@ export const DISCORD_URL = 'https://discord.gg/dxQBanJr2X';
 /**
  * The version the download buttons point at.
  *
- * Written by `pnpm release:promote`, which rewrites this line, commits it and
- * deploys the site, so it names the newest *promoted* release rather than
+ * Written by the Promote workflow (`pnpm release --promote`), which rewrites
+ * this line, commits it and deploys the site, so it names the newest *promoted* release rather than
  * whatever `/VERSION` happens to say mid-release. Those two differ for the
  * whole life of a pre-release, which is the point: the buttons below deep-link
  * to a tag, and GitHub serves a pre-release's assets from that path as readily

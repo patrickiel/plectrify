@@ -1,17 +1,15 @@
 /**
- * Build and package a local Plectrify Windows x64 release.
+ * Build and package the Plectrify Windows x64 release.
  *
- *   pnpm release:build                          build + package only, publishing nothing
  *   pnpm release                                step 1 — build + publish the pre-release
- *   pnpm release:promote                        step 3 — promote it to latest
+ *   pnpm release --promote                      step 3 — promote it to latest
  *
- * All three are release.ts dispatching here — with nothing, --pre-release and
- * --promote respectively. The commands are named for the job rather than for
- * the machine (there is no `release:windows` any more): on the Mac the same two
- * first names reach release.macos.ts instead.
+ * Both are release.ts dispatching here (with --pre-release and --promote), run
+ * by the `windows` job of .github/workflows/release.yml and by promote.yml, and
+ * refused outside GitHub Actions.
  *
- * Publishing is deliberately opt-in. The normal path builds and packages
- * locally; --pre-release additionally creates an annotated tag and a GitHub
+ * Publishing is opt-in at this level: without a flag the script builds and
+ * packages only; --pre-release additionally creates an annotated tag and a GitHub
  * release that is always marked pre-release, uploading the installer, matching
  * corresponding source, and checksums using the locally authenticated gh CLI.
  * It refuses to run with --skip-tests: an untested build is never published.
@@ -19,10 +17,9 @@
  * once --promote has made a version the latest production release it is
  * immutable, and republishing it is refused — correct it with a new version.
  *
- * The macOS artifact rides the release this script creates: run `pnpm release`
- * on the Mac between steps 1 and 3 (see RELEASING.md). --promote refuses a
- * release that does not yet carry that artifact, so "latest" never means
- * Windows only. This replaced release-windows.ps1 one-for-one; PowerShell
+ * The macOS and Linux artifacts ride the release this script creates: their
+ * jobs run between steps 1 and 3 (see RELEASING.md). --promote refuses a
+ * release that does not yet carry both, so "latest" never means Windows only. This replaced release-windows.ps1 one-for-one; PowerShell
  * survives only as a utility for Authenticode verification and elevation
  * (windows.ts).
  */
@@ -48,8 +45,8 @@ const { values } = parseArgs({
     promote: { type: 'boolean', default: false },
     'skip-tests': { type: 'boolean', default: false },
     // Promotion also points plectrify.com at the new version and deploys it.
-    // This opts out — for a promote run from a machine with no wrangler
-    // credentials, where the site is then deployed separately.
+    // This opts out — for a promote run with no Cloudflare credentials, where
+    // the site is then deployed separately.
     'no-site': { type: 'boolean', default: false },
     'webview2-installer': { type: 'string' },
     'vcredist-installer': { type: 'string' },
@@ -126,7 +123,7 @@ if (values.promote) {
   const slug = repoSlug();
   const assets = capture('gh', ['release', 'view', tag, '--repo', slug, '--json', 'assets']);
   if (assets.trim() === '') {
-    fail(`no published GitHub release ${tag} exists to promote. Run 'pnpm release' first, and check that gh is authenticated.`);
+    fail(`no published GitHub release ${tag} exists to promote. Run the Release workflow first.`);
   }
 
   // One release, three artifacts, in order (RELEASING.md): this command is the
@@ -146,7 +143,7 @@ if (values.promote) {
   const platformArtifacts = [
     {
       os: 'macOS',
-      where: 'on the Mac',
+      where: 'macOS',
       names: [
         `Plectrify-${version}-macos-arm64.pkg`,
         `Plectrify-${version}-macos-arm64.pkg.sha256`,
@@ -155,7 +152,7 @@ if (values.promote) {
     },
     {
       os: 'Linux',
-      where: 'on Linux',
+      where: 'Linux',
       names: [
         `Plectrify-${version}-linux-x64.deb`,
         `Plectrify-${version}-linux-x64.deb.sha256`,
@@ -166,7 +163,7 @@ if (values.promote) {
   for (const { os, where, names } of platformArtifacts) {
     const missing = names.filter((name) => !published.has(name));
     if (missing.length > 0) {
-      fail(`the ${tag} release is missing its ${os} artifact (${missing.join(', ')}). Run 'pnpm release' ${where} at this commit before promoting.`);
+      fail(`the ${tag} release is missing its ${os} artifact (${missing.join(', ')}). Re-run the Release workflow's ${where} job before promoting.`);
     }
   }
 
@@ -620,9 +617,8 @@ ${sourceReleaseUrl}
 
 SHA-256: ${sourceHash}
 
-If this is a locally built package that has not been published, run
-'pnpm release' from the release commit; it creates ${sourceArchiveName}
-beside the installer.
+If this package was built without publishing, the Release workflow run
+for this commit creates ${sourceArchiveName} beside the installer.
 
 THIRD-PARTY PLUGINS
 
@@ -818,7 +814,7 @@ if (values['pre-release']) {
     '--notes-file', notesPath,
   ]);
   console.log(`Published pre-release: https://github.com/${slug}/releases/tag/${tag}`);
-  console.log(`Add the mac artifact next (pnpm release, on the Mac), then promote with: pnpm release:promote`);
+  console.log('The macOS and Linux jobs add their artifacts next; then run the Promote workflow.');
 }
 
 console.log(`Release ready: ${installerPath}`);
