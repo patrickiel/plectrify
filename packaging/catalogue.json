@@ -457,6 +457,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/vvvar/PeakEater/releases/download/v0.8.2/peakeater-v0.8.2-Linux-x86_64.zip",
+          "sha256": "0ddf7d839fa436e62c2e9d5b1f188d695424d5aba2f242ad0a89bb8634f299b9",
+          "downloadBytes": 4586800
+        },
         "macos-arm64": {
           "url": "https://cdn.plectrify.com/plugins/v1/hosted/peakeater/peakeater-0.8.2-macos-arm64.zip",
           "sha256": "a0bf29b010ae364d55c1194b61ef45f17ba4ecfc7cb07eac21c0b499d72267e1",
@@ -496,6 +501,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/jerryuhoo/Fire/releases/download/v1.5.0/Fire-1.5.0-Linux.zip",
+          "sha256": "774b75bc213ebb1728aebee2f51d7ee371f3cfd0eb103b4fc7faff8efc43ab8a",
+          "downloadBytes": 7121884
+        },
         "macos-arm64": {
           "url": "https://github.com/jerryuhoo/Fire/releases/download/v1.5.0/Fire-1.5.0-macOS.zip",
           "sha256": "e4c63f6954ad89a4137d50de71dd9dd00486ad8afeca2f0ebaeb3b7c837e24b3",
@@ -533,6 +543,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/tiagolr/filtr/releases/download/v1.3.0/filtr-linux-v1.3.0.zip",
+          "sha256": "30840e30ed7cf323e7f8142aaba260b538fcdd531be74d2fdf796fb6f0dacfa0",
+          "downloadBytes": 5487278
+        },
         "macos-arm64": {
           "url": "https://github.com/tiagolr/filtr/releases/download/v1.3.0/filtr-macos-v1.3.0.zip",
           "sha256": "4a3c2f6128dd6c9b883857ac1bf37d8265dd3e44c9fe77a03f8c61d2834f43f1",
@@ -569,6 +584,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/tiagolr/gate12/releases/download/v1.3.3/gate12-linux-v1.3.3.zip",
+          "sha256": "fa19ebf1cacd064c5c2fc687894ffc7400a92e9887f6db3cc3f2f59042d07cad",
+          "downloadBytes": 5135883
+        },
         "macos-arm64": {
           "url": "https://github.com/tiagolr/gate12/releases/download/v1.3.3/gate12-macos-v1.3.3.zip",
           "sha256": "2c11517bd9b59a83fa813fe9f933c4233deff5c7571b4e299c8b6fd91b2e7189",
@@ -603,6 +623,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/tiagolr/time12/releases/download/v1.2.3/time12-linux-v1.2.3.zip",
+          "sha256": "d1e19e0c2e5332626af3077d4dd98dcaeb4b4c2b33ee74c267a732c29df10613",
+          "downloadBytes": 5066023
+        },
         "macos-arm64": {
           "url": "https://github.com/tiagolr/time12/releases/download/v1.2.3/time12-macos-v1.2.3.zip",
           "sha256": "9066d0f46fe0cbce102296180d157a176708654b9d6488f6d616e9e3d5cf45e4",
@@ -637,6 +662,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/maurocosentino/lupex-chorus-bbd/releases/download/v0.1.0/ChorusBBD-Linux-VST3.zip",
+          "sha256": "fdfd1f1c0d30b51303bd3dcf91390dc359d01f55394156c2272b36968be96d06",
+          "downloadBytes": 4088838
+        },
         "windows-x64": {
           "url": "https://github.com/maurocosentino/lupex-chorus-bbd/releases/download/v0.1.0/ChorusBBD-Windows-VST3.zip",
           "sha256": "47d60a4c5dac109984001fb63a81f6b575fdc542796cf4bcca1e417522e0d28d",
@@ -701,6 +731,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/maurocosentino/lupex-analog-delay/releases/download/v1.1.0/Lupex-Linux-VST3.zip",
+          "sha256": "e1b49fa909b6f2b18e317b449e1aebe976fd033d40b57509b5b3336d21cdbc61",
+          "downloadBytes": 4077998
+        },
         "windows-x64": {
           "url": "https://github.com/maurocosentino/lupex-analog-delay/releases/download/v1.1.0/Lupex-Windows-VST3.zip",
           "sha256": "d3a02e93782e6ccd49132a4a4328123ecd07109051418ce55cf71c3e435e9f11",
@@ -732,6 +767,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.1.2/qdelay-linux-v1.1.2.zip",
+          "sha256": "3127713fd2aa9dabfc8dc52912f40be983c9c057c1cee0c090bdc50c98b1c101",
+          "downloadBytes": 5451971
+        },
         "macos-arm64": {
           "url": "https://github.com/tiagolr/qdelay/releases/download/v1.1.2/qdelay-macos-v1.1.2.zip",
           "sha256": "44a6e68f62c60f14b6ae3da64e93387af51682aadcd421b51e53078fb6642fcf",
@@ -804,6 +844,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/tiagolr/sirial/releases/download/v1.1.1/sirial-linux-v1.1.1.zip",
+          "sha256": "4937c3c27ba4ffe41a76de4d5020ba4923ac828e6916258916fe329335c4aeff",
+          "downloadBytes": 4959438
+        },
         "macos-arm64": {
           "url": "https://github.com/tiagolr/sirial/releases/download/v1.1.1/sirial-macos-v1.1.1.zip",
           "sha256": "8b824a76797d7d4310f673818c7794cf958215e435b35b4396db6beaa0a871fa",
@@ -875,6 +920,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/tiagolr/reevr/releases/download/v1.4.0/reevr-linux-v1.4.0.zip",
+          "sha256": "243da8bd8b90e60372f75ddea9a6ae54c5a1dd7f2071b0050e47ed613c511f8f",
+          "downloadBytes": 7549063
+        },
         "macos-arm64": {
           "url": "https://github.com/tiagolr/reevr/releases/download/v1.4.0/reevr-macos-v1.4.0.zip",
           "sha256": "92e069e942ac0f286169b32d0fd175483a10e07da6470a3582c93cc8a741c9e3",
@@ -986,6 +1036,11 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://github.com/xunil-cloud/CloudReverb/releases/download/v0.5/CloudReverb-v0.5-Linux-x86_64.zip",
+          "sha256": "81cda6a9979cdbaf4d7a261338e59b87c2d4f4a123d05049a5aeaaabe399e6d1",
+          "downloadBytes": 7050789
+        },
         "macos-arm64": {
           "url": "https://github.com/xunil-cloud/CloudReverb/releases/download/v0.5/CloudReverb-v0.5-macOS.zip",
           "sha256": "88b60035570f680e29ccc2465711dd1ea9886d80c6c1bcca5f8bf09b2cd49b9c",
