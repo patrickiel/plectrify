@@ -23,6 +23,11 @@ that has no native support will not beat WASAPI.
 On **macOS** there is nothing to decide. CoreAudio is the native low-latency driver and your
 interface talks to it directly.
 
+On **Linux**, choose **JACK** when it is available. On a current desktop that is PipeWire's JACK
+support (the `pipewire-jack` package), which lets Plectrify share the interface with everything
+else while keeping low latency; with no JACK server, **ALSA** works too, and Plectrify picks it on
+its own.
+
 ## Buffer size
 
 The buffer size is the trade you actually control: **smaller buffer, lower latency, more risk of

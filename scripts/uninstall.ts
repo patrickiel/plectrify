@@ -1,11 +1,11 @@
 /**
  * `pnpm purge` — remove every Plectrify installation and every trace it left
- * behind, on Windows and macOS from one script.
+ * behind, on Windows, macOS and Linux from one script.
  *
- * One file rather than a windows/macos pair, unlike run.ts and release.ts:
+ * One file rather than a per-OS set, unlike run.ts and release.ts:
  * those dispatch because building is genuinely two different jobs, while this
- * is a single list of paths that happens to read differently per OS. The two
- * halves share the whole of their structure — enumerate, report, delete,
+ * is a single list of paths that happens to read differently per OS. The
+ * branches share the whole of their structure — enumerate, report, delete,
  * report what could not be deleted — and differ in nothing but the paths.
  *
  * Nothing is deleted without --yes. The default run prints exactly what it
@@ -23,10 +23,13 @@
  *
  * Elevation. The machine-wide targets — Program Files, the shared VST3 folder
  * and ProgramData on Windows; /Applications and /Library/Audio/Plug-Ins on
- * macOS — were written by an installer that asked for admin rights, so removing
- * them needs the same. Windows refuses up front and asks to be re-run from an
- * elevated prompt (a running console process cannot elevate itself). macOS
- * shells the individual system removals out to sudo, which prompts.
+ * macOS; the .deb's files and /var/lib/Plectrify on Linux — were written by an
+ * installer that asked for admin rights, so removing them needs the same.
+ * Windows refuses up front and asks to be re-run from an elevated prompt (a
+ * running console process cannot elevate itself). macOS and Linux shell the
+ * individual system removals out to sudo, which prompts; on Linux the package
+ * itself is removed through dpkg, so its database does not go on listing files
+ * this script deleted.
  *
  * Deliberately left alone: the WebView2 Runtime and the Visual C++
  * redistributable on Windows — shared with every other application, and the
@@ -51,14 +54,15 @@ const { values } = parseArgs({
 
 const windows = process.platform === 'win32';
 const macos = process.platform === 'darwin';
-if (!windows && !macos) fail('Plectrify runs on Windows and macOS only.');
+const linux = process.platform === 'linux';
+if (!windows && !macos && !linux) fail('Plectrify runs on Windows, macOS and Linux only.');
 
 const dryRun = !values.yes;
 const home = homedir();
 
 /** One thing to remove. `elevated` means the path belongs to an installation
     written with admin rights, which is what decides whether this process may
-    touch it at all (Windows) or has to ask sudo to (macOS). */
+    touch it at all (Windows) or has to ask sudo to (macOS, Linux). */
 interface Target {
   path: string;
   what: string;
@@ -166,6 +170,26 @@ function presentReceipts(): string[] {
   return macos ? PKG_RECEIPTS.filter((id) => probe('pkgutil', ['--pkg-info', id]) === 0) : [];
 }
 
+// --- Linux: the .deb ------------------------------------------------------------------------
+// Removed through dpkg rather than by path, for the same reason the receipts
+// are forgotten on macOS: dpkg's database otherwise keeps a package installed
+// whose files are gone. A purge (not a remove) also drops its conffiles record.
+// /var/lib/Plectrify survives it — postinst creates that folder but the package
+// does not own it — and is swept with the packages below.
+const DEB_PACKAGE = 'plectrify';
+
+function debInstalled(): boolean {
+  return linux && capture('dpkg-query', ['-W', '-f=${Status}', DEB_PACKAGE]).includes('install ok installed');
+}
+
+function purgeDeb(): void {
+  if (!debInstalled()) return;
+  console.log(`==> Removing the ${DEB_PACKAGE} package`);
+  if (runInteractive('sudo', ['dpkg', '--purge', DEB_PACKAGE]) !== 0) {
+    console.warn(`warning: dpkg could not remove ${DEB_PACKAGE}; its files are swept below instead.`);
+  }
+}
+
 function forgetReceipts(): void {
   for (const receipt of presentReceipts()) {
     console.log(`==> Forgetting receipt ${receipt}`);
@@ -177,13 +201,13 @@ function forgetReceipts(): void {
 
 // --- Packages the user installed from inside the app ---------------------------------------
 // On Windows all of these live under %PROGRAMDATA%\Plectrify, a folder of ours,
-// so the whole tree goes with the rest of the path sweep. macOS is the awkward
-// one: its managed plugin directory is ~/Library/Audio/Plug-Ins/VST3, shared
-// with every other VST3 installer on the machine, so the only defensible
-// removal is the one the app itself performs — delete exactly the files the
-// install markers say Plectrify wrote, and nothing else in that folder.
-function macManagedPluginTargets(): Target[] {
-  const markerDir = join(home, 'Library', 'Audio', 'Plug-Ins', 'VST3', '.plectrify-installed');
+// so the whole tree goes with the rest of the path sweep. macOS and Linux are
+// the awkward ones: their managed plugin directory (~/Library/Audio/Plug-Ins/VST3,
+// ~/.vst3) is shared with every other VST3 installer on the machine, so the
+// only defensible removal is the one the app itself performs — delete exactly
+// the files the install markers say Plectrify wrote, and nothing else there.
+function managedPluginTargets(pluginDir: string): Target[] {
+  const markerDir = join(pluginDir, '.plectrify-installed');
   if (!existsSync(markerDir)) return [];
 
   const found: Target[] = [];
@@ -245,6 +269,31 @@ if (windows) {
   if (!values['keep-packages']) {
     add(programData && join(programData, 'Plectrify'), 'installed packages and content', true);
   }
+} else if (linux) {
+  // What the .deb installed (release.linux.ts). dpkg takes these first; the
+  // sweep catches an interrupted install or a hand-copied tree.
+  add('/opt/plectrify', 'application', true);
+  add('/usr/bin/plectrify', 'application link', true);
+  add('/usr/share/applications/plectrify.desktop', 'desktop entry', true);
+  add('/usr/share/icons/hicolor/1024x1024/apps/plectrify.png', 'icon', true);
+  add('/usr/lib/vst3/Plectrify.vst3', 'VST3 plug-in', true);
+
+  // The dev loop's `--plugin` install.
+  add(join(home, '.vst3', 'Plectrify.vst3'), 'VST3 plug-in (dev build)');
+
+  if (!values['keep-user-data']) {
+    const config = process.env['XDG_CONFIG_HOME'] || join(home, '.config');
+    const data = process.env['XDG_DATA_HOME'] || join(home, '.local', 'share');
+    const cache = process.env['XDG_CACHE_HOME'] || join(home, '.cache');
+    add(join(config, 'Plectrify'), 'user data');
+    // WebKitGTK's own storage, kept against the program name.
+    add(join(data, 'Plectrify'), 'web view data');
+    add(join(cache, 'Plectrify'), 'web view cache');
+  }
+  if (!values['keep-packages']) {
+    targets.push(...managedPluginTargets(join(home, '.vst3')));
+    add('/var/lib/Plectrify', 'installed content', true);
+  }
 } else {
   add('/Applications/Plectrify.app', 'application', true);
   add('/Library/Audio/Plug-Ins/VST3/Plectrify.vst3', 'VST3 plug-in', true);
@@ -270,7 +319,7 @@ if (windows) {
     }
   }
   if (!values['keep-packages']) {
-    targets.push(...macManagedPluginTargets());
+    targets.push(...managedPluginTargets(join(home, 'Library', 'Audio', 'Plug-Ins', 'VST3')));
     add('/Users/Shared/Plectrify', 'installed content', true);
   }
 }
@@ -288,7 +337,9 @@ function elevatedOnWindows(): boolean {
 const receipts = presentReceipts();
 const hives = installedHives();
 
-if (targets.length === 0 && receipts.length === 0 && hives.length === 0) {
+const deb = debInstalled();
+
+if (targets.length === 0 && receipts.length === 0 && hives.length === 0 && !deb) {
   console.log('No Plectrify installation or leftover data found.');
   process.exit(0);
 }
@@ -300,6 +351,7 @@ for (const { path, what, elevated } of targets) {
 }
 if (hives.length > 0) console.log('  the Add/Remove Programs entry');
 if (receipts.length > 0) console.log(`  the installer receipts (${receipts.join(', ')})`);
+if (deb) console.log(`  the ${DEB_PACKAGE} package (dpkg --purge)`);
 
 if (values['keep-user-data']) console.log('\nKeeping rigs, patches and settings (--keep-user-data).');
 if (values['keep-packages']) console.log('Keeping plugins and content installed from the Packages panel (--keep-packages).');
@@ -317,6 +369,7 @@ if (windows && targets.some(({ elevated }) => elevated) && !elevatedOnWindows())
 
 stopPlectrify();
 if (windows) await runInnoUninstaller();
+if (linux) purgeDeb();
 
 const failures: string[] = [];
 let denied = false;
@@ -324,8 +377,8 @@ for (const { path, what, elevated } of targets) {
   if (!existsSync(path)) continue; // the uninstaller may already have taken it
   console.log(`==> Removing ${path} (${what})`);
   try {
-    if (macos && elevated && process.getuid?.() !== 0) {
-      // Written as root by the pkg; sudo prompts on the inherited terminal.
+    if ((macos || linux) && elevated && process.getuid?.() !== 0) {
+      // Written as root by the installer; sudo prompts on the inherited terminal.
       if (runInteractive('sudo', ['rm', '-rf', path]) !== 0) throw new Error('sudo rm failed');
     } else {
       rmSync(path, { recursive: true, force: true });

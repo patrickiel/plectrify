@@ -22,6 +22,7 @@ import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { unzipSync } from 'fflate';
 import { scriptArgs } from './cli.ts';
+import { ASSET_PLATFORMS } from './manifest.ts';
 import { R2_PUBLIC_BASE, buildArchive } from './pack.ts';
 import { wranglerInherit } from './wrangler.ts';
 
@@ -262,13 +263,13 @@ console.log(
       // differ per OS, drop the platforms it does not suit rather than
       // shipping them bytes that do not fit.
       assets: Object.fromEntries(
-        ['macos-arm64', 'windows-x64'].map((platform) => [
+        ASSET_PLATFORMS.map((platform) => [
           platform,
           {
             url: `${R2_PUBLIC_BASE}/${key}`,
             sha256: archiveHash,
             downloadBytes: archiveBytes,
-            // This script just uploaded it, so both platforms are served by us.
+            // This script just uploaded it, so every platform is served by us.
             selfHosted: true,
           },
         ]),

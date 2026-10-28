@@ -26,7 +26,7 @@
   const features: { title: string; body: string; art: Art }[] = [
     {
       title: 'Low latency',
-      body: 'ASIO on Windows, CoreAudio on macOS. Plug in and play in real time.',
+      body: 'ASIO on Windows, CoreAudio on macOS, JACK or PipeWire on Linux. Plug in and play in real time.',
       art: 'latency',
     },
     {

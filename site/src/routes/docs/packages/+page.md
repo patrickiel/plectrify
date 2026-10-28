@@ -20,10 +20,10 @@ Nothing needs administrator rights, and nothing is installed that you did not as
 
 ## Where things land
 
-|             | Windows                            | macOS                              |
-| ----------- | ---------------------------------- | ---------------------------------- |
-| **Plugins** | `%PROGRAMDATA%\Plectrify\plugins`  | `~/Library/Audio/Plug-Ins/VST3`    |
-| **Content** | `%PROGRAMDATA%\Plectrify\<folder>` | `/Users/Shared/Plectrify/<folder>` |
+|             | Windows                            | macOS                              | Linux                         |
+| ----------- | ---------------------------------- | ---------------------------------- | ----------------------------- |
+| **Plugins** | `%PROGRAMDATA%\Plectrify\plugins`  | `~/Library/Audio/Plug-Ins/VST3`    | `~/.vst3`                     |
+| **Content** | `%PROGRAMDATA%\Plectrify\<folder>` | `/Users/Shared/Plectrify/<folder>` | `/var/lib/Plectrify/<folder>` |
 
 > These folders are still named **Plectrify**, which is what the app was called before it became
 > Plectrify. They will be renamed in a future release; until then, the paths above are what you

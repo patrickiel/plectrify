@@ -40,7 +40,7 @@ const SAFE_CATALOGUE_ID = /^[A-Za-z0-9_-]+$/;
  * entry" — two code paths for one question. It is now an ordinary key. Must
  * match the slugs Catalogue.cpp selects by.
  */
-export const ASSET_PLATFORMS = ['macos-arm64', 'windows-x64'] as const;
+export const ASSET_PLATFORMS = ['linux-x64', 'macos-arm64', 'windows-x64'] as const;
 export type AssetPlatform = (typeof ASSET_PLATFORMS)[number];
 
 /**
