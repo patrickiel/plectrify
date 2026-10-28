@@ -224,10 +224,16 @@ export function bundledPluginsMissingFor(platformSlug: string): BundledPlugin[] 
     packages any more (nothing offers, installs or uninstalls them) — they are
     part of the application, and the only thing either script needs is a pinned
     URL and hash to stage from. */
-export function bundledPluginsFor(platformSlug: string): (BundledPlugin & {
+export function bundledPluginsFor(
+  platformSlug: string,
+  /** Ids the caller stages some other way (Linux builds Neural Amp Modeler
+      in-tree) or has already decided to do without. */
+  exclude: readonly string[] = [],
+): (BundledPlugin & {
   asset: { url: string; sha256: string; downloadBytes?: number };
 })[] {
-  return readBundledPlugins().map((plugin) => {
+  const wanted = readBundledPlugins().filter((plugin) => !exclude.includes(plugin.id));
+  return wanted.map((plugin) => {
     const asset = plugin.assets?.[platformSlug];
     // A shipped plugin with no build for this platform is not a smaller
     // release, it is a broken one: the app assumes it is there. Refuse rather
@@ -250,11 +256,14 @@ export function bundledPluginsFor(platformSlug: string): (BundledPlugin & {
     Extraction is left to the caller: the two platforms need different tools
     (tar.exe on Windows; ditto on macOS, which preserves the permission bits and
     symlinks a signed bundle cannot survive without). */
-export function fetchBundledPluginArchives(platformSlug: string): {
+export function fetchBundledPluginArchives(
+  platformSlug: string,
+  exclude: readonly string[] = [],
+): {
   plugin: ReturnType<typeof bundledPluginsFor>[number];
   archive: string;
 }[] {
-  const plugins = bundledPluginsFor(platformSlug);
+  const plugins = bundledPluginsFor(platformSlug, exclude);
   if (plugins.length === 0) return [];
 
   const cacheRoot = join(ROOT, '.release-cache');

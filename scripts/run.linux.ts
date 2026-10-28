@@ -39,12 +39,14 @@ import {
 } from './shared.ts';
 import { DEV_SERVER_PORT, DEV_SERVER_URL } from './devServer.ts';
 import {
+  IN_TREE_PLUGINS,
   appBinary,
   assertLinux,
   buildDir,
   buildTarget,
   checkContentRoot,
   configure,
+  inTreePluginBundle,
   pluginBundle,
   stageUiBesideBinary,
   startApp,
@@ -92,20 +94,31 @@ function installUiDependencies(): void {
 }
 
 /** Put the plugins Plectrify ships where a Debug build looks for them
-    (third_party/plugins). A shipped plugin with no Linux build is reported and
-    skipped: the dev loop still runs, it just lacks what that plugin enables. */
+    (third_party/plugins). The ones Linux builds in-tree are built and copied
+    (always, so the dev build never runs a stale one); the rest come from their
+    pinned archives. A shipped plugin with neither is reported and skipped: the
+    dev loop still runs, it just lacks what that plugin enables. Needs the tree
+    configured. */
 function stageBundledPlugins(): void {
-  const missing = bundledPluginsMissingFor(PLATFORM);
+  const destination = join(ROOT, 'third_party', 'plugins');
+
+  for (const { target, bundle } of Object.values(IN_TREE_PLUGINS)) {
+    buildTarget(config, target);
+    const staged = join(destination, bundle);
+    mkdirSync(destination, { recursive: true });
+    rmSync(staged, { recursive: true, force: true });
+    cpSync(inTreePluginBundle(config, bundle), staged, { recursive: true, verbatimSymlinks: true });
+  }
+
+  const missing = bundledPluginsMissingFor(PLATFORM).filter((p) => !(p.id in IN_TREE_PLUGINS));
   for (const plugin of missing) {
     console.warn(
       `warning: ${plugin.name} has no ${PLATFORM} build in packaging/bundled-plugins.json; ` +
         'the dev build runs without it.',
     );
   }
-  if (missing.length > 0) return;
-
-  const destination = join(ROOT, 'third_party', 'plugins');
-  for (const { plugin, archive } of fetchBundledPluginArchives(PLATFORM)) {
+  const skip = [...Object.keys(IN_TREE_PLUGINS), ...missing.map((p) => p.id)];
+  for (const { plugin, archive } of fetchBundledPluginArchives(PLATFORM, skip)) {
     if (existsSync(join(destination, plugin.bundleName))) continue;
 
     mkdirSync(destination, { recursive: true });
@@ -152,8 +165,8 @@ if (values.dist) {
     pnpm('Building UI', ['build'], { cwd: uiDir });
   }
 
-  stageBundledPlugins();
   configure(config);
+  stageBundledPlugins();
   checkContentRoot();
   await stopApp();
   buildTarget(config, 'Plectrify', values.clean);
@@ -208,8 +221,8 @@ if (status === 'free') {
   console.log(`==> Plectrify Vite dev server already running on :${DEV_SERVER_PORT}`);
 }
 
-stageBundledPlugins();
 configure(config);
+stageBundledPlugins();
 checkContentRoot();
 
 if (values.plugin) {

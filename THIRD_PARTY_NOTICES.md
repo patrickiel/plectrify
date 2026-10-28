@@ -91,6 +91,26 @@ that permits it, not a copy of anyone else's build.
   are recorded in a `PROVENANCE-<platform>.txt` published beside that archive.
 - The plugin's own third-party notices ship inside the plugin bundle.
 
+**On Linux** the plugin is a different build of the same DSP. Upstream's plugin
+is built on iPlug2, which has no Linux target, so Plectrify wraps Neural Amp
+Modeler's own processing in a JUCE VST3 of its own (`Source/namplugin/`, part of
+Plectrify's source under `LICENSE`) and compiles it with the rest of the
+application. It reports the same name and parameters as upstream so that
+patches and TONE3000 tones load into it unchanged; its manufacturer is
+Plectrify. Third-party code compiled into it, each at the exact commit
+Neural Amp Modeler v0.7.15 pins (see `CMakeLists.txt`):
+
+- NeuralAmpModelerCore, MIT, Copyright (c) 2023 Steven Atkinson —
+  https://github.com/sdatkinson/NeuralAmpModelerCore
+- AudioDSPTools, MIT, Copyright (c) 2023 Steven Atkinson —
+  https://github.com/sdatkinson/AudioDSPTools (its resampler derives from
+  iPlug2, zlib-style licence)
+- The tone stack and resampling wrapper of NeuralAmpModelerPlugin, MIT,
+  Copyright (c) 2023 Steven Atkinson, copied into `Source/namplugin/`
+- nlohmann/json, MIT, Copyright (c) 2013-2022 Niels Lohmann
+- Eigen, MPL-2.0 — https://gitlab.com/libeigen/eigen (source for the exact
+  commit is linked from `CMakeLists.txt`; Eigen is header-only and unmodified)
+
 ## Other VST3 plugins
 
 Beyond the one above, Plectrify redistributes no third-party plugin. (The
