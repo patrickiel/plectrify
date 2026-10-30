@@ -10,12 +10,16 @@ for AI coding agents, equally useful for humans).
 - **Windows 11** with **Visual Studio 2022/18** and the *Desktop development
   with C++* workload (bundles CMake — neither `cmake` nor `cl` needs to be on
   PATH; the scripts find the VS-bundled binaries), **or macOS 13.3+ on Apple
-  Silicon** with the Xcode Command Line Tools, CMake and (optionally) Ninja.
+  Silicon** with the Xcode Command Line Tools, CMake and (optionally) Ninja,
+  **or x86-64 Linux** with CMake, Ninja, a C++ compiler and the `-dev`
+  packages listed in `.github/actions/setup/action.yml` (WebKitGTK 4.1, GTK 3,
+  ALSA, JACK, curl, …; `pnpm app` names any that are missing). Once per
+  machine: `sudo install -d -m 1777 /var/lib/Plectrify`.
 - **Node.js** with **pnpm** (the UI uses pnpm, not npm).
 
 ## Build and run
 
-One command on both OSes (`pnpm install` once at the repo root first):
+One command on every OS (`pnpm install` once at the repo root first):
 
 ```sh
 pnpm app             # dev loop: Vite HMR server + Debug app pointed at it
@@ -28,7 +32,7 @@ pnpm app --dist --config Release  # Release build (stages ui/ where the OS serve
 ```
 
 The first CMake configure downloads JUCE (~1 min; on Windows also the WebView2
-SDK package — macOS needs none, WKWebView ships with the OS). The app serves
+SDK package — macOS and Linux need none, their web views come from the OS). The app serves
 the Svelte UI from `ui/dist`, so the UI must be built before the native app can
 show anything — `pnpm app` handles the ordering.
 

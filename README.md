@@ -18,6 +18,8 @@
 <a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="250"></a>
 &nbsp;
 <a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="250"></a>
+&nbsp;
+<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-linux.png" alt="Download for Linux" width="250"></a>
 
 [Website](https://plectrify.com) ·
 [Docs](https://plectrify.com/docs) ·
@@ -38,7 +40,7 @@
 
 ---
 
-A free guitar rig for Windows and macOS. Plug in and play through your own
+A free guitar rig for Windows, macOS and Linux. Plug in and play through your own
 VST3 amp sims and pedals. No DAW, no session to set up.
 
 Reorder, bypass and swap modules like pedals on a board. It runs live, at the
@@ -82,25 +84,29 @@ Grab the latest installer from the
 
 - **Windows 10/11 (64-bit):** run `Plectrify-<version>-win-x64-setup.exe`.
   Everything it needs is bundled.
-- **macOS (Apple Silicon, 13.3+):** open `Plectrify-<version>-macos-arm64.dmg`
-  and drag the app to Applications.
+- **macOS (Apple Silicon, 13.3+):** run `Plectrify-<version>-macos-arm64.pkg`.
+  It installs the app plus the VST3 and AU plugins.
+- **Linux (x86-64; Ubuntu 24.04, Debian 13 or newer):** install
+  `Plectrify-<version>-linux-x64.deb`, e.g.
+  `sudo apt install ./Plectrify-<version>-linux-x64.deb`.
 
 > [!IMPORTANT]
-> The macOS build is signed but **not notarized**, so macOS blocks the first
-> launch and may claim the app *"is damaged"*. It isn't: go to
+> The macOS build is signed but **not notarized**, so macOS blocks the
+> installer at first and may claim it *"is damaged"*. It isn't: go to
 > **System Settings → Privacy & Security → Open Anyway**, or see the
-> [full instructions](https://plectrify.com/docs/opening-on-macos). Every DMG
-> ships with a SHA-256 checksum you can verify.
+> [full instructions](https://plectrify.com/docs/opening-on-macos). Every
+> installer ships with a SHA-256 checksum you can verify.
 
 Bring your own VST3 plugins; plenty of great ones are free.
 [Neural Amp Modeler](https://www.neuralampmodeler.com) is included, so TONE3000
 captures play with nothing else installed. On Windows, install your interface's
-ASIO driver for the lowest latency; macOS uses CoreAudio.
+ASIO driver for the lowest latency; macOS uses CoreAudio; on Linux pick JACK
+(PipeWire's JACK works) over ALSA.
 
 ## First five minutes
 
 1. Open **Audio Settings** and pick your interface as input (the ASIO device
-   type on Windows) and your speakers or headphones as output. The first
+   type on Windows, JACK on Linux) and your speakers or headphones as output. The first
    enabled input channel is your guitar.
 2. Hit **Scan Plugins** once. Plectrify finds and remembers your VST3s.
 3. Add modules: an amp sim, then whatever effects you like. Drag to reorder,
