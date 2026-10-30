@@ -23,7 +23,7 @@
  * may already hold its published checksums.
  *
  * Every flag the platform scripts take is forwarded untouched (`--version` to
- * double-check what is shipping, `--no-site` to promote without deploying).
+ * double-check what is shipping).
  */
 const args = process.argv.slice(2);
 

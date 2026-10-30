@@ -37,17 +37,19 @@ an empty Packages panel on someone else's machine.
 
 **4. Run the Promote workflow** (Actions → Promote, on `main`, same version).
 Marks the release **latest** (refused until the macOS and Linux assets are
-there), then points plectrify.com at it: `site/src/lib/site.ts` is rewritten,
-committed, pushed to `main` and deployed. The deploy needs the
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets; without
-them, or with *Deploy the site* unticked, the site is left alone. If only the
-deploy fails, the promotion still stands — run `pnpm --dir site run deploy`.
+there). That is all it does, and all it needs to: the download buttons on
+plectrify.com and in the README link to
+`/releases/latest/download/Plectrify-<platform>.<ext>`, so they serve the new
+version the moment the flag moves, with no commit and no site deploy. The asset
+names carry no version for exactly that reason — keep it that way, or those
+links break on the next release. Until a version is promoted the buttons keep
+serving the previous one, since GitHub's "latest" skips pre-releases.
 
 ## Notes
 
-**Secrets.** Steps 2 and 4 need nothing but the built-in `GITHUB_TOKEN`; only
-the site deploy needs Cloudflare's. The catalogue signing key is unrelated to
-releases and stays offline (`packaging/README.md`).
+**Secrets.** Steps 2 and 4 need nothing but the built-in `GITHUB_TOKEN`. The
+catalogue signing key is unrelated to releases and stays offline
+(`packaging/README.md`).
 
 **Mac signing.** There is no Apple Developer Program membership, so the mac
 build is ad-hoc signed: the pkg is unsigned, not notarized, and without the

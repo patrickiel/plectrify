@@ -345,7 +345,7 @@ exit 0
 chmodSync(join(debian, 'postinst'), 0o755);
 
 // --- Build the .deb ------------------------------------------------------------
-const debName = `Plectrify-${version}-linux-x64.deb`;
+const debName = 'Plectrify-linux-x64.deb';
 const debPath = join(outputDir, debName);
 rmSync(debPath, { force: true });
 run('Building the .deb', 'dpkg-deb', ['--root-owner-group', '-Zxz', '--build', stage, debPath]);

@@ -82,7 +82,7 @@ ui/                   # Svelte front-end
   dist/               # build output — served by the native app at runtime (gitignored)
 site/                 # plectrify.com — static marketing + docs site (see site/README.md)
   src/routes/docs/    # one .md per page, wrapped by src/lib/docs/_docs.svelte
-  src/lib/site.ts     # version, download URLs, video id — the product facts
+  src/lib/site.ts     # download URLs, video id — the product facts
 third_party/          # vendored, gitignored: Microsoft.Web.WebView2 NuGet package (Windows)
 build/                # CMake output (gitignored); exe at build/Plectrify_artefacts/<Config>/Plectrify.exe
 build-macos-*/        # macOS CMake trees (one per config; single-config generators)

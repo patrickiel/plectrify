@@ -87,13 +87,13 @@ repo, no CI credentials to hold. To automate it later, the same command with a
   `title` and `description`; the shared prose shell wraps it automatically.
   Adding a page means adding the file **and** an entry in
   `src/lib/docs/nav.ts`, which is the hand-ordered table of contents.
-- **Product facts** — `src/lib/site.ts`. Version, download URLs, the demo
-  video's YouTube id, and the top navigation all live there rather than being
-  scattered through components.
-- **A new release** — bump `VERSION` in `src/lib/site.ts` in the same commit
-  that publishes the release. The download buttons build their URLs from it.
-  It is plain data on purpose: a static site that calls the GitHub API at build
-  time is a site whose deploy can fail because of someone else's outage.
+- **Product facts** — `src/lib/site.ts`. Download URLs, the demo video's
+  YouTube id, and the top navigation all live there rather than being scattered
+  through components.
+- **A new release** — needs nothing here. The download buttons link to
+  `/releases/latest/download/<file>`, which GitHub resolves to whichever
+  release is promoted, so promoting one is what updates them; no edit and no
+  deploy. That depends on the release assets keeping version-free names.
 
 ## Design
 

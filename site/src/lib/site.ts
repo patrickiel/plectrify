@@ -1,12 +1,12 @@
 /**
  * Every fact about the product that appears in more than one place on the site.
  *
- * The release constants are deliberately plain data rather than a build-time
- * fetch of the GitHub releases API. A static site that calls an API at build
- * time is a site whose deploy can fail because someone else's service is
- * having a bad morning, and it buys nothing here: a release already touches
- * this repo, so it can touch one more line. Bump `version` in the same commit
- * that publishes the release and the download buttons follow.
+ * Nothing here names a release. The download buttons point at GitHub's
+ * `/releases/latest/download/<file>`, which serves that file from whichever
+ * release is currently promoted, so a release moves them without touching this
+ * repo or redeploying the site. That is also why it is not a build-time fetch
+ * of the releases API: a static site that calls an API at build time is a site
+ * whose deploy can fail because someone else's service is having a bad morning.
  */
 
 /** Marketing name. The codebase is still called Plectrify: repository URLs,
@@ -46,23 +46,10 @@ export const REPO = 'https://github.com/patrickiel/plectrify';
     same URL in `ui/src/lib/links.ts`; keep the two in step. */
 export const DISCORD_URL = 'https://discord.gg/dxQBanJr2X';
 
-/**
- * The version the download buttons point at.
- *
- * Written by the Promote workflow (`pnpm release --promote`), which rewrites
- * this line, commits it and deploys the site, so it names the newest *promoted* release rather than
- * whatever `/VERSION` happens to say mid-release. Those two differ for the
- * whole life of a pre-release, which is the point: the buttons below deep-link
- * to a tag, and GitHub serves a pre-release's assets from that path as readily
- * as a promoted one. Only promotion moves this.
- *
- * Editing it by hand is fine; it is a plain constant and the release script
- * only cares that the declaration keeps this shape.
- */
-export const VERSION = '0.1.0';
-
 /** Release-asset naming, as produced by scripts/release.windows.ts and its mac
-    and Linux twins. These still say "Plectrify" because the built artefacts do. */
+    and Linux twins. These still say "Plectrify" because the built artefacts do.
+    The names carry no version, and must not start to: a fixed name is what lets
+    `/releases/latest/download/` find the file in every release. */
 const ASSET_BASE = 'Plectrify';
 
 /** The three desktop platforms, in the spelling the pre-paint OS probe in
@@ -77,48 +64,31 @@ export interface Download {
   url: string;
 }
 
-const asset = (file: string) => `${REPO}/releases/download/v${VERSION}/${file}`;
+/** The newest *promoted* release's copy of `file`. GitHub's "latest" skips
+    pre-releases, so a release reaches these buttons when the Promote workflow
+    runs and not before: until then they keep serving the previous one. */
+const asset = (file: string) => `${REPO}/releases/latest/download/${file}`;
 
-/** The first release that carries a Linux .deb. The site's VERSION trails the
-    newest promoted release, so until that release is promoted the Linux button
-    would deep-link to a file that does not exist; it is left out instead, and
-    appears by itself with the promotion that makes it real. */
-const LINUX_SINCE = '0.1.1';
-
-/** Numeric MAJOR.MINOR.PATCH comparison; `'0.10.0'` is newer than `'0.9.0'`. */
-function atLeast(version: string, floor: string): boolean {
-  const a = version.split('.').map(Number);
-  const b = floor.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
-  }
-  return true;
-}
-
-const ALL_DOWNLOADS: Download[] = [
+export const DOWNLOADS: Download[] = [
   {
     platform: 'windows',
     os: 'Windows',
-    file: `${ASSET_BASE}-${VERSION}-win-x64-setup.exe`,
-    url: asset(`${ASSET_BASE}-${VERSION}-win-x64-setup.exe`),
+    file: `${ASSET_BASE}-win-x64-setup.exe`,
+    url: asset(`${ASSET_BASE}-win-x64-setup.exe`),
   },
   {
     platform: 'macos',
     os: 'macOS',
-    file: `${ASSET_BASE}-${VERSION}-macos-arm64.pkg`,
-    url: asset(`${ASSET_BASE}-${VERSION}-macos-arm64.pkg`),
+    file: `${ASSET_BASE}-macos-arm64.pkg`,
+    url: asset(`${ASSET_BASE}-macos-arm64.pkg`),
   },
   {
     platform: 'linux',
     os: 'Linux',
-    file: `${ASSET_BASE}-${VERSION}-linux-x64.deb`,
-    url: asset(`${ASSET_BASE}-${VERSION}-linux-x64.deb`),
+    file: `${ASSET_BASE}-linux-x64.deb`,
+    url: asset(`${ASSET_BASE}-linux-x64.deb`),
   },
 ];
-
-export const DOWNLOADS: Download[] = ALL_DOWNLOADS.filter(
-  (dl) => dl.platform !== 'linux' || atLeast(VERSION, LINUX_SINCE),
-);
 
 export const RELEASES_URL = `${REPO}/releases`;
 

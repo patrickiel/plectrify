@@ -15,11 +15,11 @@
 <br>
 <br>
 
-<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="250"></a>
+<a href="https://github.com/patrickiel/plectrify/releases/latest/download/Plectrify-win-x64-setup.exe"><img src="Assets/DownloadButton-windows.png" alt="Download for Windows" width="250"></a>
 &nbsp;
-<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="250"></a>
+<a href="https://github.com/patrickiel/plectrify/releases/latest/download/Plectrify-macos-arm64.pkg"><img src="Assets/DownloadButton-macos.png" alt="Download for macOS" width="250"></a>
 &nbsp;
-<a href="https://github.com/patrickiel/plectrify/releases/latest"><img src="Assets/DownloadButton-linux.png" alt="Download for Linux" width="250"></a>
+<a href="https://github.com/patrickiel/plectrify/releases/latest/download/Plectrify-linux-x64.deb"><img src="Assets/DownloadButton-linux.png" alt="Download for Linux" width="250"></a>
 
 [Website](https://plectrify.com) ·
 [Docs](https://plectrify.com/docs) ·
@@ -82,13 +82,13 @@ lowest latency your interface can do.
 Grab the latest installer from the
 [releases page](https://github.com/patrickiel/plectrify/releases):
 
-- **Windows 10/11 (64-bit):** run `Plectrify-<version>-win-x64-setup.exe`.
+- **Windows 10/11 (64-bit):** run `Plectrify-win-x64-setup.exe`.
   Everything it needs is bundled.
-- **macOS (Apple Silicon, 13.3+):** run `Plectrify-<version>-macos-arm64.pkg`.
+- **macOS (Apple Silicon, 13.3+):** run `Plectrify-macos-arm64.pkg`.
   It installs the app plus the VST3 and AU plugins.
 - **Linux (x86-64; Ubuntu 24.04, Debian 13 or newer):** install
-  `Plectrify-<version>-linux-x64.deb`, e.g.
-  `sudo apt install ./Plectrify-<version>-linux-x64.deb`.
+  `Plectrify-linux-x64.deb`, e.g.
+  `sudo apt install ./Plectrify-linux-x64.deb`.
 
 > [!IMPORTANT]
 > The macOS build is signed but **not notarized**, so macOS blocks the

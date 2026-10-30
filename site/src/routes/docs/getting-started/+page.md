@@ -19,7 +19,7 @@ Grab the build for your machine from the [download section](/#download).
   see [Opening it on macOS](/docs/opening-on-macos), which is a two-minute detour you do
   once.
 - **Linux** (x86-64; Ubuntu 24.04, Debian 13 or newer; from version 0.1.1): install the `.deb`, for example with
-  `sudo apt install ./Plectrify-<version>-linux-x64.deb`. It installs the app (launch it from
+  `sudo apt install ./Plectrify-linux-x64.deb`. It installs the app (launch it from
   your app menu, or run `plectrify`), and **Plectrify as a VST3 plug-in** in `/usr/lib/vst3`,
   where every Linux DAW looks.
 

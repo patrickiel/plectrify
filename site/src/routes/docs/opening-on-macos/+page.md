@@ -5,7 +5,7 @@ description: macOS may refuse to open the Plectrify installer. Nothing is wrong 
 
 ## What you will see
 
-When you open the downloaded `Plectrify-<version>-macos-arm64.pkg`, macOS may refuse it.
+When you open the downloaded `Plectrify-macos-arm64.pkg`, macOS may refuse it.
 The exact wording depends on your macOS version — "from an unidentified developer",
 "Apple could not verify that it is free of malware", or even "damaged" — but they all mean
 the same thing.
@@ -68,11 +68,11 @@ your browser saves. It changes nothing inside the installer and affects no other
 ## Verifying your download first
 
 If you would rather check the file before running any of this, every release publishes a
-checksum beside the installer. Download `Plectrify-<version>-macos-arm64.pkg.sha256` from
+checksum beside the installer. Download `Plectrify-macos-arm64.pkg.sha256` from
 the [releases page](https://github.com/patrickiel/plectrify/releases), then run:
 
 ```sh
-shasum -a 256 ~/Downloads/Plectrify-<version>-macos-arm64.pkg
+shasum -a 256 ~/Downloads/Plectrify-macos-arm64.pkg
 ```
 
 Compare the long hex string it prints with the one in the `.sha256` file. If they match, the

@@ -44,10 +44,6 @@ const { values } = parseArgs({
     'pre-release': { type: 'boolean', default: false },
     promote: { type: 'boolean', default: false },
     'skip-tests': { type: 'boolean', default: false },
-    // Promotion also points plectrify.com at the new version and deploys it.
-    // This opts out — for a promote run with no Cloudflare credentials, where
-    // the site is then deployed separately.
-    'no-site': { type: 'boolean', default: false },
     'webview2-installer': { type: 'string' },
     'vcredist-installer': { type: 'string' },
     'inno-compiler': { type: 'string' },
@@ -145,8 +141,8 @@ if (values.promote) {
       os: 'macOS',
       where: 'macOS',
       names: [
-        `Plectrify-${version}-macos-arm64.pkg`,
-        `Plectrify-${version}-macos-arm64.pkg.sha256`,
+        'Plectrify-macos-arm64.pkg',
+        'Plectrify-macos-arm64.pkg.sha256',
         'release-manifest-macos.json',
       ],
     },
@@ -154,8 +150,8 @@ if (values.promote) {
       os: 'Linux',
       where: 'Linux',
       names: [
-        `Plectrify-${version}-linux-x64.deb`,
-        `Plectrify-${version}-linux-x64.deb.sha256`,
+        'Plectrify-linux-x64.deb',
+        'Plectrify-linux-x64.deb.sha256',
         'release-manifest-linux.json',
       ],
     },
@@ -173,65 +169,11 @@ if (values.promote) {
     'release', 'edit', tag, '--repo', slug, '--prerelease=false', '--latest',
   ]);
   console.log(`Promoted release: https://github.com/${slug}/releases/tag/${tag}`);
-
-  if (!values['no-site']) publishSite(version);
+  // Nothing else to move: plectrify.com and the README link to
+  // `/releases/latest/download/<name>`, which follows the flag just set — the
+  // reason the asset names carry no version.
 
   process.exit(0);
-}
-
-/** Point plectrify.com's download buttons at the version just promoted, and put
-    the site live.
-
-    The site pins the version rather than asking the GitHub API at build time
-    (site.ts explains why), and a pin is only as good as the thing that moves
-    it. Nothing did: `VERSION` and site.ts's copy were kept in step by hand,
-    which is a rule that holds right up until the release you are tired during.
-
-    This runs *after* the release is latest, never before. The buttons deep-link
-    to `releases/download/vX.Y.Z/...`, which serves a pre-release's assets
-    perfectly happily — GitHub only hides those behind `/releases/latest`. So
-    deploying first would put an untested build in front of strangers for as
-    long as the promote took, whereas deploying second can only ever leave the
-    site briefly a version behind, still pointing at downloads that work. If the
-    deploy fails the promotion still stands: re-run `pnpm --dir site run deploy`
-    once the cause is fixed, and nothing about the release needs redoing. */
-function publishSite(releaseVersion: string): void {
-  const siteDir = join(ROOT, 'site');
-  const constantsPath = join(siteDir, 'src', 'lib', 'site.ts');
-  const before = readFileSync(constantsPath, 'utf8');
-
-  // The one declaration, anchored to line start so a mention in prose or a
-  // comment cannot be rewritten instead.
-  const declaration = /^(export const VERSION = ')([^']*)(';)$/m;
-  const match = declaration.exec(before);
-  if (!match) {
-    fail(`could not find 'export const VERSION' in ${constantsPath}. The release is already promoted — point the site at ${releaseVersion} by hand and deploy it.`);
-  }
-
-  if (match[2] === releaseVersion) {
-    console.log(`==> site.ts already points at ${releaseVersion}`);
-  } else {
-    writeFileSync(constantsPath, before.replace(declaration, `$1${releaseVersion}$3`));
-    console.log(`==> site.ts ${match[2]} -> ${releaseVersion}`);
-
-    // Only this file, so a promote run from a dirty tree commits what it
-    // changed and nothing it happened to find lying about.
-    run('Committing the site version', 'git', [
-      '-C', ROOT, 'commit',
-      '-m', `chore(site): point downloads at ${releaseVersion}`,
-      '--only', '--', constantsPath,
-    ]);
-    run('Pushing the site version', 'git', ['-C', ROOT, 'push']);
-  }
-
-  if (!existsSync(join(siteDir, 'node_modules'))) {
-    pnpm('Installing site tooling', ['--dir', siteDir, 'install', '--frozen-lockfile']);
-  }
-  // `run deploy`, not `deploy`: bare `pnpm deploy` is one of pnpm's own
-  // subcommands. The script builds before publishing, so the Worker never
-  // serves a stale build/.
-  pnpm('Deploying plectrify.com', ['--dir', siteDir, 'run', 'deploy']);
-  console.log('\nplectrify.com now offers ' + releaseVersion + '.');
 }
 
 // --- Tooling ------------------------------------------------------------------
@@ -675,10 +617,15 @@ run('Compiling Inno Setup installer', innoPath, [
   installerScript,
 ]);
 
-const installerPath = join(outputPath, `Plectrify-${version}-win-x64-setup.exe`);
+// No version in the name (Plectrify.iss's OutputBaseFilename, likewise the mac
+// and Linux scripts'): `/releases/latest/download/<name>` resolves only a name
+// every release shares, and that path is how the site and the README link a
+// download without being edited per release. The version is in the tag, the
+// manifest and the installer itself.
+const installerPath = join(outputPath, 'Plectrify-win-x64-setup.exe');
 if (!existsSync(installerPath)) fail(`Inno Setup did not produce ${installerPath}.`);
 const installerHash = sha256File(installerPath);
-const checksumPath = join(outputPath, `Plectrify-${version}-win-x64-setup.exe.sha256`);
+const checksumPath = join(outputPath, 'Plectrify-win-x64-setup.exe.sha256');
 writeFileSync(checksumPath, `${installerHash}  ${basename(installerPath)}`, 'ascii');
 copyFileSync(pdbPath, join(outputPath, `Plectrify-${version}-win-x64.pdb`));
 // The VST3's PDB under a name of its own, archived beside the installer like

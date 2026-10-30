@@ -14,7 +14,7 @@
  * THE MAC ARTIFACT RIDES THE WINDOWS RELEASE. Step 1 on the Windows box creates
  * the tag, the GitHub pre-release, and the AGPL corresponding-source archive;
  * this script verifies it is building the very same commit, then uploads
- * Plectrify-<version>-macos-arm64.pkg beside the Windows installer. Update
+ * Plectrify-macos-arm64.pkg beside the Windows installer. Update
  * discovery reads only the release tag, so a second asset needs no app change.
  * Run order per release: the Release workflow (Windows job, then Mac and
  * Linux), then the Promote workflow.
@@ -617,7 +617,7 @@ writeFileSync(
 `,
 );
 
-const pkgName = `Plectrify-${version}-macos-arm64.pkg`;
+const pkgName = 'Plectrify-macos-arm64.pkg';
 const pkgPath = join(outputDir, pkgName);
 rmSync(pkgPath, { force: true });
 

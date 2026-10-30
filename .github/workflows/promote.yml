@@ -1,14 +1,11 @@
-# Step 3 of a release (RELEASING.md): flip the verified pre-release to latest and
-# point plectrify.com at it. Started by hand, and only after someone has
-# installed every platform's build from the pre-release and played through it —
-# this is the sign-off, and it is irreversible: a promoted version is immutable.
+# Step 3 of a release (RELEASING.md): flip the verified pre-release to latest.
+# Started by hand, and only after someone has installed every platform's build
+# from the pre-release and played through it — this is the sign-off, and it is
+# irreversible: a promoted version is immutable.
 #
-# The script refuses a release still missing its macOS or Linux artifact. It
-# then rewrites site/src/lib/site.ts, commits and pushes that to the branch this
-# runs on (run it from main), and deploys the site. The deploy needs the
-# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets; without
-# them, or with "Deploy the site" unticked, the release is promoted and the site
-# left alone (`pnpm --dir site run deploy` from anywhere with credentials).
+# The script refuses a release still missing its macOS or Linux artifact. That
+# flag is the whole of it: plectrify.com and the README download from
+# `/releases/latest/download/<name>`, so they follow it with no commit or deploy.
 name: Promote
 
 on:
@@ -17,10 +14,6 @@ on:
       version:
         description: Version to promote — must equal the VERSION file (e.g. 0.2.0)
         required: true
-      site:
-        description: Deploy the site
-        type: boolean
-        default: true
 
 concurrency:
   group: release
@@ -38,8 +31,6 @@ jobs:
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       # Windows runners check out with core.autocrlf=true, and Prettier (like
       # every other tool here) expects the LF the repository stores.
@@ -54,10 +45,4 @@ jobs:
 
       - name: Promote
         shell: bash
-        run: |
-          flags=(--promote --version "${{ inputs.version }}")
-          if [ "${{ inputs.site }}" != "true" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::warning::Not deploying the site (unticked, or no CLOUDFLARE_API_TOKEN secret)."
-            flags+=(--no-site)
-          fi
-          pnpm release "${flags[@]}"
+        run: pnpm release --promote --version "${{ inputs.version }}"
