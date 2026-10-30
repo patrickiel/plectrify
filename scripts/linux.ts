@@ -9,8 +9,11 @@
  * plugins/ staged beside it (moduleResourceDir), not a bundle.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { accessSync, constants, cpSync, existsSync, rmSync, statSync } from 'node:fs';
+import {
+  accessSync, constants, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
+import { crc32, deflateSync, inflateSync } from 'node:zlib';
 import { ROOT, capture, fail, run } from './shared.ts';
 
 export function assertLinux(script: string): void {
@@ -204,4 +207,135 @@ export function stageUiBesideBinary(config: string): void {
   const target = join(appBinary(config), '..', 'ui');
   rmSync(target, { recursive: true, force: true });
   cpSync(dist, target, { recursive: true });
+}
+
+/**
+ * Writes the app icon into a hicolor theme tree (`<share>/icons/hicolor`) at
+ * every size from 512 down to 16, each halved from the one above.
+ *
+ * A theme lookup only searches the directories its index.theme declares, and
+ * hicolor's stop at 512x512: the 1024 px art installed as-is was in a folder
+ * nothing looks in, so GNOME drew its generic gear. Halving rather than one
+ * resample per size keeps this a box filter with no image library — the art is
+ * 1024 px, so every step is exact.
+ */
+export function writeHicolorIcons(source: string, hicolor: string): void {
+  let image = decodeRgbaPng(readFileSync(source));
+  if (image.width !== 1024 || image.height !== 1024) {
+    fail(`${source} must be 1024x1024 (is ${image.width}x${image.height}).`);
+  }
+  while (image.width > 16) {
+    image = halve(image);
+    const dir = join(hicolor, `${image.width}x${image.width}`, 'apps');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'plectrify.png'), encodeRgbaPng(image));
+  }
+}
+
+interface RgbaImage { width: number; height: number; pixels: Uint8Array }
+
+function decodeRgbaPng(png: Buffer): RgbaImage {
+  const idat: Buffer[] = [];
+  let width = 0;
+  let height = 0;
+  for (let at = 8; at < png.length;) {
+    const length = png.readUInt32BE(at);
+    const type = png.toString('latin1', at + 4, at + 8);
+    const data = png.subarray(at + 8, at + 8 + length);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      // 8-bit RGBA, not interlaced: what the art is, and all this reads.
+      if (data[8] !== 8 || data[9] !== 6 || data[12] !== 0) {
+        fail('The app icon must be an 8-bit, non-interlaced RGBA PNG.');
+      }
+    } else if (type === 'IDAT') {
+      idat.push(data);
+    }
+    at += 12 + length;
+  }
+
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * 4;
+  const pixels = new Uint8Array(stride * height);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)]!;
+    const row = y * (stride + 1) + 1;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= 4 ? pixels[y * stride + x - 4]! : 0;
+      const b = y > 0 ? pixels[(y - 1) * stride + x]! : 0;
+      const c = x >= 4 && y > 0 ? pixels[(y - 1) * stride + x - 4]! : 0;
+      let predicted = 0;
+      if (filter === 1) predicted = a;
+      else if (filter === 2) predicted = b;
+      else if (filter === 3) predicted = (a + b) >> 1;
+      else if (filter === 4) {
+        const p = a + b - c;
+        const pa = Math.abs(p - a);
+        const pb = Math.abs(p - b);
+        const pc = Math.abs(p - c);
+        predicted = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      pixels[y * stride + x] = (raw[row + x]! + predicted) & 0xff;
+    }
+  }
+  return { width, height, pixels };
+}
+
+/** Averages each 2x2 block, weighting colour by alpha so transparent edges do not darken. */
+function halve({ width, height, pixels }: RgbaImage): RgbaImage {
+  const w = width >> 1;
+  const h = height >> 1;
+  const out = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+        const i = ((2 * y + dy) * width + 2 * x + dx) * 4;
+        const alpha = pixels[i + 3]!;
+        r += pixels[i]! * alpha;
+        g += pixels[i + 1]! * alpha;
+        b += pixels[i + 2]! * alpha;
+        a += alpha;
+      }
+      const o = (y * w + x) * 4;
+      if (a > 0) {
+        out[o] = Math.round(r / a);
+        out[o + 1] = Math.round(g / a);
+        out[o + 2] = Math.round(b / a);
+      }
+      out[o + 3] = Math.round(a / 4);
+    }
+  }
+  return { width: w, height: h, pixels: out };
+}
+
+function encodeRgbaPng({ width, height, pixels }: RgbaImage): Buffer {
+  const chunk = (type: string, data: Buffer): Buffer => {
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const framed = Buffer.alloc(body.length + 8);
+    framed.writeUInt32BE(data.length, 0);
+    body.copy(framed, 4);
+    framed.writeUInt32BE(crc32(body), body.length + 4);
+    return framed;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 6, 0, 0, 0], 8);
+  // Every row unfiltered (filter byte 0): a few kilobytes larger, nothing to get wrong.
+  const stride = width * 4;
+  const raw = Buffer.alloc((stride + 1) * height);
+  for (let y = 0; y < height; y++) {
+    raw.set(pixels.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+  }
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(raw, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }

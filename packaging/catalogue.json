@@ -359,6 +359,20 @@
     },
     {
       "category": "Open source",
+      "tags": [
+        "EQ",
+        "Dynamics",
+        "Delay",
+        "Reverb",
+        "Modulation",
+        "Cabs & IRs"
+      ],
+      "label": "LSP Plugins",
+      "url": "https://lsp-plug.in/?page=download",
+      "note": "EQs, compressors, gates, delays, reverbs and an IR loader - free on Linux, paid per plugin on Windows, no macOS build"
+    },
+    {
+      "category": "Open source",
       "label": "HISE",
       "url": "https://github.com/christophhart/HISE",
       "note": "A framework for building plugins - a developer tool, not a pedal",
@@ -1160,6 +1174,15 @@
     "half about MSI first - and that one piece of work would unlock both, plus whatever",
     "else this publisher releases. Until then, pointing at the project is the honest",
     "answer.",
+    "",
+    "LSP PLUGINS is a link, and its note carries the one term a guitarist would trip over:",
+    "the source is LGPL-3.0 and the Linux builds are free, but the project's Windows builds",
+    "are sold per plugin through lsp-builds.com, and there is no macOS build at all. A link",
+    "cannot be limited to one platform, so the note says so rather than letting a Windows",
+    "user find a price after the click. It is not a package because the free Linux builds",
+    "ship as .7z archives, which CatalogueInstaller cannot open (it unzips), and a package",
+    "offered on Linux alone would be one platform's half of a suite most people meet as a",
+    "paid Windows product. Revisit this if upstream ever publishes plain zips.",
     "",
     "INSTRUMENTS ARE NOT LISTED AT ALL, as packages or as links, and that is a standing",
     "rule rather than a judgement about any one of them. A synthesiser generates sound",

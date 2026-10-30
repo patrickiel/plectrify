@@ -275,7 +275,11 @@ if (windows) {
   add('/opt/plectrify', 'application', true);
   add('/usr/bin/plectrify', 'application link', true);
   add('/usr/share/applications/plectrify.desktop', 'desktop entry', true);
-  add('/usr/share/icons/hicolor/1024x1024/apps/plectrify.png', 'icon', true);
+  // Every size release.linux.ts writes, plus the 1024 px copy earlier
+  // packages put where no icon lookup searched.
+  for (const size of [16, 32, 64, 128, 256, 512, 1024]) {
+    add(`/usr/share/icons/hicolor/${size}x${size}/apps/plectrify.png`, `icon (${size} px)`, true);
+  }
   add('/usr/lib/vst3/Plectrify.vst3', 'VST3 plug-in', true);
 
   // The dev loop's `--plugin` install.

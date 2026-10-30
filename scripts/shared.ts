@@ -158,6 +158,26 @@ export const JUCE_PATCHES = [
     file: 'modules/juce_audio_processors_headless/processors/juce_AudioProcessorGraph.cpp',
     marker: 'PLECTRIFY_HOST_OWNED_BYPASS',
   },
+  {
+    patch: 'cmake/juce-linux-webkit-gpu.patch',
+    file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
+    marker: 'PLECTRIFY_WEBKIT_GPU',
+  },
+  {
+    patch: 'cmake/juce-linux-webkit-render-device.patch',
+    file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
+    marker: 'PLECTRIFY_WEBKIT_RENDER_DEVICE',
+  },
+  {
+    patch: 'cmake/juce-linux-webkit-persistent-cookies.patch',
+    file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
+    marker: 'PLECTRIFY_WEBKIT_PERSISTENT_COOKIES',
+  },
+  {
+    patch: 'cmake/juce-linux-alsa-duplex-prefill.patch',
+    file: 'modules/juce_audio_devices/native/juce_ALSA_linux.cpp',
+    marker: 'PLECTRIFY_ALSA_DUPLEX_PREFILL',
+  },
 ] as const;
 
 /** What `git diff --name-only` must report for the patched JUCE tree, and

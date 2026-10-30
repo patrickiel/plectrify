@@ -53,6 +53,7 @@ import {
   configure,
   inTreePluginBundle,
   pluginBundle,
+  writeHicolorIcons,
 } from './linux.ts';
 
 assertLinux('release.linux.ts');
@@ -300,9 +301,7 @@ Categories=AudioVideo;Audio;Music;
 StartupWMClass=Plectrify
 `,
 );
-const iconDir = join(stage, 'usr/share/icons/hicolor/1024x1024/apps');
-mkdirSync(iconDir, { recursive: true });
-copyFileSync(join(ROOT, 'Assets/PlectrifyIcon.png'), join(iconDir, 'plectrify.png'));
+writeHicolorIcons(join(ROOT, 'Assets/PlectrifyIcon.png'), join(stage, 'usr/share/icons/hicolor'));
 
 // --- Package metadata ---------------------------------------------------------
 const debian = join(stage, 'DEBIAN');

@@ -172,6 +172,36 @@ int PluginManager::unblacklistPlugins (const juce::StringArray& files)
     return removed;
 }
 
+namespace
+{
+    /** `Foo.vst3/Contents/<arch>-linux/Foo.so` → `Foo.vst3`; anything else
+        unchanged. Matched on the path's shape alone, so it is harmless on
+        every OS and also repairs a Linux document opened elsewhere (where the
+        bundle path then misses and the uid fallback takes over). */
+    juce::String bundlePathForModule (const juce::String& fileOrIdentifier)
+    {
+        const auto module = juce::File::createFileWithoutCheckingPath (fileOrIdentifier);
+        const auto archDir = module.getParentDirectory();
+        const auto contents = archDir.getParentDirectory();
+        const auto bundle = contents.getParentDirectory();
+
+        if (module.hasFileExtension (".so")
+            && archDir.getFileName().endsWith ("-linux")
+            && contents.getFileName() == "Contents"
+            && bundle.hasFileExtension (".vst3"))
+            return bundle.getFullPathName();
+
+        return fileOrIdentifier;
+    }
+}
+
+juce::PluginDescription PluginManager::describeInstance (const juce::AudioPluginInstance& instance)
+{
+    auto desc = instance.getPluginDescription();
+    desc.fileOrIdentifier = bundlePathForModule (desc.fileOrIdentifier);
+    return desc;
+}
+
 void PluginManager::createInstanceAsync (
     const juce::PluginDescription& desc,
     double sampleRate,
@@ -192,7 +222,8 @@ void PluginManager::createInstanceAsync (
     // The next capture writes the loaded instance's real path, so the document
     // heals itself on the following save.
     auto resolved = desc;
-    if (! juce::File::createFileWithoutCheckingPath (desc.fileOrIdentifier).exists())
+    resolved.fileOrIdentifier = bundlePathForModule (desc.fileOrIdentifier);
+    if (! juce::File::createFileWithoutCheckingPath (resolved.fileOrIdentifier).exists())
     {
         const auto sameId = [] (int known, int stored) { return stored != 0 && known == stored; };
         for (const auto& known : knownPlugins.getTypes())

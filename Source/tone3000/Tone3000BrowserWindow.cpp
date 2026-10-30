@@ -174,6 +174,13 @@ Tone3000BrowserWindow::Tone3000BrowserWindow (const juce::String& startUrl,
     // inside the dev loop's orphan-killer glob (see scripts/windows.ts).
     const auto dataFolder = plectrify::appDataDir().getChildFile ("WebView2-Tone3000");
     dataFolder.createDirectory();
+   #elif JUCE_LINUX
+    // Where the TONE3000 sign-in survives this window. WebKitGTK otherwise
+    // keeps cookies in memory, in a child process that dies with the window —
+    // and a fresh authorization always means a fresh window, so every tone
+    // picked asked for the password again. JUCE has no Linux option for it;
+    // juce-linux-webkit-persistent-cookies.patch reads the WebView2 folder.
+    const auto dataFolder = plectrify::appDataDir().getChildFile ("WebKit-Tone3000");
    #endif
 
     browserOptions = juce::WebBrowserComponent::Options{}
@@ -182,6 +189,9 @@ Tone3000BrowserWindow::Tone3000BrowserWindow (const juce::String& startUrl,
         .withWinWebView2Options (juce::WebBrowserComponent::Options::WinWebView2{}
                                      .withUserDataFolder (dataFolder)
                                      .withBackgroundColour (juce::Colours::black))
+       #elif JUCE_LINUX
+        .withWinWebView2Options (juce::WebBrowserComponent::Options::WinWebView2{}
+                                     .withUserDataFolder (dataFolder))
        #endif
         // Deliberately no native integration and no resource provider: this
         // window shows a third party's pages, and nothing on them may reach

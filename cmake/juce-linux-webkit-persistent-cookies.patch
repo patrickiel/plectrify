@@ -1,0 +1,102 @@
+Keep a Linux web view's cookies on disk when its owner names a user-data folder.
+
+JUCE never gives WebKitGTK's cookie manager a persistent store (its own
+clearCookies() says the Linux backend "does not store cookies"), so the jar
+lives in memory. Every WebBrowserComponent also runs in a forked child process
+of its own, so the jar dies with the window: each new browser starts signed out
+of every site. Plectrify's TONE3000 window is rebuilt for every fresh OAuth
+authorization, which meant signing in to TONE3000 again for every tone picked.
+
+Options has no Linux storage location, but WinWebView2 already carries a
+per-browser user-data folder for exactly this purpose, so the Linux backend now
+reads it too: when it is set, the child points the view's cookie manager at
+<folder>/cookies.sqlite before the first load. A browser that names no folder
+keeps JUCE's in-memory behaviour unchanged. Each child has its own default
+context, so the store reaches that view alone.
+
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+@@ -164,6 +164,16 @@
+                                          (WebKitWebView*),
+                                          WebKitWebContext*)
+ 
++    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (webkit_web_context_get_cookie_manager,
++                                         juce_webkit_web_context_get_cookie_manager,
++                                         (WebKitWebContext*),
++                                         WebKitCookieManager*)
++
++    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (webkit_cookie_manager_set_persistent_storage,
++                                         juce_webkit_cookie_manager_set_persistent_storage,
++                                         (WebKitCookieManager*, const gchar*, WebKitCookiePersistentStorage),
++                                         void)
++
+     JUCE_GENERATE_FUNCTION_WITH_DEFAULT (webkit_uri_scheme_request_get_path,
+                                          juce_webkit_uri_scheme_request_get_path,
+                                          (WebKitURISchemeRequest*),
+@@ -376,6 +386,8 @@
+                             makeSymbolBinding (juce_webkit_web_view_run_javascript_finish,                       "webkit_web_view_run_javascript_finish"),
+                             makeSymbolBinding (juce_webkit_web_context_register_uri_scheme,                      "webkit_web_context_register_uri_scheme"),
+                             makeSymbolBinding (juce_webkit_web_view_get_context,                                 "webkit_web_view_get_context"),
++                            makeSymbolBinding (juce_webkit_web_context_get_cookie_manager,                       "webkit_web_context_get_cookie_manager"),
++                            makeSymbolBinding (juce_webkit_cookie_manager_set_persistent_storage,                "webkit_cookie_manager_set_persistent_storage"),
+                             makeSymbolBinding (juce_webkit_uri_scheme_request_get_path,                          "webkit_uri_scheme_request_get_path"),
+                             makeSymbolBinding (juce_webkit_uri_scheme_response_new,                              "webkit_uri_scheme_response_new"),
+                             makeSymbolBinding (juce_webkit_uri_scheme_response_set_http_headers,                 "webkit_uri_scheme_response_set_http_headers"),
+@@ -667,6 +679,7 @@
+     String userAgent;
+     String userScript;
+     String allowedOrigin;
++    String cookieFile;
+ 
+     static constexpr std::optional<int> marshallingVersion = std::nullopt;
+ 
+@@ -676,7 +689,8 @@
+         archive (named ("nativeIntegrationsEnabled", item.nativeIntegrationsEnabled),
+                  named ("userAgent", item.userAgent),
+                  named ("userScript", item.userScript),
+-                 named ("allowedOrigin", item.allowedOrigin));
++                 named ("allowedOrigin", item.allowedOrigin),
++                 named ("cookieFile", item.cookieFile));
+     }
+ };
+ 
+@@ -871,6 +885,19 @@
+         auto* webviewWidget = WebKitSymbols::getInstance()->juce_webkit_web_view_new_with_settings (settings);
+         webview = (WebKitWebView*) webviewWidget;
+ 
++        // PLECTRIFY_WEBKIT_PERSISTENT_COOKIES: keep this view's cookies on disk
++        // when its owner named a user-data folder. JUCE leaves WebKitGTK's
++        // cookie jar in memory, and each WebBrowserComponent runs in a child
++        // process of its own, so every new browser started signed out of every
++        // site: a login lasted exactly as long as one window. The folder is
++        // the one WinWebView2 already carries for the same purpose; a browser
++        // that names none keeps JUCE's in-memory behaviour. Set before the
++        // first load, and per child, so it reaches only this view's context.
++        if (initialisationData->cookieFile.isNotEmpty())
++            wk.juce_webkit_cookie_manager_set_persistent_storage (wk.juce_webkit_web_context_get_cookie_manager (wk.juce_webkit_web_view_get_context (webview)),
++                                                                  initialisationData->cookieFile.toRawUTF8(),
++                                                                  WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE);
++
+         if (initialisationData->nativeIntegrationsEnabled)
+         {
+             manager = wk.juce_webkit_web_view_get_user_content_manager (webview);
+@@ -1422,7 +1449,18 @@
+         init (InitialisationData { optionsIn.getNativeIntegrationsEnabled(),
+                                    userAgent,
+                                    userStrings.joinIntoString ("\n"),
+-                                   optionsIn.getAllowedOrigin() ? *optionsIn.getAllowedOrigin() : "" });
++                                   optionsIn.getAllowedOrigin() ? *optionsIn.getAllowedOrigin() : "",
++                                   cookieFileFor (optionsIn) });
++    }
++
++    static String cookieFileFor (const WebBrowserComponent::Options& options)
++    {
++        const auto folder = options.getWinWebView2BackendOptions().getUserDataFolder();
++
++        if (folder == File() || ! folder.createDirectory())
++            return {};
++
++        return folder.getChildFile ("cookies.sqlite").getFullPathName();
+     }
+ 
+     ~Platform() override

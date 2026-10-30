@@ -85,6 +85,18 @@ FetchContent_Declare(
     #   - graph-host-owned-bypass: a bypass the host requested is enforced by
     #     the graph instead of being delegated to the plugin's own exported
     #     bypass parameter, which some plugins export but ignore (both OSes).
+    #   - linux-webkit-gpu: the WebKitGTK backend hard-codes software
+    #     rendering, so the whole UI is rasterised on the CPU (Linux).
+    #   - linux-webkit-render-device: WebKit falls back to software on
+    #     NVIDIA's proprietary driver, so render on a Mesa GPU when the
+    #     machine has one (Linux).
+    #   - linux-webkit-persistent-cookies: the WebKitGTK backend keeps cookies
+    #     in memory only, so every new browser window starts signed out; a
+    #     browser that names a user-data folder now keeps them there (Linux).
+    #   - linux-alsa-duplex-prefill: a duplex ALSA device starts with an empty
+    #     playback buffer, so every block is written where the hardware is
+    #     already reading - steady crackle on a USB interface until a reopen
+    #     happens to land on a better phase (Linux).
     PATCH_COMMAND  "${CMAKE_COMMAND}"
                    "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
                    "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-disable-webview2-zoom.patch"
@@ -108,6 +120,26 @@ FetchContent_Declare(
            COMMAND "${CMAKE_COMMAND}"
                    "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
                    "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-graph-host-owned-bypass.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-linux-webkit-gpu.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-linux-webkit-render-device.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-linux-webkit-persistent-cookies.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-linux-alsa-duplex-prefill.patch"
                    "-DSOURCE_DIR=<SOURCE_DIR>"
                    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
 )

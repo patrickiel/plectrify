@@ -43,6 +43,10 @@
     orphan killer (scripts/windows.ts, which globs *\\Plectrify\\WebView2*) still
     reaps it. It must also be destroyed before the main web view, for the same
     async COM teardown reason MainComponent's destructor documents.
+
+    On Linux the folder (WebKit-Tone3000) holds the cookie jar alone, through
+    juce-linux-webkit-persistent-cookies.patch: WebKitGTK's would otherwise die
+    with each window's child process, and with it the TONE3000 sign-in.
 */
 class Tone3000BrowserWindow : public juce::DocumentWindow,
                               private juce::Timer

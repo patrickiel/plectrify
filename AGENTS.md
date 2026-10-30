@@ -671,7 +671,7 @@ records the substitution it made.
   found via `JUCE_WEBVIEW2_PACKAGE_LOCATION`. No manual bootstrap; building
   offline, place the extracted package there yourself. macOS needs nothing —
   WKWebView ships with the OS.
-- **JUCE patches**: CMake applies three small patches from `cmake/` to the
+- **JUCE patches**: CMake applies small patches from `cmake/` to the
   fetched JUCE tree, and **all are applied on both OSes** even though each
   fixes one — every patch is internally guarded, so there is one patched tree
   and one answer to what a binary was built from. `JUCE_PATCHES` in
@@ -731,6 +731,61 @@ records the substitution it made.
     keeps it for exactly that case — try the string as given, escape only if
     NSURL rejects it. (Modern NSURL is lenient and encodes stray characters
     itself; the fallback is for the 13.3 floor.)
+  - `juce-linux-webkit-gpu.patch` — JUCE's WebKitGTK backend hard-codes
+    `WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER`, so the whole UI is rasterised
+    and composited on the CPU. On the same machine it ran visibly slower than
+    under WebView2: every animation, and every `backdrop-filter` (the UI has
+    dozens), re-rendered in software each frame. The patch asks for `ALWAYS`.
+    JUCE's choice was probably a cautious one, since the view lives in a forked
+    GTK child embedded over XEmbed and forced onto the X11 backend (XWayland
+    on a Wayland session), and not every driver composites there. So
+    `PLECTRIFY_WEBKIT_SOFTWARE_RENDERING=1` in the launch environment restores
+    software rendering; the child inherits it. The policy is necessary but
+    not sufficient — see the next patch.
+  - `juce-linux-webkit-render-device.patch` — on NVIDIA's proprietary driver
+    WebKitGTK 2.52 cannot allocate its GBM buffers ("Failed to create GBM
+    buffer: Invalid argument") and silently stays in non-composited software
+    mode whatever the policy says: the whole page is repainted on one CPU
+    thread every frame, at a cost that grows with the pixel count, so a 4K
+    monitor at 166% (scale 2) is the worst case. Stock MiniBrowser does the
+    same, natively on Wayland too, so neither the XEmbed embedding nor
+    XWayland is the cause. A Mesa render node composites fine, so the forked
+    child — before GTK starts, which keeps the `setenv` single-threaded and
+    out of a DAW's environment — points `WEBKIT_WEB_RENDER_DEVICE_FILE` at the
+    first accessible non-`nvidia` node when an `nvidia` one exists. A device
+    the user set is left alone; an NVIDIA-only machine stays in software mode,
+    since nothing on the WebKit side gets it further (forcing the DMA-BUF
+    renderer there fails to import or crashes). Measured on an RTX 3060 beside
+    a Radeon iGPU at scale 2: a CSS animation's web-process CPU went from ~90%
+    to ~4%, ~19% with backdrop blur — and under JUCE's stock "never" it stays
+    at ~71% even on the iGPU, which is why the two patches come as a pair.
+  - `juce-linux-webkit-persistent-cookies.patch` — JUCE never gives
+    WebKitGTK's cookie manager a persistent store, and every
+    `WebBrowserComponent` runs in a child process of its own, so cookies die
+    with the window. The TONE3000 window is rebuilt for every fresh
+    authorization (see *TONE3000*), so every tone picked asked for the
+    TONE3000 password again. Options has no Linux storage location, so the
+    patch reads the one `WinWebView2::withUserDataFolder` already carries for
+    the same job and keeps `<folder>/cookies.sqlite` there; a browser naming no
+    folder (the main UI) keeps JUCE's in-memory jar. The TONE3000 window names
+    `WebKit-Tone3000` under the data root, its Linux twin of
+    `WebView2-Tone3000`.
+  - `juce-linux-alsa-duplex-prefill.patch` — JUCE's ALSA thread starts a
+    linked capture/playback pair with an empty playback buffer and paces the
+    loop by capture, so every block is written exactly where the hardware is
+    already reading. Its stop threshold is the boundary, so ALSA never calls
+    that an xrun; the stream just stays on the edge for the life of the device.
+    On a USB interface with implicit feedback (a Scarlett Solo 3rd gen, at
+    128/48k) the next playback packet is queued at the instant the capture
+    packet wakes the thread, so the block always loses that race: crackle from
+    launch, cured only by changing the sample rate and back — a reopen that
+    happened to start on a better phase, which is why it looked like a stale
+    rate. `/proc/asound/card*/pcm0p/sub0/status` showed the fill at -4..0
+    frames. The patch writes two periods of silence before the thread starts,
+    which puts playback a full period ahead (124..254 frames, holding across a
+    stall) — the callback's processing budget. One period is not enough: it
+    lands back on the same race. Duplex only; an output-only loop fills its
+    own buffer.
 
   After changing the JUCE tag, regenerate them all against the new sources and
   delete `build*/_deps/juce-*` so FetchContent re-populates. Editing a

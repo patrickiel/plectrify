@@ -1,0 +1,52 @@
+Prefill ALSA duplex playback so each block lands ahead of the hardware.
+
+JUCE 8.0.14's ALSAThread links the capture and playback streams, prepares
+both, and starts them with the first capture read. The playback buffer is
+empty at that moment, and since the loop reads a block, processes it and only
+then writes it, every write lands exactly where the hardware is already
+reading. Stop threshold is the boundary, so ALSA never reports that as an
+xrun: the stream simply stays on the edge for the life of the device.
+
+On a USB interface with implicit feedback (Focusrite Scarlett 3rd gen,
+measured) the next playback packet is queued at the very moment the capture
+packet wakes the audio thread, so the block always loses that race: steady
+crackle from the first launch, cured only by a reopen (changing the sample
+rate and back) that happens to start on a better phase. Measured through
+/proc/asound on the running app: playback fill -4..0 frames at launch.
+
+Write two periods of silence into the playback stream before the thread
+starts. Playback then runs a full period ahead (fill 124..254 frames on the
+same Scarlett at 128/48k, holding across a 50 ms stall), which is exactly the
+budget the callback needs to process a block before the hardware wants it.
+One period is not enough: it puts the write back on the same race. Duplex
+only - an output-only loop is paced by the playback stream and fills its own
+buffer.
+
+diff --git a/modules/juce_audio_devices/native/juce_ALSA_linux.cpp b/modules/juce_audio_devices/native/juce_ALSA_linux.cpp
+--- a/modules/juce_audio_devices/native/juce_ALSA_linux.cpp
++++ b/modules/juce_audio_devices/native/juce_ALSA_linux.cpp
+@@ -630,6 +630,24 @@ public:
+         if (outputDevice != nullptr && JUCE_ALSA_FAILED (snd_pcm_prepare (outputDevice->handle)))
+             return;
+ 
++        // PLECTRIFY_ALSA_DUPLEX_PREFILL: a duplex loop is paced by the capture
++        // stream, and the linked playback stream starts with nothing in it, so
++        // each block is written exactly where the hardware is already reading.
++        // On a USB interface with implicit feedback the next playback packet is
++        // queued at the very moment the capture packet wakes this thread, so
++        // the block always arrives too late for it: steady crackle, fixed only
++        // by a reopen that happens to land on a better phase. Two periods of
++        // silence put playback a full period ahead, which is the budget the
++        // callback needs to process a block before the hardware wants it.
++        if (inputDevice != nullptr && outputDevice != nullptr)
++        {
++            outputChannelBuffer.clear();
++
++            for (int i = 0; i < 2; ++i)
++                if (! outputDevice->writeToOutputDevice (outputChannelBuffer, bufferSize))
++                    break;
++        }
++
+         startThread (Priority::high);
+ 
+         int count = 1000;

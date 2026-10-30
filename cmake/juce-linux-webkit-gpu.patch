@@ -1,0 +1,42 @@
+Composite the Linux web view on the GPU.
+
+JUCE 8.0.14's WebKitGTK backend sets the hardware acceleration policy to
+"never", so WebKit rasterises and composites every frame on the CPU. WebView2
+(Windows) and WKWebView (macOS) both composite on the GPU, so on the same
+machine the Linux build's animations, transitions and backdrop filters run
+visibly slower: a backdrop blur is re-rendered in software on every frame
+behind it.
+
+Use "always" instead. JUCE's choice was probably a cautious one, since the view
+runs in a forked GTK child that is embedded over XEmbed and forced onto the
+X11 backend (XWayland on a Wayland session), and some drivers do not composite
+there. So keep that choice one environment variable away:
+PLECTRIFY_WEBKIT_SOFTWARE_RENDERING=1 restores "never". The forked child
+inherits the parent's environment, so setting it where Plectrify is launched
+is enough.
+
+diff --git a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+@@ -805,10 +805,20 @@ public:
+ 
+         auto* settings = wk.juce_webkit_settings_new();
+ 
++        // PLECTRIFY_WEBKIT_GPU: composite on the GPU, as WebView2 and WKWebView
++        // do. JUCE hard-codes "never", which rasterises every frame on the CPU
++        // and makes animations and backdrop filters crawl. Setting
++        // PLECTRIFY_WEBKIT_SOFTWARE_RENDERING=1 restores JUCE's choice for a
++        // driver that cannot composite inside the embedded X11 window.
++        static constexpr int webkitHadwareAccelerationPolicyAlwaysFlag = 1;
+         static constexpr int webkitHadwareAccelerationPolicyNeverFlag = 2;
+ 
++        const auto* softwareRendering = std::getenv ("PLECTRIFY_WEBKIT_SOFTWARE_RENDERING");
++        const auto forceSoftware = softwareRendering != nullptr && std::strcmp (softwareRendering, "1") == 0;
++
+         WebKitSymbols::getInstance()->juce_webkit_settings_set_hardware_acceleration_policy (settings,
+-                                                                                             webkitHadwareAccelerationPolicyNeverFlag);
++                                                                                             forceSoftware ? webkitHadwareAccelerationPolicyNeverFlag
++                                                                                                           : webkitHadwareAccelerationPolicyAlwaysFlag);
+         if (initialisationData->userAgent.isNotEmpty())
+             WebKitSymbols::getInstance()->juce_webkit_settings_set_user_agent (settings,
+                                                                                initialisationData->userAgent.toRawUTF8());

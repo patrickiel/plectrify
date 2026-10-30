@@ -1,0 +1,76 @@
+Render the Linux web view on a Mesa GPU when NVIDIA's proprietary driver would
+be chosen.
+
+WebKitGTK 2.52 cannot allocate its GBM buffers on NVIDIA's proprietary driver
+("Failed to create GBM buffer: Invalid argument") and silently falls back to
+non-composited software mode, which repaints the whole page on one CPU thread
+every frame. That fallback happens patch or no patch, which is why
+juce-linux-webkit-gpu.patch on its own changed nothing on such a machine. Stock
+MiniBrowser behaves the same way, natively on Wayland too.
+
+A machine with a second, Mesa-driven GPU (typically an iGPU beside the NVIDIA
+card) composites fine on that one, and WebKit can be told to use it through
+WEBKIT_WEB_RENDER_DEVICE_FILE. Measured on an RTX 3060 beside a Radeon iGPU, a
+CSS animation's web process CPU drops from ~90% to ~4% at a scale factor of 2.
+
+So, in the forked child, before GTK starts: if some render node is driven by
+"nvidia" and another accessible one is not, point WebKit at the first such
+node. A device the user named is left alone, and a machine with no NVIDIA node
+or no alternative is untouched. Doing it in the child keeps the setenv
+single-threaded and out of the host's environment, which matters inside a DAW,
+and every WebKit process the child launches inherits it.
+
+diff --git a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+@@ -767,6 +767,41 @@ struct ResourceRequestResponse
+     static inline const String key { "resourceRequestResponse" };
+ };
+ 
++//==============================================================================
++// PLECTRIFY_WEBKIT_RENDER_DEVICE: keep WebKit off NVIDIA's proprietary driver
++// when the machine has another GPU to render on. WebKitGTK cannot allocate its
++// GBM buffers there and silently falls back to repainting the whole page on one
++// CPU thread, so the GPU policy above buys nothing; a Mesa render node (an
++// iGPU beside the NVIDIA card) composites properly. Runs in the freshly
++// exec'd child before GTK starts, so the setenv is single-threaded and never
++// touches the host's environment, and every WebKit process inherits it. A
++// device the user named is left alone.
++static void plectrifyAvoidNvidiaRenderDevice()
++{
++    if (std::getenv ("WEBKIT_WEB_RENDER_DEVICE_FILE") != nullptr)
++        return;
++
++    auto nodes = File ("/sys/class/drm").findChildFiles (File::findDirectories, false, "renderD*");
++    nodes.sort();
++
++    auto sawNvidia = false;
++    String alternative;
++
++    for (const auto& node : nodes)
++    {
++        const auto driver = node.getChildFile ("device/driver").getLinkedTarget().getFileName();
++        const auto device = "/dev/dri/" + node.getFileName();
++
++        if (driver == "nvidia")
++            sawNvidia = true;
++        else if (driver.isNotEmpty() && alternative.isEmpty() && access (device.toRawUTF8(), R_OK | W_OK) == 0)
++            alternative = device;
++    }
++
++    if (sawNvidia && alternative.isNotEmpty())
++        setenv ("WEBKIT_WEB_RENDER_DEVICE_FILE", alternative.toRawUTF8(), 0);
++}
++
+ //==============================================================================
+ class GtkChildProcess final : private CommandReceiver::Responder
+ {
+@@ -796,6 +831,8 @@ public:
+             }
+         }
+ 
++        plectrifyAvoidNvidiaRenderDevice();
++
+         auto& wk = *WebKitSymbols::getInstance();
+ 
+         // webkit2gtk crashes when using the wayland backend embedded into an x11 window

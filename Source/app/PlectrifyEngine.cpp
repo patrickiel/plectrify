@@ -1924,7 +1924,7 @@ juce::Array<juce::var> PlectrifyEngine::captureRackEntries() const
         if (inst != nullptr)
         {
             // How to re-create the plugin later.
-            if (auto xml = inst->getPluginDescription().createXml())
+            if (auto xml = PluginManager::describeInstance (*inst).createXml())
                 e->setProperty ("description", xml->toString());
 
             // The plugin's full internal tone, base64'd for JSON transport.
@@ -2582,6 +2582,8 @@ void PlectrifyEngine::applyRigEntries (std::shared_ptr<juce::Array<juce::var>> e
                 failure->setProperty ("name", pluginName);
                 failure->setProperty ("error", error.isNotEmpty() ? error : "Unknown error");
                 failures->add (juce::var (failure));
+                juce::Logger::writeToLog ("Could not restore " + pluginName + ": "
+                                          + failure->getProperty ("error").toString());
 
                 // The module stays in the rack as a visible "missing"
                 // placeholder — audibly inert, like a bypassed slot — with the

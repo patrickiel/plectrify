@@ -113,6 +113,14 @@ public:
         the scan thread owns the blacklist and the cache file for its duration. */
     int unblacklistPlugins (const juce::StringArray& files);
 
+    /** A live instance's description in the form a later createInstanceAsync
+        accepts — what to persist, never inst.getPluginDescription() directly.
+        On Linux JUCE fills a hosted VST3's description from the module it
+        loaded, `Foo.vst3/Contents/x86_64-linux/Foo.so`, while its VST3 format
+        only ever accepts the `.vst3` bundle: persisted raw, every module
+        restores as missing. */
+    static juce::PluginDescription describeInstance (const juce::AudioPluginInstance& instance);
+
     /** Asynchronously creates an instance. The callback receives the instance
         (moved) or nullptr plus an error string, always on the message thread.
 
@@ -120,7 +128,9 @@ public:
         scan cache by plugin identity before instantiation: a saved rig bakes
         the absolute path it was loaded from, which may belong to another
         build's copy of the same plugin (the bundled plugin's path is per-build
-        by construction). */
+        by construction). A Linux module path inside a bundle is mapped back to
+        the bundle first (see describeInstance), so documents written before
+        that existed still load. */
     void createInstanceAsync (
         const juce::PluginDescription& desc,
         double sampleRate,
