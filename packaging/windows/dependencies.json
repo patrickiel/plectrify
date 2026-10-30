@@ -2,7 +2,7 @@
   "webView2": {
     "fileName": "MicrosoftEdgeWebView2RuntimeInstallerX64.exe",
     "url": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
-    "sha256": "13f6d9cdc8c3e7186e4b180db7f48e199ee97d631480e8391fb3106f338fb21a"
+    "sha256": "00c6e5a7413c37753bb92e176539dbf691a101846a622e00a9faec3f23e2816b"
   },
   "visualCppRedistributable": {
     "fileName": "VC_redist.x64.exe",
