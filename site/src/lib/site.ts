@@ -106,7 +106,6 @@ export const VIDEO: { youtubeId: string | null; title: string; posterAlt: string
 
 export const NAV = [
   { href: '/#features', label: 'Features' },
-  { href: '/#video', label: 'Demo' },
   { href: '/docs', label: 'Docs' },
   { href: '/#download', label: 'Download' },
 ];

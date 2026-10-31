@@ -9,10 +9,10 @@
    * The sticky top bar, wearing the app's chrome surface so the site's frame
    * and the product's frame are visibly the same material.
    *
-   * There is no hamburger menu and no open/closed state: four links fit on a
-   * phone once the two that only make sense beside a hero ("Features",
-   * "Demo") drop out below `sm`. A menu button would be JavaScript, a focus
-   * trap and an escape-key handler bought for four links.
+   * There is no hamburger menu and no open/closed state: the links fit on a
+   * phone once the in-page anchors, which only make sense beside a hero, drop
+   * out below `sm`. A menu button would be JavaScript, a focus trap and an
+   * escape-key handler bought for three links.
    *
    * It wears that chrome only once there is something under it to be chrome
    * *over*. The bar is sticky in normal flow, not fixed, so at the top of any

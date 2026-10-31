@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { DESCRIPTION, IDENTITY, PRODUCT, TAGLINE, VIDEO } from '$lib/site';
+  import { DESCRIPTION, IDENTITY, PRODUCT, TAGLINE } from '$lib/site';
   import DownloadButtons from '$lib/components/DownloadButtons.svelte';
-  import VideoEmbed from '$lib/components/VideoEmbed.svelte';
   import Knob from '$lib/components/Knob.svelte';
   import tone3000Logo from '$lib/assets/tone3000-logo.svg';
   import screenshotRack from '$lib/assets/screenshot-rack.png';
@@ -335,23 +334,6 @@
         </article>
       {/each}
     </div>
-  </div>
-</section>
-
-<!-- ── Demo video ───────────────────────────────────────────────────────────
-     Heading left-aligned, like every other section heading on the page. The
-     centred CTA below is the one exception, and it earns it by being a panel
-     the reader is meant to act on rather than a section they read past. -->
-<section id="video" class="scroll-mt-24 px-5 py-20 sm:px-8 sm:py-24">
-  <!-- max-w-6xl, the same column as Features and Practice. A narrower wrapper
-       would set this heading in from theirs, which is worse than the centring
-       it replaced: an inconsistent left edge reads as a mistake where a centred
-       block reads as a choice. -->
-  <div class="mx-auto max-w-6xl">
-    <div class="mb-6 max-w-2xl">
-      <h2 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Demo</h2>
-    </div>
-    <VideoEmbed id={VIDEO.youtubeId} title={VIDEO.title} />
   </div>
 </section>
 

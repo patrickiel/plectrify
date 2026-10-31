@@ -10,7 +10,6 @@
       items: [
         { label: 'Features', href: '/#features' },
         { label: 'Practice and stage', href: '/#practice' },
-        { label: 'Demo', href: '/#video' },
         { label: 'Download', href: '/#download' },
         { label: 'Releases', href: RELEASES_URL, external: true },
       ],
