@@ -399,6 +399,13 @@
 
     if (!shortcutsEnabled) return;
 
+    // The gate is a live control like the tuner's status-bar toggle: it works
+    // in Edit mode too, and obeys the modal/busy/learn guards above.
+    if (action === 'noiseGateToggle') {
+      engine.setStatus({ noiseGateEnabled: !status.noiseGateEnabled });
+      return;
+    }
+
     // Maximizing is a view action, so it works wherever the tools do — the
     // player raises the looper or the tempo onto the whole screen, and the same
     // switch drops it again. No rig state is touched, so no edit-mode gate.

@@ -88,6 +88,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   looperViewMode: 'simple',
   metronomeViewMode: 'simple',
   packagesViewMode: 'simple',
+  noiseGateViewMode: 'simple',
   songEditMode: false,
   looperSessionAutoCleanup: true,
   looperSessionAutoCleanupLimit: 20,
@@ -198,7 +199,7 @@ function patchOrderMap(value: unknown): Record<string, string[]> {
     selects plus the fixed verbs. Anything else in a persisted file is stale
     or hand-edited and is dropped. */
 const MIDI_ACTION_KEY =
-  /^(?:rig:\d+|scene:\d+|rigNext|rigPrev|sceneNext|scenePrev|tunerToggle|outputMute|looperToggle|looperStop|looperClear|looperUndo|looperMaximize|metronomeToggle|metronomeTapTempo|metronomeTempoDown|metronomeTempoUp|metronomeMaximize|songNext|songPrev|songMaximize)$/;
+  /^(?:rig:\d+|scene:\d+|rigNext|rigPrev|sceneNext|scenePrev|tunerToggle|outputMute|noiseGateToggle|looperToggle|looperStop|looperClear|looperUndo|looperMaximize|metronomeToggle|metronomeTapTempo|metronomeTempoDown|metronomeTempoUp|metronomeMaximize|songNext|songPrev|songMaximize)$/;
 
 /** Keep only well-formed action→trigger entries from a persisted binding map,
     re-built field by field so stray extra properties don't survive a load. */
@@ -334,6 +335,10 @@ export function normalizeAppSettings(value: unknown): AppSettings {
     packagesViewMode: toolViewMode(
       candidate?.packagesViewMode,
       DEFAULT_APP_SETTINGS.packagesViewMode,
+    ),
+    noiseGateViewMode: toolViewMode(
+      candidate?.noiseGateViewMode,
+      DEFAULT_APP_SETTINGS.noiseGateViewMode,
     ),
     songEditMode: bool(candidate?.songEditMode, DEFAULT_APP_SETTINGS.songEditMode),
     looperSessionAutoCleanup: bool(

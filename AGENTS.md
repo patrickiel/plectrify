@@ -1016,6 +1016,41 @@ page hides the surface behind `HostCapabilities`).
   the router itself never learns a channel index. The pin is clamped at render
   time, so a saved choice survives a move to a smaller interface, and it is
   persisted in `audio_settings.xml` beside the device it indexes into.
+- `NoiseGate` (`Source/audio/NoiseGate.h`, owned by the router) — the built-in
+  noise gate, last thing in the router: after input gain and after both meters,
+  before the first module. It is a **downward expander on the clean guitar
+  signal**, where a pedalboard puts a gate and for the same reason: the gap
+  between a played note and the pickup's hum is widest before the amp's
+  compression pulls the two together, and whatever the amp sim then amplifies
+  has already been quietened. A peak detector (instant attack, 20 ms decay)
+  because the IN meter the threshold is set against is a peak meter; opens at
+  the threshold, closes only after sitting 6 dB under it for the whole hold.
+  What closed *means* is the **shape**: soft and firm are expander slopes (2
+  and 4 dB of attenuation per dB below the close threshold), easing a dying
+  note out at a multiple of its own decay; hard is the classic gate, straight
+  to the floor. The floor is the **range** (10–70 dB), which is also how far
+  the gain has to climb when opening and so the main thing that decides
+  whether the opening clicks. Gain moves at the user's attack and release,
+  both in constant dB per second over the range; switching it off has its own
+  30 ms ramp back to unity whatever the attack says, and switching it on over
+  silence closes at the release rate like any other close. The first version fixed attack at 0.5 ms and
+  the slope at 6 and was heard as cutting off and switching on abruptly —
+  which is why all three are controls now. Threshold, shape, attack, hold,
+  release and range are the controls (`noiseGate*` on `StatusState`, mirrored
+  in `ui/src/lib/engine/noiseGate.ts` — keep its ranges and the shape codec in
+  step with the header); hysteresis and the detector are fixed. Persisted in
+  `audio_settings.xml` and the plugin's
+  host-saved document alike; offered by both hosts, so no capability gates it.
+  It sits after the meters on purpose: the IN meter shows what the gate hears,
+  and auto-standby keeps watching the real input rather than a gate closed over
+  it. The page's GATE pill beside the IN meter is the mute pill's mirror — click
+  for on/off, hover for the slideout — and doubles as the lamp: bright while
+  open, dimmed while closed, so a silent rig can be told from a dead cable.
+  The slideout has the same Simple/Expert switch as the looper and metronome
+  (`noiseGateViewMode`): Simple is on/off and the threshold, which is the
+  whole job on most rigs; Expert reveals shape, attack, hold, release and
+  range behind the shared slide reveal.
+  `Plectrify.NoiseGate` pins the behaviour against synthetic signals.
 - `OutputLevelProcessor` (same header) — fixed final node: master gain, meter,
   and **five independent mute reasons** (MIDI tuner, rig load, standby, feedback
   guard, the user's own mute), each its own atomic so none clears another's. The
@@ -1233,7 +1268,8 @@ OS.
   a later rename must leave them alone.
 - `settings.json` — app preferences (e.g. rack zoom).
 - `audio_settings.xml` — last audio device state, which input channel the guitar
-  is on, input/output gain and tuner state (`MainComponent`). **Its absence is
+  is on, input/output gain, the noise gate's settings and tuner state
+  (`MainComponent`). **Its absence is
   what defines a first run for the audio stack** — see
   `chooseFirstRunAudioDevice` — just as `settings.json`'s absence does for the
   page (`setupCompleted`, `starterInstallAttempted`).

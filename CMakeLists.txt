@@ -735,6 +735,22 @@ if (BUILD_TESTING)
         juce::juce_recommended_warning_flags)
     add_test(NAME Plectrify.RackProcessor COMMAND PlectrifyRackTests)
 
+    # The noise gate against synthetic signals: a tone above the threshold
+    # passes at unity, hum below it is pushed down the slope, a stopped note
+    # waits out the hold and fades at the release rate, and a disabled gate
+    # is a no-op. Header-only DSP, so this links the bare basics.
+    juce_add_console_app(PlectrifyNoiseGateTests PRODUCT_NAME "Plectrify Noise Gate Tests")
+    juce_generate_juce_header(PlectrifyNoiseGateTests)
+    target_sources(PlectrifyNoiseGateTests PRIVATE Tests/audio/NoiseGateTests.cpp)
+    target_include_directories(PlectrifyNoiseGateTests PRIVATE Source/audio)
+    target_compile_definitions(PlectrifyNoiseGateTests PRIVATE JUCE_USE_CURL=0)
+    target_link_libraries(PlectrifyNoiseGateTests PRIVATE
+        juce::juce_audio_basics
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    add_test(NAME Plectrify.NoiseGate COMMAND PlectrifyNoiseGateTests)
+
     # The looper's state machine and audio path: toggle cycle, record/playback
     # fidelity, overdub summing and the amortized undo snapshot — all against
     # the bare processor, no graph involved.

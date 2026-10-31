@@ -72,6 +72,7 @@ import {
 } from './patches';
 import { nextRigName } from './rigNames';
 import { isStaleEcho, notePendingParamWrite, type PendingEchoes } from './paramEcho';
+import { notePendingStatus, reconcileStatusPush, type PendingStatusWrites } from './statusEcho';
 import {
   EMPTY_CATALOGUE_STATE,
   normalizeInstallFinished,
@@ -418,6 +419,8 @@ export class JuceEngine implements EngineBridge {
   // Optimistic param writes awaiting their engine echo — see paramEcho.ts.
   private pendingParamEcho: PendingEchoes = new Map();
   private status: StatusState = { ...DEFAULT_STATUS_STATE };
+  // Optimistic status writes awaiting their echo — see statusEcho.ts.
+  private pendingStatus: PendingStatusWrites = new Map();
   private statusListeners = new Set<(status: StatusState) => void>();
   private appSettings = { ...DEFAULT_APP_SETTINGS };
   private appSettingsListeners = new Set<(settings: AppSettings) => void>();
@@ -689,7 +692,12 @@ export class JuceEngine implements EngineBridge {
         update.metronomeAccents = [...update.metronomePattern].map((level) => Number(level));
       }
       delete update.metronomePattern;
-      this.status = { ...this.status, ...update };
+      // A tick snapshotted before a click was handled must not undo the click
+      // for one frame; the keys we are waiting on keep the page's value.
+      this.status = {
+        ...this.status,
+        ...reconcileStatusPush(this.pendingStatus, update, performance.now()),
+      };
       // A deep-standby wake re-applies plugin state natively; the plugins'
       // change notifications trailing it are not user edits.
       if (prevStage !== 'active' && this.status.standbyStage === 'active')
@@ -2723,6 +2731,7 @@ export class JuceEngine implements EngineBridge {
 
   setStatus(status: Partial<SettableStatus>): void {
     this.status = { ...this.status, ...status };
+    notePendingStatus(this.pendingStatus, status, performance.now());
     this.emitStatus();
     backend()?.emitEvent('setStatus', status);
   }

@@ -70,12 +70,22 @@ card, dial in a sound you like, and play.
 > downstream: output device or volume. If it is not, the problem is upstream: input channel or
 > input gain. [Troubleshooting](/docs/troubleshooting) has the rest.
 
-## 5. Tune up
+## 5. Quieten the hum
+
+Single coils hum and high-gain amps hiss. The **GATE** pill beside the IN meter switches on a
+noise gate that sits before the first module, where a pedal gate would go. Hover the pill for its
+settings: set the threshold just above where the IN meter settles when you are not playing.
+**Shape** is how it closes: soft and firm ease a dying note out, hard cuts like a classic gate. If
+it cuts off too abruptly, soften the shape, lengthen the release or shallow the range; if it
+clicks when a note starts, lengthen the attack. The pill is bright while the gate is open and dims
+while it is closed, so a silent rig is not a mystery.
+
+## 6. Tune up
 
 The tuner lives in the status bar and taps the input directly, so it works no matter what the
 rack is doing, so you do not have to bypass anything to use it.
 
-## 6. Save it
+## 7. Save it
 
 Two different things are worth saving, and they are not the same thing:
 

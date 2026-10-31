@@ -445,6 +445,15 @@ juce::var PlectrifyEngine::buildStatusState()
     auto* status = new juce::DynamicObject();
     status->setProperty ("inputGainDb", rack.getInputGainDb());
     status->setProperty ("outputGainDb", rack.getOutputGainDb());
+    status->setProperty ("noiseGateEnabled", rack.isNoiseGateEnabled());
+    status->setProperty ("noiseGateThresholdDb", rack.getNoiseGateThresholdDb());
+    status->setProperty ("noiseGateHoldMs", rack.getNoiseGateHoldMs());
+    status->setProperty ("noiseGateReleaseMs", rack.getNoiseGateReleaseMs());
+    status->setProperty ("noiseGateAttackMs", rack.getNoiseGateAttackMs());
+    status->setProperty ("noiseGateRangeDb", rack.getNoiseGateRangeDb());
+    status->setProperty ("noiseGateShape", rack.getNoiseGateShape());
+    status->setProperty ("noiseGateReductionDb", rack.getNoiseGateReductionDb());
+    status->setProperty ("noiseGateOpen", rack.isNoiseGateOpen());
     status->setProperty ("inputPeak", rack.consumeInputPeak());
     status->setProperty ("outputPeak", rack.consumeOutputPeak());
     status->setProperty ("tunerEnabled", rack.isTunerEnabled());
@@ -1707,6 +1716,20 @@ void PlectrifyEngine::handleSetStatus (const juce::var& payload)
         rack.setInputGainDb ((float) (double) payload["inputGainDb"]);
     if (object->hasProperty ("outputGainDb"))
         rack.setOutputGainDb ((float) (double) payload["outputGainDb"]);
+    if (object->hasProperty ("noiseGateEnabled"))
+        rack.setNoiseGateEnabled ((bool) payload["noiseGateEnabled"]);
+    if (object->hasProperty ("noiseGateThresholdDb"))
+        rack.setNoiseGateThresholdDb ((float) (double) payload["noiseGateThresholdDb"]);
+    if (object->hasProperty ("noiseGateHoldMs"))
+        rack.setNoiseGateHoldMs ((float) (double) payload["noiseGateHoldMs"]);
+    if (object->hasProperty ("noiseGateReleaseMs"))
+        rack.setNoiseGateReleaseMs ((float) (double) payload["noiseGateReleaseMs"]);
+    if (object->hasProperty ("noiseGateAttackMs"))
+        rack.setNoiseGateAttackMs ((float) (double) payload["noiseGateAttackMs"]);
+    if (object->hasProperty ("noiseGateRangeDb"))
+        rack.setNoiseGateRangeDb ((float) (double) payload["noiseGateRangeDb"]);
+    if (object->hasProperty ("noiseGateShape"))
+        rack.setNoiseGateShape ((int) payload["noiseGateShape"]);
     if (object->hasProperty ("tunerEnabled"))
         rack.setTunerEnabled ((bool) payload["tunerEnabled"]);
     if (object->hasProperty ("midiTunerActive"))
@@ -3197,6 +3220,13 @@ juce::String PlectrifyEngine::buildHostStateJson() const
     auto* fixed = new juce::DynamicObject();
     fixed->setProperty ("inputGainDb", rack.getInputGainDb());
     fixed->setProperty ("outputGainDb", rack.getOutputGainDb());
+    fixed->setProperty ("noiseGateEnabled", rack.isNoiseGateEnabled());
+    fixed->setProperty ("noiseGateThresholdDb", rack.getNoiseGateThresholdDb());
+    fixed->setProperty ("noiseGateHoldMs", rack.getNoiseGateHoldMs());
+    fixed->setProperty ("noiseGateReleaseMs", rack.getNoiseGateReleaseMs());
+    fixed->setProperty ("noiseGateAttackMs", rack.getNoiseGateAttackMs());
+    fixed->setProperty ("noiseGateRangeDb", rack.getNoiseGateRangeDb());
+    fixed->setProperty ("noiseGateShape", rack.getNoiseGateShape());
     fixed->setProperty ("tunerEnabled", rack.isTunerEnabled());
     // The guard's arming is a preference; its latch is not — same rule as
     // audio_settings.xml.
@@ -3276,6 +3306,20 @@ void PlectrifyEngine::applyHostState (const juce::String& json)
         // contract — an older state simply says less.
         if (fixed->hasProperty ("inputGainDb"))    rack.setInputGainDb ((float) (double) fixedVar["inputGainDb"]);
         if (fixed->hasProperty ("outputGainDb"))   rack.setOutputGainDb ((float) (double) fixedVar["outputGainDb"]);
+        if (fixed->hasProperty ("noiseGateEnabled"))
+            rack.setNoiseGateEnabled ((bool) fixedVar["noiseGateEnabled"]);
+        if (fixed->hasProperty ("noiseGateThresholdDb"))
+            rack.setNoiseGateThresholdDb ((float) (double) fixedVar["noiseGateThresholdDb"]);
+        if (fixed->hasProperty ("noiseGateHoldMs"))
+            rack.setNoiseGateHoldMs ((float) (double) fixedVar["noiseGateHoldMs"]);
+        if (fixed->hasProperty ("noiseGateReleaseMs"))
+            rack.setNoiseGateReleaseMs ((float) (double) fixedVar["noiseGateReleaseMs"]);
+        if (fixed->hasProperty ("noiseGateAttackMs"))
+            rack.setNoiseGateAttackMs ((float) (double) fixedVar["noiseGateAttackMs"]);
+        if (fixed->hasProperty ("noiseGateRangeDb"))
+            rack.setNoiseGateRangeDb ((float) (double) fixedVar["noiseGateRangeDb"]);
+        if (fixed->hasProperty ("noiseGateShape"))
+            rack.setNoiseGateShape ((int) fixedVar["noiseGateShape"]);
         if (fixed->hasProperty ("tunerEnabled"))   rack.setTunerEnabled ((bool) fixedVar["tunerEnabled"]);
         if (fixed->hasProperty ("feedbackGuardEnabled"))
             rack.setFeedbackGuardEnabled ((bool) fixedVar["feedbackGuardEnabled"]);

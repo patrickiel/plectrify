@@ -124,6 +124,8 @@
   let tunerMidiLearning = $state(false);
   // Same shape for the mute's learn, armed from the mute pill's own slideout.
   let muteMidiLearning = $state(false);
+  // And for the noise gate's, armed from the GATE pill's slideout.
+  let gateMidiLearning = $state(false);
   // Same shape for the looper's main-switch learn (in the tools sidebar). The
   // rack sees these as one combined midiLearnActive flag below.
   let looperMidiLearning = $state(false);
@@ -387,12 +389,13 @@
     bind:metronomeMidiLearning
     bind:setlistMidiLearning
     bind:settingsMidiLearning
-    otherLearnActive={rackMidiLearning || tunerMidiLearning || muteMidiLearning}
+    otherLearnActive={rackMidiLearning || tunerMidiLearning || muteMidiLearning || gateMidiLearning}
     onMidiSettingsOpen={() => {
       // One armed learn app-wide: the MIDI view brings its own Learn buttons,
       // so a learn still listening elsewhere would capture the same press.
       tunerMidiLearning = false;
       muteMidiLearning = false;
+      gateMidiLearning = false;
       looperMidiLearning = false;
       metronomeMidiLearning = false;
       setlistMidiLearning = false;
@@ -449,6 +452,7 @@
       onSetAppSettings={(settings) => engine.setAppSettings(settings)}
       midiLearnActive={tunerMidiLearning ||
         muteMidiLearning ||
+        gateMidiLearning ||
         looperMidiLearning ||
         metronomeMidiLearning ||
         setlistMidiLearning ||
@@ -491,6 +495,7 @@
       settingsMidiLearning}
     bind:tunerMidiLearning
     bind:muteMidiLearning
+    bind:gateMidiLearning
   />
 </div>
 

@@ -214,6 +214,27 @@ public:
 
     void setInputGainDb (float db);
     float getInputGainDb() const noexcept;
+    /** The built-in noise gate on the input router — persisted preferences,
+        all atomics, gapless. The reduction is its one live readout: the
+        attenuation in force, 0 while open. Message thread. */
+    void setNoiseGateEnabled (bool enabled);
+    bool isNoiseGateEnabled() const noexcept;
+    void setNoiseGateThresholdDb (float db);
+    float getNoiseGateThresholdDb() const noexcept;
+    void setNoiseGateHoldMs (float ms);
+    float getNoiseGateHoldMs() const noexcept;
+    void setNoiseGateReleaseMs (float ms);
+    float getNoiseGateReleaseMs() const noexcept;
+    void setNoiseGateAttackMs (float ms);
+    float getNoiseGateAttackMs() const noexcept;
+    void setNoiseGateRangeDb (float db);
+    float getNoiseGateRangeDb() const noexcept;
+    /** NoiseGate::Shape as its integer value — what the bridge and the
+        settings file carry; out of range reads as the default. */
+    void setNoiseGateShape (int shape);
+    int getNoiseGateShape() const noexcept;
+    float getNoiseGateReductionDb() const noexcept;
+    bool isNoiseGateOpen() const noexcept;
     void setOutputGainDb (float db);
     float getOutputGainDb() const noexcept;
     /** Persisted status-bar preference. It controls analysis, but never mutes. */

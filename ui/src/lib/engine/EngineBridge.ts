@@ -38,6 +38,13 @@ export type SettableStatus = Pick<
   StatusState,
   | 'inputGainDb'
   | 'outputGainDb'
+  | 'noiseGateEnabled'
+  | 'noiseGateThresholdDb'
+  | 'noiseGateHoldMs'
+  | 'noiseGateReleaseMs'
+  | 'noiseGateAttackMs'
+  | 'noiseGateRangeDb'
+  | 'noiseGateShape'
   | 'tunerEnabled'
   | 'midiTunerActive'
   | 'feedbackGuardEnabled'

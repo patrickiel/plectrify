@@ -112,6 +112,19 @@ MainComponent::MainComponent()
         rack.setInputSourceChannel (savedState->getIntAttribute ("inputSourceChannel", 0));
         rack.setInputGainDb ((float) savedState->getDoubleAttribute ("inputGainDb", 0.0));
         rack.setOutputGainDb ((float) savedState->getDoubleAttribute ("outputGainDb", 0.0));
+        rack.setNoiseGateEnabled (savedState->getBoolAttribute ("noiseGateEnabled", false));
+        rack.setNoiseGateThresholdDb ((float) savedState->getDoubleAttribute (
+            "noiseGateThresholdDb", NoiseGate::defaultThresholdDb));
+        rack.setNoiseGateHoldMs ((float) savedState->getDoubleAttribute (
+            "noiseGateHoldMs", NoiseGate::defaultHoldMs));
+        rack.setNoiseGateReleaseMs ((float) savedState->getDoubleAttribute (
+            "noiseGateReleaseMs", NoiseGate::defaultReleaseMs));
+        rack.setNoiseGateAttackMs ((float) savedState->getDoubleAttribute (
+            "noiseGateAttackMs", NoiseGate::defaultAttackMs));
+        rack.setNoiseGateRangeDb ((float) savedState->getDoubleAttribute (
+            "noiseGateRangeDb", NoiseGate::defaultRangeDb));
+        rack.setNoiseGateShape (savedState->getIntAttribute (
+            "noiseGateShape", (int) NoiseGate::defaultShape));
         rack.setTunerEnabled (savedState->getBoolAttribute ("tunerEnabled", true));
         rack.setFeedbackGuardEnabled (savedState->getBoolAttribute ("feedbackGuardEnabled", false));
         rack.setLooperPostChain (savedState->getBoolAttribute ("looperPostChain", true));
@@ -729,6 +742,13 @@ void MainComponent::saveAudioDeviceState()
         xml->setAttribute ("inputSourceChannel", rack.getInputSourceChannel());
         xml->setAttribute ("inputGainDb", rack.getInputGainDb());
         xml->setAttribute ("outputGainDb", rack.getOutputGainDb());
+        xml->setAttribute ("noiseGateEnabled", rack.isNoiseGateEnabled());
+        xml->setAttribute ("noiseGateThresholdDb", rack.getNoiseGateThresholdDb());
+        xml->setAttribute ("noiseGateHoldMs", rack.getNoiseGateHoldMs());
+        xml->setAttribute ("noiseGateReleaseMs", rack.getNoiseGateReleaseMs());
+        xml->setAttribute ("noiseGateAttackMs", rack.getNoiseGateAttackMs());
+        xml->setAttribute ("noiseGateRangeDb", rack.getNoiseGateRangeDb());
+        xml->setAttribute ("noiseGateShape", rack.getNoiseGateShape());
         xml->setAttribute ("tunerEnabled", rack.isTunerEnabled());
         // The guard's arming is a preference; its latch is not. Restoring a mute
         // from a session that ended hours ago would only look like a dead rig.

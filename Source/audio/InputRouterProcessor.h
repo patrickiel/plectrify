@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 
+#include "NoiseGate.h"
 #include "PassthroughProcessor.h"
 #include "TunerDetector.h"
 
@@ -17,7 +18,11 @@
     that one to both of ours (see RackProcessor::setInputSourceChannel), so the
     choice of jack is a connection upstream and never a channel index here.
     Channel 0 is copied onto channel 1, input gain is applied, and the tuner
-    taps the pre-gain signal.
+    taps the pre-gain signal. The built-in noise gate comes last, after the
+    meters: the IN meter shows what the gate is listening to, which is the
+    only way a threshold set against that meter can mean anything, and the
+    standby idle detector keeps watching the real input rather than a gate
+    that has closed over it.
 */
 class InputRouterProcessor final : public PassthroughProcessor
 {
@@ -30,6 +35,9 @@ public:
     bool isTunerEnabled() const noexcept           { return tunerDetector.isEnabled(); }
     float consumePeak() noexcept                    { return peak.consume(); }
     TunerReading getTunerReading() const            { return tunerDetector.getReading(); }
+    /** The gate's controls are its own atomics; see NoiseGate. */
+    NoiseGate& getNoiseGate() noexcept              { return noiseGate; }
+    const NoiseGate& getNoiseGate() const noexcept  { return noiseGate; }
 
     /** Message thread. A second, independent tap of the same level for the
         auto-standby idle detector. consumePeak() is destructive and the status
@@ -43,7 +51,11 @@ public:
         MIDI state and must survive a standby cycle untouched. */
     void setStandby (bool shouldStandby) noexcept   { standby.store (shouldStandby); }
 
-    void prepareToPlay (double rate, int) override { tunerDetector.prepare (rate); }
+    void prepareToPlay (double rate, int) override
+    {
+        tunerDetector.prepare (rate);
+        noiseGate.prepare (rate);
+    }
     void releaseResources() override               { tunerDetector.release(); }
 
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
@@ -69,6 +81,9 @@ public:
         const float magnitude = buffer.getMagnitude (0, 0, numSamples);
         peak.update (magnitude);
         standbyPeak.update (magnitude);
+
+        // After the meters, before the first module — see the class comment.
+        noiseGate.process (buffer);
     }
 
 private:
@@ -77,6 +92,7 @@ private:
     PeakMeter standbyPeak;
     std::atomic<bool> standby { false };
     TunerDetector tunerDetector;
+    NoiseGate noiseGate;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (InputRouterProcessor)
 };

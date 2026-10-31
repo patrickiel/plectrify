@@ -934,6 +934,22 @@ void RackProcessor::updateSuspendedStates()
 
 void RackProcessor::setInputGainDb (float db) { if (inputRouter != nullptr) inputRouter->setGainDb (db); }
 float RackProcessor::getInputGainDb() const noexcept { return inputRouter != nullptr ? inputRouter->getGainDb() : 0.0f; }
+void RackProcessor::setNoiseGateEnabled (bool enabled) { if (inputRouter != nullptr) inputRouter->getNoiseGate().setEnabled (enabled); }
+bool RackProcessor::isNoiseGateEnabled() const noexcept { return inputRouter != nullptr && inputRouter->getNoiseGate().isEnabled(); }
+void RackProcessor::setNoiseGateThresholdDb (float db) { if (inputRouter != nullptr) inputRouter->getNoiseGate().setThresholdDb (db); }
+float RackProcessor::getNoiseGateThresholdDb() const noexcept { return inputRouter != nullptr ? inputRouter->getNoiseGate().getThresholdDb() : NoiseGate::defaultThresholdDb; }
+void RackProcessor::setNoiseGateHoldMs (float ms) { if (inputRouter != nullptr) inputRouter->getNoiseGate().setHoldMs (ms); }
+float RackProcessor::getNoiseGateHoldMs() const noexcept { return inputRouter != nullptr ? inputRouter->getNoiseGate().getHoldMs() : NoiseGate::defaultHoldMs; }
+void RackProcessor::setNoiseGateReleaseMs (float ms) { if (inputRouter != nullptr) inputRouter->getNoiseGate().setReleaseMs (ms); }
+float RackProcessor::getNoiseGateReleaseMs() const noexcept { return inputRouter != nullptr ? inputRouter->getNoiseGate().getReleaseMs() : NoiseGate::defaultReleaseMs; }
+void RackProcessor::setNoiseGateAttackMs (float ms) { if (inputRouter != nullptr) inputRouter->getNoiseGate().setAttackMs (ms); }
+float RackProcessor::getNoiseGateAttackMs() const noexcept { return inputRouter != nullptr ? inputRouter->getNoiseGate().getAttackMs() : NoiseGate::defaultAttackMs; }
+void RackProcessor::setNoiseGateRangeDb (float db) { if (inputRouter != nullptr) inputRouter->getNoiseGate().setRangeDb (db); }
+float RackProcessor::getNoiseGateRangeDb() const noexcept { return inputRouter != nullptr ? inputRouter->getNoiseGate().getRangeDb() : NoiseGate::defaultRangeDb; }
+void RackProcessor::setNoiseGateShape (int shape) { if (inputRouter != nullptr) inputRouter->getNoiseGate().setShape (shape); }
+int RackProcessor::getNoiseGateShape() const noexcept { return inputRouter != nullptr ? (int) inputRouter->getNoiseGate().getShape() : (int) NoiseGate::defaultShape; }
+float RackProcessor::getNoiseGateReductionDb() const noexcept { return inputRouter != nullptr ? inputRouter->getNoiseGate().getReductionDb() : 0.0f; }
+bool RackProcessor::isNoiseGateOpen() const noexcept { return inputRouter == nullptr || inputRouter->getNoiseGate().isOpen(); }
 void RackProcessor::setOutputGainDb (float db) { if (outputLevel != nullptr) outputLevel->setGainDb (db); }
 float RackProcessor::getOutputGainDb() const noexcept { return outputLevel != nullptr ? outputLevel->getGainDb() : 0.0f; }
 void RackProcessor::setTunerEnabled (bool enabled)

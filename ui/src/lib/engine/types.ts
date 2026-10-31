@@ -403,6 +403,7 @@ export type MidiActionId =
   | 'scenePrev'
   | 'tunerToggle'
   | 'outputMute'
+  | 'noiseGateToggle'
   | 'looperToggle'
   | 'looperStop'
   | 'looperClear'
@@ -523,6 +524,9 @@ export interface AppSettings {
       Expert reveals the filter box, views and tag chips, the outbound link
       cards, and the licence disclosure. */
   packagesViewMode: ToolViewMode;
+  /** Simple keeps the noise gate's slideout to on/off and the threshold;
+      Expert reveals shape, attack, hold, release and range. */
+  noiseGateViewMode: ToolViewMode;
   /** Whether the song tool exposes its editing controls. The same Perform/Edit
       split the rack has, kept separate from it: a player editing the rack is
       not necessarily editing the book, and mid-set the song panel must show
@@ -612,6 +616,32 @@ export interface StatusState {
   outputGainDb: number;
   inputPeak: number;
   outputPeak: number;
+  /** The built-in noise gate on the input, after the IN meter and before the
+      first module. Persisted preferences; the engine's NoiseGate owns the DSP
+      and `noiseGate.ts` mirrors its ranges. */
+  noiseGateEnabled: boolean;
+  /** Opens at this peak level, in dBFS against the IN meter's scale. */
+  noiseGateThresholdDb: number;
+  /** How long the level may sit under the close threshold before the gate
+      starts closing. */
+  noiseGateHoldMs: number;
+  /** How long the gain takes to fall through its full range once closing. */
+  noiseGateReleaseMs: number;
+  /** How long the gain takes to climb back through the range when opening. */
+  noiseGateAttackMs: number;
+  /** How far down closed goes, in dB of attenuation (positive number). */
+  noiseGateRangeDb: number;
+  /** The engine's NoiseGate::Shape as its integer: 0 soft, 1 firm, 2 hard.
+      `noiseGate.ts` has the codec and the names. */
+  noiseGateShape: number;
+  /** Live, read-only: the attenuation in force (0 open, negative closed).
+      Level-triggered like the meters, so a dropped push costs one tick. */
+  noiseGateReductionDb: number;
+  /** Live, read-only: the gate's decision. False from the first block it has
+      decided to close, while the release is still ramping the gain — the lamp
+      follows this, not the reduction, so switching on over a quiet input dims
+      the pill at once rather than a few ticks later. True while the gate is off. */
+  noiseGateOpen: boolean;
   /** Persisted status-bar tuner preference. Manual tuning never mutes output. */
   tunerEnabled: boolean;
   /** Transient MIDI-driven stage tuner. Forces analysis and mutes output. */
@@ -737,6 +767,15 @@ export const DEFAULT_STATUS_STATE: StatusState = {
   outputGainDb: 0,
   inputPeak: 0,
   outputPeak: 0,
+  noiseGateEnabled: false,
+  noiseGateThresholdDb: -50,
+  noiseGateHoldMs: 50,
+  noiseGateReleaseMs: 250,
+  noiseGateAttackMs: 2,
+  noiseGateRangeDb: 50,
+  noiseGateShape: 1,
+  noiseGateReductionDb: 0,
+  noiseGateOpen: true,
   tunerEnabled: true,
   midiTunerActive: false,
   feedbackGuardEnabled: false,

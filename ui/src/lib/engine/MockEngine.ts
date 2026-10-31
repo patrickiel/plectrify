@@ -35,6 +35,7 @@ import { looperSessionName, normalizeLooperSessions, pruneLooperSessions } from 
 import { DEFAULT_STATUS_STATE } from './types';
 import { DEFAULT_APP_SETTINGS, normalizeAppSettings } from './appSettings';
 import { knobMeterPatch } from './contentMidi';
+import { noiseGateShapeFromEngine, noiseGateSteadyReductionDb } from './noiseGate';
 import { asModuleColor, asModuleIcon, asModuleTexture, asStyleVariant } from './moduleAppearance';
 import { firstFreePos, moveKnobToPos, normalizePositions } from './knobLayout';
 import { laneName, makeLane, nextLaneName, normalizeRoutingState } from './routing';
@@ -957,6 +958,18 @@ export class MockEngine implements EngineBridge {
       const detected = analysing && stage.detected;
       const standby = this.tickStandby();
       const asleep = standby.standbyStage !== 'active';
+      const inputPeak = asleep ? 0 : 0.08 + Math.abs(Math.sin(t * 2.1)) * 0.52;
+      // The gate's lamp, from the engine's static curve against the synthetic
+      // level — no hold or release, but enough that dragging the threshold
+      // through the level in the slideout shows the pill dim and brighten.
+      const noiseGateReductionDb = this.status.noiseGateEnabled
+        ? noiseGateSteadyReductionDb(
+            inputPeak > 0.00001 ? 20 * Math.log10(inputPeak) : -120,
+            this.status.noiseGateThresholdDb,
+            noiseGateShapeFromEngine(this.status.noiseGateShape),
+            this.status.noiseGateRangeDb,
+          )
+        : 0;
       this.status = {
         ...this.status,
         ...standby,
@@ -964,7 +977,9 @@ export class MockEngine implements EngineBridge {
         ...this.tickMetronome(performance.now()),
         // A parked rig is silent: the meters must show that, or the mock would
         // contradict the standby badge it is drawing.
-        inputPeak: asleep ? 0 : 0.08 + Math.abs(Math.sin(t * 2.1)) * 0.52,
+        inputPeak,
+        noiseGateReductionDb,
+        noiseGateOpen: noiseGateReductionDb === 0,
         outputPeak:
           asleep || this.status.midiTunerActive ? 0 : 0.05 + Math.abs(Math.sin(t * 1.7)) * 0.72,
         tunerReading: detected

@@ -255,6 +255,12 @@ describe('normalizeAppSettings', () => {
     expect(normalizeAppSettings({ looperViewMode: 'advanced' }).looperViewMode).toBe('simple');
   });
 
+  it('keeps a known noise gate view and defaults malformed values to Simple', () => {
+    expect(normalizeAppSettings({}).noiseGateViewMode).toBe('simple');
+    expect(normalizeAppSettings({ noiseGateViewMode: 'expert' }).noiseGateViewMode).toBe('expert');
+    expect(normalizeAppSettings({ noiseGateViewMode: 'pro' }).noiseGateViewMode).toBe('simple');
+  });
+
   it('keeps a known metronome view and defaults malformed values to Simple', () => {
     expect(normalizeAppSettings({}).metronomeViewMode).toBe('simple');
     expect(normalizeAppSettings({ metronomeViewMode: 'expert' }).metronomeViewMode).toBe('expert');
