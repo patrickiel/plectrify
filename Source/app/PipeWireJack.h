@@ -44,22 +44,28 @@ namespace plectrify::pipewirejack
     /** Where PipeWire's socket is, from the same environment PipeWire reads:
         PIPEWIRE_REMOTE names the socket (an absolute path is used as given),
         else "pipewire-0" inside PIPEWIRE_RUNTIME_DIR, else XDG_RUNTIME_DIR,
-        else the caller's fallback (/run/user/<uid>). */
-    inline juce::File socketPath (const juce::String& pipewireRemote,
-                                  const juce::String& pipewireRuntimeDir,
-                                  const juce::String& xdgRuntimeDir,
-                                  const juce::String& fallbackRuntimeDir)
+        else the caller's fallback (/run/user/<uid>). A POSIX path as a string,
+        empty when there is nothing to go on: this is a rule about a Unix
+        socket, so it is pure on every OS and juce::File (which would read the
+        same text as a Windows path) only enters on the Linux caller's side. */
+    inline juce::String socketPath (const juce::String& pipewireRemote,
+                                    const juce::String& pipewireRuntimeDir,
+                                    const juce::String& xdgRuntimeDir,
+                                    const juce::String& fallbackRuntimeDir)
     {
         const auto name = pipewireRemote.isNotEmpty() ? pipewireRemote : juce::String ("pipewire-0");
 
-        if (juce::File::isAbsolutePath (name))
-            return juce::File (name);
+        if (name.startsWithChar ('/'))
+            return name;
 
         const auto dir = pipewireRuntimeDir.isNotEmpty() ? pipewireRuntimeDir
                        : xdgRuntimeDir.isNotEmpty()      ? xdgRuntimeDir
                                                          : fallbackRuntimeDir;
 
-        return dir.isNotEmpty() ? juce::File (dir).getChildFile (name) : juce::File();
+        if (dir.isEmpty())
+            return {};
+
+        return dir.endsWithChar ('/') ? dir + name : dir + "/" + name;
     }
 
     /** Where distributions install PipeWire's JACK, in the order tried. These
@@ -105,7 +111,7 @@ namespace plectrify::pipewirejack
                                         env ("XDG_RUNTIME_DIR"),
                                         "/run/user/" + juce::String ((int) getuid()));
 
-        const auto library = chooseLibrary (socket != juce::File() && socket.exists(),
+        const auto library = chooseLibrary (socket.isNotEmpty() && juce::File (socket).exists(),
                                             libraryCandidates(),
                                             [] (const juce::String& path) { return juce::File (path).existsAsFile(); });
 

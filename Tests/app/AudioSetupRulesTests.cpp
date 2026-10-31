@@ -126,17 +126,17 @@ void testPipeWireJack()
 {
     using namespace plectrify::pipewirejack;
 
-    expectEquals (socketPath ({}, {}, "/run/user/1000", "/run/user/0").getFullPathName(),
+    expectEquals (socketPath ({}, {}, "/run/user/1000", "/run/user/0"),
                   "/run/user/1000/pipewire-0", "the socket is pipewire-0 under XDG_RUNTIME_DIR");
-    expectEquals (socketPath ({}, "/tmp/pw", "/run/user/1000", "/run/user/0").getFullPathName(),
+    expectEquals (socketPath ({}, "/tmp/pw", "/run/user/1000", "/run/user/0"),
                   "/tmp/pw/pipewire-0", "PIPEWIRE_RUNTIME_DIR wins over XDG_RUNTIME_DIR");
-    expectEquals (socketPath ({}, {}, {}, "/run/user/1000").getFullPathName(),
+    expectEquals (socketPath ({}, {}, {}, "/run/user/1000"),
                   "/run/user/1000/pipewire-0", "no runtime dir in the environment falls back to /run/user/<uid>");
-    expectEquals (socketPath ("pipewire-1", {}, "/run/user/1000", {}).getFullPathName(),
+    expectEquals (socketPath ("pipewire-1", {}, "/run/user/1000", {}),
                   "/run/user/1000/pipewire-1", "PIPEWIRE_REMOTE names the socket");
-    expectEquals (socketPath ("/srv/pw/sock", "/tmp/pw", "/run/user/1000", {}).getFullPathName(),
+    expectEquals (socketPath ("/srv/pw/sock", "/tmp/pw", "/run/user/1000", {}),
                   "/srv/pw/sock", "an absolute PIPEWIRE_REMOTE is the socket");
-    expect (socketPath ({}, {}, {}, {}) == juce::File(), "nothing to go on is no socket, not a relative path");
+    expect (socketPath ({}, {}, {}, {}).isEmpty(), "nothing to go on is no socket, not a relative path");
 
     const juce::StringArray candidates { "/a/libjack.so.0", "/b/libjack.so.0" };
     const auto onlyB = [] (const juce::String& path) { return path.startsWith ("/b/"); };
