@@ -20,6 +20,10 @@
       --force-device-scale-factor=1 --window-size=1280,420 \
       --screenshot=Assets/Banner.png "Assets/SocialPreview.html?h=420"
 
+  On Linux and macOS the flags are the same; only the binary differs
+  (google-chrome, or "/Applications/Google Chrome.app/Contents/MacOS/Google
+  Chrome"), and the page wants an absolute file:// URL.
+
   Tokens are lifted from site/src/app.css under the same names, and the fonts
   are that site's own files — this card and the front page must look like the
   same product. Nothing here is responsive on purpose: the viewport is fixed at
@@ -33,18 +37,18 @@
       @font-face {
         font-family: 'Chakra Petch';
         font-weight: 600;
-        src: url('../site/static/fonts/chakra-petch-latin-600-normal.woff2') format('woff2');
+        src: url('../site/src/lib/fonts/chakra-petch-latin-600-normal.woff2') format('woff2');
       }
       @font-face {
         font-family: 'Inter Variable';
         font-weight: 100 900;
-        src: url('../site/static/fonts/inter-latin-wght-normal.woff2')
+        src: url('../site/src/lib/fonts/inter-latin-wght-normal.woff2')
           format('woff2-variations');
       }
       @font-face {
         font-family: 'JetBrains Mono Variable';
         font-weight: 100 800;
-        src: url('../site/static/fonts/jetbrains-mono-latin-wght-normal.woff2')
+        src: url('../site/src/lib/fonts/jetbrains-mono-latin-wght-normal.woff2')
           format('woff2-variations');
       }
 
@@ -72,7 +76,7 @@
         position: relative;
         display: flex;
         align-items: center;
-        gap: 76px;
+        gap: 60px;
         padding: 0 96px;
         background: var(--space);
         font-family: 'Inter Variable', sans-serif;
@@ -166,16 +170,19 @@
       .strip {
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 10px;
         margin-top: 40px;
         font-family: 'JetBrains Mono Variable', monospace;
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 500;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.09em;
         text-transform: uppercase;
         color: var(--accent);
         /* One line or it is not a spec line. There is no smaller size to fall
-           back to at this scale, so it must not be allowed to wrap. */
+           back to at this scale, so it must not be allowed to wrap — which
+           means it must fit: with three platforms named it sits within a few
+           pixels of the right padding, so lengthen any part of it only after
+           measuring. */
         white-space: nowrap;
       }
 
@@ -215,7 +222,7 @@
       <div class="strip">
         <span>VST3 guitar rig</span>
         <span>/</span>
-        <span class="quiet">Windows &amp; macOS</span>
+        <span class="quiet">Windows · macOS · Linux</span>
         <span>/</span>
         <span class="quiet">Free &amp; open source</span>
       </div>
