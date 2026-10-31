@@ -34,7 +34,8 @@ Open **Audio Settings** from the toolbar.
 1. Pick your **device type** first. On Windows choose **ASIO** if your interface offers it;
    it is the difference between a rig you can play and one you can only hear. On macOS,
    CoreAudio is already the native low-latency path and there is nothing to choose. On Linux,
-   choose JACK if it is listed, otherwise ALSA.
+   choose JACK: on a PipeWire desktop Plectrify finds PipeWire's JACK by itself, and ALSA is
+   the fallback that silences every other application while the app runs.
 2. Set your interface as the **input** and your speakers or headphones as the **output**.
 3. Enable the input channel your guitar is plugged into.
 
