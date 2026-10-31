@@ -1341,6 +1341,13 @@
     await saveRig(nextRigName(rigs.map((r) => r.name)));
   }
 
+  async function clearRig() {
+    // The same teardown as New rig, but the selection stays: the rack now
+    // differs from the loaded rig's baseline, so it reads as unsaved — Save
+    // writes the empty rig, Discard reloads what was there.
+    await engine.newRig();
+  }
+
   // Performance shortcuts must not act through a modal, a rack rebuild or the
   // standby overlay. Edit mode adds its local guards inside the switcher
   // components.
@@ -1483,6 +1490,7 @@
       onDeleteRig={deleteRig}
       onMoveRig={(id, toIndex) => engine.moveRig(id, toIndex)}
       onNewRig={newRig}
+      onClearRig={clearRig}
       scenes={sceneState.scenes}
       activeSceneId={sceneState.activeSceneId}
       {sceneDirty}

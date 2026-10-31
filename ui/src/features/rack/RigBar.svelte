@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FilePlusIcon } from 'phosphor-svelte';
+  import { EraserIcon, FilePlusIcon } from 'phosphor-svelte';
   import type { Rig } from '../../lib/engine/types';
   import { nextRigName } from '../../lib/engine/rigNames';
   import SwitcherGroup from '../../lib/components/SwitcherGroup.svelte';
@@ -25,6 +25,8 @@
     /** Discard the whole chain and start a fresh empty rig, saved under the
         next free default name and active immediately. */
     onNew: () => void;
+    /** Empty the chain while keeping the loaded rig (if any) selected. */
+    onClear: () => void;
     /** The loaded rig has unsaved changes — shows a dot on its segment. */
     dirty?: boolean;
     /** Width budget from the toolbar half hosting this group (see TopToolbar). */
@@ -44,26 +46,30 @@
     onDelete,
     onMove,
     onNew,
+    onClear,
     dirty = false,
     maxWidth = 0,
     shortcutsEnabled,
   }: Props = $props();
 
-  // "New rig" is destructive, so it has to be confirmed when there is
-  // something to lose. That is a non-empty rack that isn't already on disk:
-  // either it has drifted from the rig it was loaded from, or it was never
-  // saved as a rig at all. A clean rack backed by a saved rig loses nothing —
-  // it is one click away in this same list — so it skips the prompt rather
-  // than asking about changes that don't exist.
-  let confirmingNew = $state(false);
+  // "New rig" and "Clear rig" are destructive, so they have to be confirmed
+  // when there is something to lose. That is a non-empty rack that isn't
+  // already on disk: either it has drifted from the rig it was loaded from, or
+  // it was never saved as a rig at all. A clean rack backed by a saved rig
+  // loses nothing — it is one click away in this same list (and a cleared one
+  // comes back with Discard) — so it skips the prompt rather than asking about
+  // changes that don't exist.
+  let confirming = $state<'new' | 'clear' | null>(null);
 
-  function beginNew(close: () => void) {
-    if (canSave && (dirty || !activeRig)) confirmingNew = true;
-    else commitNew(close);
+  function begin(action: 'new' | 'clear', close: () => void) {
+    if (canSave && (dirty || !activeRig)) confirming = action;
+    else commit(action, close);
   }
 
-  function commitNew(close: () => void) {
-    onNew();
+  function commit(action: 'new' | 'clear', close: () => void) {
+    confirming = null;
+    if (action === 'new') onNew();
+    else onClear();
     close();
   }
 </script>
@@ -82,7 +88,7 @@
   shortcutKeys={RIG_SHORTCUT_KEYS}
   {shortcutsEnabled}
   onSelect={onLoad}
-  onMenuOpen={() => (confirmingNew = false)}
+  onMenuOpen={() => (confirming = null)}
 >
   {#snippet menu(close)}
     <ItemMenuPanel
@@ -102,22 +108,34 @@
       {close}
     >
       {#snippet footerTop({ close })}
-        {#if confirmingNew}
+        {#if confirming}
+          {@const action = confirming}
           <InlineConfirmRow
             stacked
             message="Discard unsaved changes?"
-            confirmLabel="Discard"
-            onConfirm={() => commitNew(close)}
-            onCancel={() => (confirmingNew = false)}
+            confirmLabel={action === 'new' ? 'Discard' : 'Clear'}
+            onConfirm={() => commit(action, close)}
+            onCancel={() => (confirming = null)}
           />
         {:else}
           <button
             type="button"
             class="flex w-full items-center gap-1.5 rounded px-3 py-1.5 text-left text-[0.8rem] text-ink/80 hover:bg-ink/10"
-            onclick={() => beginNew(close)}
+            onclick={() => begin('new', close)}
           >
             <FilePlusIcon size={13} />
             New rig
+          </button>
+          <!-- Empties the chain in place: the rig stays selected and reads as
+               unsaved, so Save keeps it empty and Discard restores it. -->
+          <button
+            type="button"
+            class="flex w-full items-center gap-1.5 rounded px-3 py-1.5 text-left text-[0.8rem] text-ink/80 enabled:hover:bg-ink/10 disabled:cursor-default disabled:opacity-(--disabled-opacity)"
+            disabled={!canSave}
+            onclick={() => begin('clear', close)}
+          >
+            <EraserIcon size={13} />
+            {activeRig ? 'Clear rig' : 'Clear rack'}
           </button>
         {/if}
       {/snippet}

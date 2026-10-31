@@ -27,6 +27,9 @@
     onDeleteRig: (rigId: string) => void;
     onMoveRig: (rigId: string, toIndex: number) => void;
     onNewRig: () => void;
+    /** Empty the chain but keep the loaded rig selected (it then reads as
+        unsaved: Save commits the empty rig, Discard brings the chain back). */
+    onClearRig: () => void;
     onSaveScene: (name: string) => void;
     onApplyScene: (sceneId: string) => void;
     onRenameScene: (sceneId: string, name: string) => void;
@@ -56,6 +59,7 @@
     onDeleteRig,
     onMoveRig,
     onNewRig,
+    onClearRig,
     onSaveScene,
     onApplyScene,
     onRenameScene,
@@ -152,6 +156,7 @@
           onDelete={onDeleteRig}
           onMove={onMoveRig}
           onNew={onNewRig}
+          onClear={onClearRig}
         />
       </div>
 
