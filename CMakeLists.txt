@@ -142,6 +142,16 @@ FetchContent_Declare(
                    "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-linux-alsa-duplex-prefill.patch"
                    "-DSOURCE_DIR=<SOURCE_DIR>"
                    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-jack-buffer-size.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-no-zero-block-spin.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
 )
 FetchContent_MakeAvailable(JUCE)
 

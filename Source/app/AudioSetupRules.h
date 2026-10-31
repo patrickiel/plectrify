@@ -31,7 +31,9 @@ namespace plectrify::audiosetup
         either opens the hardware exclusively — failing outright while a desktop
         sound server holds it — or plays through that server's own buffer. A
         JACK type with no server behind it fails to open, and the caller's
-        fallback then takes JUCE's default, exactly as a dead ASIO driver does. */
+        fallback then takes JUCE's default, exactly as a dead ASIO driver does.
+        Which libjack that type finds is PipeWireJack.h's job: on a stock
+        desktop the loader's default is jackd2's, behind which nothing runs. */
     inline const juce::StringArray& preferredDeviceTypes()
     {
         static const juce::StringArray types { "ASIO", "JACK" };

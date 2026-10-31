@@ -178,6 +178,16 @@ export const JUCE_PATCHES = [
     file: 'modules/juce_audio_devices/native/juce_ALSA_linux.cpp',
     marker: 'PLECTRIFY_ALSA_DUPLEX_PREFILL',
   },
+  {
+    patch: 'cmake/juce-jack-buffer-size.patch',
+    file: 'modules/juce_audio_devices/native/juce_JackAudio.cpp',
+    marker: 'PLECTRIFY_JACK_BUFFER_SIZE',
+  },
+  {
+    patch: 'cmake/juce-no-zero-block-spin.patch',
+    file: 'modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp',
+    marker: 'PLECTRIFY_NO_ZERO_BLOCK_SPIN',
+  },
 ] as const;
 
 /** What `git diff --name-only` must report for the patched JUCE tree, and

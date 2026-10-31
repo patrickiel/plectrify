@@ -1,0 +1,29 @@
+Never let CallbackMaxSizeEnforcer loop on a block size of 0.
+
+AudioDeviceManager wraps its callback in CallbackMaxSizeEnforcer, which
+splits each incoming block into pieces no larger than the size the device
+reported in audioDeviceAboutToStart. A device that reported 0 (PipeWire's
+JACK does, between jack_activate and its first cycle) makes that loop advance
+by 0 samples per iteration, forever, on the audio thread - the whole process
+is then a spinning core with no sound, and closing the device under it
+crashes. The JACK device is fixed to never report 0 (juce-jack-buffer-size);
+this is the guard for the next backend that does. A block larger than the
+callback expected is the lesser harm, so it is passed through whole.
+diff --git a/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp b/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp
+--- a/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp
++++ b/modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp
+@@ -115,7 +115,13 @@ public:
+ 
+         while (position < numSamples)
+         {
+-            const auto blockLength = jmin (maximumSize, numSamples - position);
++            // PLECTRIFY_NO_ZERO_BLOCK_SPIN: a device that reported a buffer size
++            // of 0 in audioDeviceAboutToStart (PipeWire's JACK does, between
++            // jack_activate and its first cycle) made this loop advance by 0
++            // forever, on the audio thread. A block larger than expected is
++            // the lesser harm; pass it through whole.
++            const auto blockLength = maximumSize > 0 ? jmin (maximumSize, numSamples - position)
++                                                     : numSamples - position;
+ 
+             const auto addOffset = [position] (auto ptr) { return ptr + position; };
+             std::transform (inputChannelData,  inputChannelData  + numInputChannels,  storedInputChannels .begin(), addOffset);

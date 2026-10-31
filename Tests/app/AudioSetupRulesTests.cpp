@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 
 #include "AudioSetupRules.h"
+#include "PipeWireJack.h"
 
 #include <iostream>
 
@@ -118,11 +119,47 @@ namespace
     }
 }
 
+//==============================================================================
+// Which JACK JUCE is pointed at on a PipeWire desktop, from the environment
+// PipeWire itself reads — never from the machine the test runs on.
+void testPipeWireJack()
+{
+    using namespace plectrify::pipewirejack;
+
+    expectEquals (socketPath ({}, {}, "/run/user/1000", "/run/user/0").getFullPathName(),
+                  "/run/user/1000/pipewire-0", "the socket is pipewire-0 under XDG_RUNTIME_DIR");
+    expectEquals (socketPath ({}, "/tmp/pw", "/run/user/1000", "/run/user/0").getFullPathName(),
+                  "/tmp/pw/pipewire-0", "PIPEWIRE_RUNTIME_DIR wins over XDG_RUNTIME_DIR");
+    expectEquals (socketPath ({}, {}, {}, "/run/user/1000").getFullPathName(),
+                  "/run/user/1000/pipewire-0", "no runtime dir in the environment falls back to /run/user/<uid>");
+    expectEquals (socketPath ("pipewire-1", {}, "/run/user/1000", {}).getFullPathName(),
+                  "/run/user/1000/pipewire-1", "PIPEWIRE_REMOTE names the socket");
+    expectEquals (socketPath ("/srv/pw/sock", "/tmp/pw", "/run/user/1000", {}).getFullPathName(),
+                  "/srv/pw/sock", "an absolute PIPEWIRE_REMOTE is the socket");
+    expect (socketPath ({}, {}, {}, {}) == juce::File(), "nothing to go on is no socket, not a relative path");
+
+    const juce::StringArray candidates { "/a/libjack.so.0", "/b/libjack.so.0" };
+    const auto onlyB = [] (const juce::String& path) { return path.startsWith ("/b/"); };
+    const auto all   = [] (const juce::String&) { return true; };
+    const auto none  = [] (const juce::String&) { return false; };
+
+    expectEquals (chooseLibrary (true, candidates, all), "/a/libjack.so.0", "the first candidate that exists");
+    expectEquals (chooseLibrary (true, candidates, onlyB), "/b/libjack.so.0", "a missing first candidate is skipped");
+    expectEquals (chooseLibrary (true, candidates, none), juce::String(), "no library installed loads nothing");
+    expectEquals (chooseLibrary (false, candidates, all), juce::String(),
+                  "PipeWire not running loads nothing, so a real jackd keeps its own JACK");
+
+    expect (libraryCandidates().size() >= 3, "the known distribution paths are all tried");
+    for (const auto& candidate : libraryCandidates())
+        expect (candidate.endsWith ("/pipewire-0.3/jack/libjack.so.0"), "every candidate is PipeWire's JACK, by its soname");
+}
+
 int main()
 {
     testDeviceType();
     testBufferSize();
     testInputChannels();
+    testPipeWireJack();
 
     if (failures == 0)
         std::cout << "AudioSetupRules tests passed\n";

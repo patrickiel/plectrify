@@ -160,7 +160,20 @@ as on macOS), content root `/var/lib/Plectrify`, created mode 1777 by the
 .deb's postinst — a dev machine needs `sudo install -d -m 1777
 /var/lib/Plectrify` once, which the dev loop warns about. A first run opens at
 most 32 input channels (`inputChannelsToOpen`): PipeWire's ALSA `default`
-device advertises 128 and its converter crashes beyond 64. Upstream Neural Amp
+device advertises 128 and its converter crashes beyond 64. **JACK means
+PipeWire's JACK**, and the app has to make that so itself
+(`Source/app/PipeWireJack.h`): JUCE's JACK type dlopens `libjack.so.0` by
+name, and distributions keep PipeWire's copy out of the loader's default path
+on purpose (Ubuntu ships the enabling `ld.so.conf` fragment only as an example
+under `/usr/share/doc/pipewire`), so the name lands on jackd2's client
+library, which finds no `jackd`, lists no device, and the first-run choice
+falls back to ALSA — which opens the interface exclusively and silences every
+other application for as long as the app runs. So, before the device manager
+creates its types, `MainComponent` loads PipeWire's library by full path when
+PipeWire's socket exists; glibc then resolves JUCE's lookup by soname to the
+copy already loaded. Only while PipeWire runs: a machine running a real
+`jackd` keeps its own JACK. The paths and the rule are pure and pinned in
+`Plectrify.AudioSetupRules`. Upstream Neural Amp
 Modeler is iPlug2 with no Linux target, so `Source/namplugin/` is our own JUCE
 VST3 around NeuralAmpModelerCore and AudioDSPTools (pinned in
 `CMakeLists.txt`), built in-tree as `PlectrifyNam` rather than fetched through
@@ -786,6 +799,27 @@ records the substitution it made.
     stall) — the callback's processing budget. One period is not enough: it
     lands back on the same race. Duplex only; an output-only loop fills its
     own buffer.
+  - `juce-jack-buffer-size.patch` — JUCE's JACK device offers exactly one
+    buffer size (whatever the server is running) and ignores the size handed
+    to `open()`, so the settings showed a single entry and the first-run 5 ms
+    rule had nothing to choose from. A JACK client may ask the server for a
+    block size, and PipeWire's JACK honours it (jackd changes its period for
+    every client, which is what a rig wants), so the patch offers 32..2048
+    plus the running size and requests the chosen one on open. The sample
+    rate stays single: the JACK API has no way to ask for another, and under
+    PipeWire it is the graph's. The same patch fixes the bug this was found
+    through: PipeWire's JACK reports a buffer size of **0** from
+    `jack_activate` until its first process cycle, and `open()` always
+    deactivates and re-activates, so every reopen (a settings change, or the
+    manager's own restart after launch) read the size inside that window. The
+    player was prepared with a block of 0 and the manager's
+    `CallbackMaxSizeEnforcer` then advanced by 0 samples forever on the audio
+    thread — a full core burnt for the life of the process, no sound, and a
+    crash when the device was next closed under it. The device now answers
+    with the last size the server did report, never 0.
+  - `juce-no-zero-block-spin.patch` — the guard on the other side of that:
+    `CallbackMaxSizeEnforcer` passes a block through whole when its maximum
+    is 0 rather than looping, for the next backend that reports one.
 
   After changing the JUCE tag, regenerate them all against the new sources and
   delete `build*/_deps/juce-*` so FetchContent re-populates. Editing a

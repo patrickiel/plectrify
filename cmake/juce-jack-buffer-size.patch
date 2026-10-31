@@ -1,0 +1,137 @@
+Let a JACK client choose its block size, and never report a size of 0.
+
+JUCE 8.0.14's JackAudioIODevice offers exactly one buffer size - whatever
+jack_get_buffer_size() says - and ignores the size handed to open(), so the
+audio settings show a single entry and the first-run rule that prefers a
+5 ms block has nothing to choose from. JACK lets a client ask the server for
+a block size (jack_set_buffer_size); PipeWire's JACK honours it (measured on
+PipeWire 1.6: deactivate, set 128, activate -> 128 from the next cycle), and
+jackd changes its period for every client, which is what a guitar rig wants.
+Offer 32..2048 plus the running size, and request the chosen one in open().
+
+The second half is the bug this was found through. PipeWire's JACK reports
+a buffer size of 0 from jack_activate() until its first process cycle, and
+open() always deactivates and re-activates, so a reopen - a settings change,
+or AudioDeviceManager's own restart after the first launch - read the size
+inside that window. The player was then prepared with a block size of 0,
+and AudioDeviceManager's CallbackMaxSizeEnforcer, with a maximum of 0,
+advanced by 0 samples forever: a full core burnt on the audio thread for the
+life of the process (journal: 49.8 s CPU over 56.8 s wall), silence, and a
+crash the next time the device was closed under it. Remember the last size
+the server did report (or the one open() asked for) and answer with that;
+never with 0.
+diff --git a/modules/juce_audio_devices/native/juce_JackAudio.cpp b/modules/juce_audio_devices/native/juce_JackAudio.cpp
+--- a/modules/juce_audio_devices/native/juce_JackAudio.cpp
++++ b/modules/juce_audio_devices/native/juce_JackAudio.cpp
+@@ -74,6 +74,7 @@ JUCE_DECL_JACK_FUNCTION (int, jack_client_close, (jack_client_t *client), (clien
+ JUCE_DECL_JACK_FUNCTION (int, jack_activate, (jack_client_t* client), (client))
+ JUCE_DECL_JACK_FUNCTION (int, jack_deactivate, (jack_client_t* client), (client))
+ JUCE_DECL_JACK_FUNCTION (jack_nframes_t, jack_get_buffer_size, (jack_client_t* client), (client))
++JUCE_DECL_JACK_FUNCTION (int, jack_set_buffer_size, (jack_client_t* client, jack_nframes_t nframes), (client, nframes))
+ JUCE_DECL_JACK_FUNCTION (jack_nframes_t, jack_get_sample_rate, (jack_client_t* client), (client))
+ JUCE_DECL_VOID_JACK_FUNCTION (jack_on_shutdown, (jack_client_t* client, void (*function) (void* arg), void* arg), (client, function, arg))
+ JUCE_DECL_VOID_JACK_FUNCTION (jack_on_info_shutdown, (jack_client_t* client, JackInfoShutdownCallback function, void* arg), (client, function, arg))
+@@ -220,6 +221,11 @@ public:
+ 
+             inChans.calloc (totalNumberOfInputChannels + 2);
+             outChans.calloc (totalNumberOfOutputChannels + 2);
++
++            // PLECTRIFY_JACK_BUFFER_SIZE: remember what the server says while it
++            // is saying something, see getCurrentBufferSizeSamples().
++            getCurrentBufferSizeSamples();
++            getCurrentSampleRate();
+         }
+     }
+ 
+@@ -257,19 +263,53 @@ public:
+         return rates;
+     }
+ 
++    // PLECTRIFY_JACK_BUFFER_SIZE: a JACK client may ask the server for a block
++    // size (jack_set_buffer_size), so offer the usual ladder rather than only
++    // the size the server happens to be running - open() requests the chosen
++    // one. The sample rate stays the server's: the JACK API has no way to ask
++    // for another.
+     Array<int> getAvailableBufferSizes() override
+     {
+         Array<int> sizes;
+ 
+         if (client != nullptr)
+-            sizes.add (static_cast<int> (juce::jack_get_buffer_size (client)));
++        {
++            for (int size = 32; size <= 2048; size *= 2)
++                sizes.add (size);
++
++            sizes.addIfNotAlreadyThere (getCurrentBufferSizeSamples());
++            sizes.sort();
++        }
+ 
+         return sizes;
+     }
+ 
+     int getDefaultBufferSize() override             { return getCurrentBufferSizeSamples(); }
+-    int getCurrentBufferSizeSamples() override      { return client != nullptr ? static_cast<int> (juce::jack_get_buffer_size (client)) : 0; }
+-    double getCurrentSampleRate() override          { return client != nullptr ? static_cast<int> (juce::jack_get_sample_rate (client)) : 0; }
++
++    // PLECTRIFY_JACK_BUFFER_SIZE: PipeWire's JACK reports a buffer size of 0
++    // from jack_activate() until its first process cycle, and open() always
++    // deactivates and re-activates, so a reopen read the size inside that
++    // window. AudioDeviceManager's CallbackMaxSizeEnforcer then had a maximum
++    // of 0 and looped forever handing the callback zero-sample blocks. Answer
++    // with the last size the server did report (or the one open() requested),
++    // and never with 0.
++    int getCurrentBufferSizeSamples() override
++    {
++        if (client != nullptr)
++            if (const auto size = static_cast<int> (juce::jack_get_buffer_size (client)); size > 0)
++                lastKnownBufferSize = size;
++
++        return lastKnownBufferSize > 0 ? lastKnownBufferSize : fallbackBufferSize;
++    }
++
++    double getCurrentSampleRate() override
++    {
++        if (client != nullptr)
++            if (const auto rate = static_cast<int> (juce::jack_get_sample_rate (client)); rate > 0)
++                lastKnownSampleRate = rate;
++
++        return lastKnownSampleRate;
++    }
+ 
+     template <typename Fn>
+     void forEachClientChannel (const String& clientName, bool isInput, Fn&& fn)
+@@ -287,7 +327,7 @@ public:
+     }
+ 
+     String open (const BigInteger& inputChannels, const BigInteger& outputChannels,
+-                 double /* sampleRate */, int /* bufferSizeSamples */) override
++                 double /* sampleRate */, int bufferSizeSamples) override
+     {
+         if (client == nullptr)
+         {
+@@ -298,6 +338,13 @@ public:
+         lastError.clear();
+         close();
+ 
++        // PLECTRIFY_JACK_BUFFER_SIZE: the size the caller chose from
++        // getAvailableBufferSizes(). The server may settle on another; the
++        // next getCurrentBufferSizeSamples() reads what it took.
++        if (bufferSizeSamples > 0 && bufferSizeSamples != getCurrentBufferSizeSamples())
++            if (juce::jack_set_buffer_size (client, static_cast<jack_nframes_t> (bufferSizeSamples)) == 0)
++                lastKnownBufferSize = bufferSizeSamples;
++
+         xruns.store (0, std::memory_order_relaxed);
+         juce::jack_set_process_callback (client, processCallback, this);
+         juce::jack_set_port_connect_callback (client, portConnectCallback, this);
+@@ -586,6 +633,11 @@ private:
+ 
+     std::atomic<int> xruns { 0 };
+ 
++    // PLECTRIFY_JACK_BUFFER_SIZE: message thread only, like the getters.
++    static constexpr int fallbackBufferSize = 1024;   // PipeWire's default quantum
++    int lastKnownBufferSize = 0;
++    double lastKnownSampleRate = 0;
++
+     std::function<void()> notifyChannelsChanged;
+     MainThreadDispatcher mainThreadDispatcher { *this };
+ };

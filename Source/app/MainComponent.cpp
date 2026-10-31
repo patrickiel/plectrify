@@ -1,6 +1,7 @@
 #include "MainComponent.h"
 #include "AppPaths.h"
 #include "AudioSetupRules.h"
+#include "PipeWireJack.h"
 #include "EngineHelpers.h"
 #include "EngineWebView.h"
 
@@ -69,6 +70,12 @@ namespace
 
 MainComponent::MainComponent()
 {
+    // Before the device manager creates its device types: JUCE's JACK type
+    // dlopen()s "libjack.so.0" on its first scan, and on a PipeWire desktop
+    // that name has to land on PipeWire's JACK (see PipeWireJack.h).
+    if (const auto library = plectrify::pipewirejack::preferPipeWireJack(); library.isNotEmpty())
+        juce::Logger::writeToLog ("Using PipeWire's JACK: " + library);
+
     // --- Audio device: restore the last-used setup if we have one ---------
     std::unique_ptr<juce::XmlElement> savedState;
     if (auto file = getAudioSettingsFile(); file.existsAsFile())
