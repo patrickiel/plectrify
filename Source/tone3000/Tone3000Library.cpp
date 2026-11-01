@@ -198,14 +198,4 @@ int chooseModel (const juce::Array<ModelChoice>& models, const juce::String& pre
 
     return best;
 }
-juce::String selectArchitectureParam (const juce::String& browseArchitecture)
-{
-    return browseArchitecture == legacyArchitecture ? juce::String() : browseArchitecture;
-}
-
-juce::String preferredModelArchitecture (const juce::String& browseArchitecture)
-{
-    return browseArchitecture == legacyArchitecture ? juce::String ("1") : browseArchitecture;
-}
-
 } // namespace Tone3000Library

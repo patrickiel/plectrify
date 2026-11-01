@@ -231,9 +231,9 @@
       // Ships with Plectrify, so this is all but always there; if a scan has not
       // finished yet the engine falls back to its own lookup by name.
       pluginId: namPlugin?.id,
-      // Always stated: A2 unless the user switched to A1 or Legacy in Settings
-      // to reach older captures. Legacy is a token the engine turns into *no*
-      // architecture on the authorize URL, which TONE3000 reads as A1 + Custom.
+      // Always stated, never omitted: TONE3000 reads a missing architecture as
+      // its legacy A1 + Custom selection and hides every modern capture. A2
+      // unless the user switched to A1 in Settings to reach older captures.
       architecture: appSettings.tone3000Architecture,
     });
   }

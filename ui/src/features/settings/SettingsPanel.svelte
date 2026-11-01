@@ -344,11 +344,6 @@
           options={[
             { value: '2', label: 'A2', tip: 'Current Neural Amp Modeler captures' },
             { value: '1', label: 'A1', tip: 'Legacy captures never published as A2' },
-            {
-              value: 'legacy',
-              label: 'Legacy',
-              tip: "TONE3000's legacy selection: A1 and custom architectures",
-            },
           ]}
           onSelect={(value) => onSetAppSettings({ tone3000Architecture: value })}
         />
@@ -356,8 +351,7 @@
       <p
         class="mt-[-.15rem] px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
       >
-        A1 finds older captures that were never published as A2. Legacy adds custom architectures,
-        which not every Neural Amp Modeler build can load.
+        A1 finds older captures that were never published as A2.
       </p>
     </Card>
     <!-- Auto Standby. Named after the amp switch it behaves like, and off by

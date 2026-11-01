@@ -254,9 +254,7 @@ function templateKnobs(value: unknown): KnobDef[] {
     is A2: that is what the window always browsed by, and an empty value would
     be TONE3000's legacy selection, which hides every modern capture. */
 function tone3000Architecture(value: unknown): Tone3000Architecture {
-  return value === '1' || value === '2' || value === 'legacy'
-    ? value
-    : DEFAULT_APP_SETTINGS.tone3000Architecture;
+  return value === '1' || value === '2' ? value : DEFAULT_APP_SETTINGS.tone3000Architecture;
 }
 
 /** Did this come from a stored settings document at all? Only

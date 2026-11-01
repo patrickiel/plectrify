@@ -188,9 +188,8 @@ void Tone3000Service::loadSession()
         windowPlace = stringProperty (stored, "place");
         windowScroll = (int) property (stored, "scroll");
 
-        // The generation that place was read under ("2", "1" or "legacy"). A
-        // file from before the switch existed has none, and everything then was
-        // browsed as A2.
+        // The generation that place was read under. A file from before the
+        // switch existed has none, and everything then was browsed as A2.
         if (const auto architecture = stringProperty (stored, "architecture"); architecture.isNotEmpty())
             browseArchitecture = architecture;
     }
@@ -318,9 +317,7 @@ juce::String Tone3000Service::authorizeUrl() const
     // already connected lands straight on the catalogue rather than on a
     // consent screen they have seen before.
     options.prompt = "select_tone";
-    // Empty for the legacy selection, which is the one generation reached by
-    // *not* stating it — see Tone3000Library::selectArchitectureParam.
-    options.architecture = Tone3000Library::selectArchitectureParam (browseArchitecture);
+    options.architecture = browseArchitecture;
     return Tone3000Auth::buildAuthorizeUrl (apiBase, clientId, redirectUri, options, pending);
 }
 
@@ -940,8 +937,7 @@ void Tone3000Service::beginInstall (juce::int64 toneId, juce::int64 modelId)
                                    stringProperty (model, "architecture_version"),
                                    stringProperty (model, "size") });
 
-                const auto index = Tone3000Library::chooseModel (
-                    choices, Tone3000Library::preferredModelArchitecture (browseArchitecture));
+                const auto index = Tone3000Library::chooseModel (choices, browseArchitecture);
 
                 if (index < 0)
                     return failInstall ("TONE3000 has no model for that tone that Plectrify can load");

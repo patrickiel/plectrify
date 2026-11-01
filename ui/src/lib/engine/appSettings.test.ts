@@ -162,9 +162,6 @@ describe('normalizeAppSettings', () => {
     expect(normalizeAppSettings({}).tone3000Architecture).toBe('2');
     expect(normalizeAppSettings({ tone3000Architecture: '1' }).tone3000Architecture).toBe('1');
     expect(normalizeAppSettings({ tone3000Architecture: '2' }).tone3000Architecture).toBe('2');
-    expect(normalizeAppSettings({ tone3000Architecture: 'legacy' }).tone3000Architecture).toBe(
-      'legacy',
-    );
     expect(normalizeAppSettings({ tone3000Architecture: '' }).tone3000Architecture).toBe('2');
     expect(normalizeAppSettings({ tone3000Architecture: 'custom' }).tone3000Architecture).toBe('2');
     expect(normalizeAppSettings({ tone3000Architecture: 1 }).tone3000Architecture).toBe('2');

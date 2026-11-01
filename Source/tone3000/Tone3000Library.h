@@ -118,22 +118,4 @@ struct ModelChoice
     one piece of the no-questions-asked flow a user can disagree with, so it is
     worth being able to state exactly what it does. */
 int chooseModel (const juce::Array<ModelChoice>& models, const juce::String& preferredArchitecture);
-
-//==============================================================================
-/** The browse generation the page may ask for besides TONE3000's own values:
-    their legacy A1 + Custom selection, which is reached by sending *no*
-    architecture at all. A token of its own rather than an empty string, because
-    a missing value already means "keep the current choice" on the way in and
-    "a file from before the switch" in state.json. */
-inline constexpr const char* legacyArchitecture = "legacy";
-
-/** What the authorize URL's `architecture` parameter carries for a browse
-    generation: the value itself, or nothing for `legacyArchitecture` — which
-    Tone3000Auth then omits, and TONE3000 reads as A1 + Custom. */
-juce::String selectArchitectureParam (const juce::String& browseArchitecture);
-
-/** What `chooseModel` prefers for a browse generation. Legacy prefers A1: a tone
-    found there that also carries an A2 model was still found as an A1 tone, and
-    a Custom-only tone has nothing to prefer between anyway. */
-juce::String preferredModelArchitecture (const juce::String& browseArchitecture);
 } // namespace Tone3000Library
