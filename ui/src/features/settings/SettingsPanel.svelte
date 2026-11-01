@@ -325,6 +325,35 @@
         />
       </CardRow>
     </Card>
+    <!-- TONE3000's Select flow lists one model generation at a time, so a tone
+         only ever published as A1 cannot be found while browsing for A2. Here
+         rather than beside each Browse button because it is a standing
+         preference, not a per-trip choice — and there are several Browse
+         buttons. Takes effect on the next Browse: the engine rebuilds the
+         window, since an open one is already showing the other catalogue. -->
+    <Card>
+      <p
+        class="px-[.6rem] py-[.35rem] text-[.625rem] font-semibold tracking-[.14em] text-muted uppercase"
+      >
+        TONE3000
+      </p>
+      <CardRow label="Browse models" class="font-sans text-[.8rem] font-medium">
+        <SegmentedControl
+          label="TONE3000 model architecture"
+          value={appSettings.tone3000Architecture}
+          options={[
+            { value: '2', label: 'A2', tip: 'Current Neural Amp Modeler captures' },
+            { value: '1', label: 'A1', tip: 'Legacy captures never published as A2' },
+          ]}
+          onSelect={(value) => onSetAppSettings({ tone3000Architecture: value })}
+        />
+      </CardRow>
+      <p
+        class="mt-[-.15rem] px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
+      >
+        A1 finds older captures that were never published as A2.
+      </p>
+    </Card>
     <!-- Auto Standby. Named after the amp switch it behaves like, and off by
          default: nothing may silence or unload a rig on stage unless the user
          asked for it.

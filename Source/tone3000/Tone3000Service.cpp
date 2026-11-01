@@ -187,6 +187,11 @@ void Tone3000Service::loadSession()
         windowBounds = Tone3000WindowState::fromVar (property (stored, "window"));
         windowPlace = stringProperty (stored, "place");
         windowScroll = (int) property (stored, "scroll");
+
+        // The generation that place was read under. A file from before the
+        // switch existed has none, and everything then was browsed as A2.
+        if (const auto architecture = stringProperty (stored, "architecture"); architecture.isNotEmpty())
+            browseArchitecture = architecture;
     }
 
     // An earlier build saved the browse page here together with the PKCE it
@@ -236,6 +241,7 @@ void Tone3000Service::saveLocalState()
     stored->setProperty ("window", Tone3000WindowState::toVar (windowBounds));
     stored->setProperty ("place", windowPlace);
     stored->setProperty ("scroll", windowScroll);
+    stored->setProperty ("architecture", browseArchitecture);
     directory.getChildFile ("state.json")
         .replaceWithText (juce::JSON::toString (juce::var { stored }));
 }
@@ -323,8 +329,22 @@ void Tone3000Service::connect (const juce::var& payload)
     browseModuleId = stringProperty (payload, "moduleId");
     browsePluginId = stringProperty (payload, "pluginId");
 
-    if (const auto architecture = stringProperty (payload, "architecture"); architecture.isNotEmpty())
+    // A different generation is a different catalogue. The open window's flow
+    // was authorized with the old filter, so it cannot simply be shown again —
+    // it is rebuilt through the fresh path below, exactly as after a pick. And
+    // the remembered page goes with it: it is a list read under the other
+    // filter (whose own query may well carry it), so restoring it would put the
+    // user back on the catalogue they just switched away from.
+    if (const auto architecture = stringProperty (payload, "architecture");
+        architecture.isNotEmpty() && architecture != browseArchitecture)
+    {
+        Tone3000WindowState::trace ("connect: architecture " + browseArchitecture + " -> " + architecture);
         browseArchitecture = architecture;
+        windowPlace = {};
+        windowScroll = 0;
+        flowSpent = true;
+        saveLocalState();
+    }
 
     pendingToneId = {};
     pendingModelId = {};

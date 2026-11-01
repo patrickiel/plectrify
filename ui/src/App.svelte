@@ -231,9 +231,10 @@
       // Ships with Plectrify, so this is all but always there; if a scan has not
       // finished yet the engine falls back to its own lookup by name.
       pluginId: namPlugin?.id,
-      // A2 explicitly, and not omitted: TONE3000 reads a missing architecture
-      // as its legacy A1 + Custom selection and hides every modern capture.
-      architecture: '2',
+      // Always stated, never omitted: TONE3000 reads a missing architecture as
+      // its legacy A1 + Custom selection and hides every modern capture. A2
+      // unless the user switched to A1 in Settings to reach older captures.
+      architecture: appSettings.tone3000Architecture,
     });
   }
 

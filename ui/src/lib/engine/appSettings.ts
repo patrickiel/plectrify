@@ -5,6 +5,7 @@ import type {
   NeedlePrecision,
   StrobePrecision,
   ThemeName,
+  Tone3000Architecture,
   ToolId,
   TunerDisplayMode,
 } from './types';
@@ -95,6 +96,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   updateDismissedVersion: '',
   midiBindings: {},
   tone3000TemplateKnobs: namDefaultKnobs(),
+  tone3000Architecture: '2',
   activeTool: null,
   songs: [],
   setlists: [],
@@ -247,6 +249,14 @@ function templateKnobs(value: unknown): KnobDef[] {
   return normalizePositions(knobs);
 }
 
+/** Guard the TONE3000 browse architecture. Anything unrecognised — including
+    a missing field, which is every settings file written before the switch —
+    is A2: that is what the window always browsed by, and an empty value would
+    be TONE3000's legacy selection, which hides every modern capture. */
+function tone3000Architecture(value: unknown): Tone3000Architecture {
+  return value === '1' || value === '2' ? value : DEFAULT_APP_SETTINGS.tone3000Architecture;
+}
+
 /** Did this come from a stored settings document at all? Only
     `starterInstallAttempted` asks, and only to tell a machine that has saved
     settings before from one that never has. */
@@ -354,6 +364,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       typeof candidate?.updateDismissedVersion === 'string' ? candidate.updateDismissedVersion : '',
     midiBindings: midiBindingsMap(candidate?.midiBindings),
     tone3000TemplateKnobs: templateKnobs(candidate?.tone3000TemplateKnobs),
+    tone3000Architecture: tone3000Architecture(candidate?.tone3000Architecture),
     activeTool: activeTool(
       candidate?.activeTool,
       (value as Record<string, unknown> | null)?.['toolsSidebarOpen'],
