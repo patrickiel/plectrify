@@ -421,6 +421,14 @@ export type MidiActionId =
 /** How much setup chrome a performance tool shows around its live controls. */
 export type ToolViewMode = 'simple' | 'expert';
 
+/** TONE3000's `architecture` values Plectrify browses by: "2" is current
+    Neural Amp Modeler, "1" the legacy generation, "custom" captures trained on
+    a non-standard network. Sent to TONE3000 as-is. Single-valued on their
+    side — there is no "all", and omitting it is their legacy A1 + Custom
+    selection, which hides every A2 capture. */
+export const TONE3000_ARCHITECTURES = ['2', '1', 'custom'] as const;
+export type Tone3000Architecture = (typeof TONE3000_ARCHITECTURES)[number];
+
 /** User preferences for the application itself. These survive restarts but are
     deliberately excluded from saved rigs and the working session. */
 export interface AppSettings {
@@ -553,6 +561,12 @@ export interface AppSettings {
       can still be re-mapped individually afterwards. An empty list is a real
       choice — the tone then lands with no knobs mapped. */
   tone3000TemplateKnobs: KnobDef[];
+  /** Which Neural Amp Modeler generation the TONE3000 window lists. TONE3000's
+      Select flow takes one architecture, so a tone only ever published as A1
+      or Custom is invisible while browsing for A2 — this is how it is
+      reached. Also what the engine prefers when a picked tone carries models
+      of several. */
+  tone3000Architecture: Tone3000Architecture;
   /** Which tool's panel is open beside the right-hand rail, or null for none.
       The rail's icons stay visible either way. Replaces the pre-rail
       toolsSidebarOpen boolean (migrated on load). */

@@ -156,7 +156,7 @@ private:
         model selections, choose one (Tone3000Library::chooseModel) and run it
         through the download-and-rewrite pipeline. No UI stands between the pick
         and the sound. */
-    void beginInstall (juce::int64 toneId, juce::int64 modelId);
+    void beginInstall (juce::int64 toneId, juce::int64 modelId, const juce::String& architecture);
     void startDownload (const juce::var& tone, const juce::var& model);
     void failInstall (const juce::String& error);
 
@@ -187,6 +187,10 @@ private:
     Tone3000Auth::Pkce pending;
     juce::String pendingToneId;
     juce::String pendingModelId;
+    /** The architecture the pending tone was picked under — taken with the
+        pick, not read when its models arrive, so switching generation while
+        the code exchange is in flight cannot change which model it gets. */
+    juce::String pendingArchitecture;
     bool windowOpen = false;
 
     /** Where a tone the user picks should land. Set when the window is opened
@@ -196,7 +200,10 @@ private:
     juce::String browsePluginId;
     /** The architecture the window was opened for, and what `chooseModel`
         prefers. Single-valued, and **omitting it is not "all"** — see
-        Tone3000Auth::AuthorizeOptions. */
+        Tone3000Auth::AuthorizeOptions. The page's Settings choose it (A2, A1
+        or Custom, sent as-is) and every open states it; it is persisted in state.json beside
+        `windowPlace` because that place was read under it, and a change
+        discards both the place and the open window's flow. */
     juce::String browseArchitecture { "2" };
 
     /** What this build's key is allowed to do. 'prompt' is TONE3000's free

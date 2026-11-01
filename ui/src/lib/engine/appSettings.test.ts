@@ -158,6 +158,18 @@ describe('normalizeAppSettings', () => {
     expect(knobs.map((k) => k.pos)).toEqual([2, 0]);
   });
 
+  it('keeps a known TONE3000 architecture and falls back to A2 for anything else', () => {
+    expect(normalizeAppSettings({}).tone3000Architecture).toBe('2');
+    expect(normalizeAppSettings({ tone3000Architecture: '1' }).tone3000Architecture).toBe('1');
+    expect(normalizeAppSettings({ tone3000Architecture: '2' }).tone3000Architecture).toBe('2');
+    expect(normalizeAppSettings({ tone3000Architecture: 'custom' }).tone3000Architecture).toBe(
+      'custom',
+    );
+    expect(normalizeAppSettings({ tone3000Architecture: '' }).tone3000Architecture).toBe('2');
+    expect(normalizeAppSettings({ tone3000Architecture: 'legacy' }).tone3000Architecture).toBe('2');
+    expect(normalizeAppSettings({ tone3000Architecture: 1 }).tone3000Architecture).toBe('2');
+  });
+
   it('keeps a known theme and falls back to dark for anything else', () => {
     expect(normalizeAppSettings({ theme: 'light' }).theme).toBe('light');
     expect(normalizeAppSettings({ theme: 'dark' }).theme).toBe('dark');

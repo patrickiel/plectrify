@@ -18,7 +18,10 @@
     HostCapabilities,
     MidiTrigger,
     ThemeName,
+    Tone3000Architecture,
   } from '../../lib/engine/types';
+  import { TONE3000_ARCHITECTURES } from '../../lib/engine/types';
+  import { ARCHITECTURE_LABELS } from '../../lib/engine/tone3000';
   import {
     MAX_RACK_ZOOM,
     MAX_UI_SCALE,
@@ -97,6 +100,14 @@
   };
   const setRackZoom = scaleSetter('rackZoom', MIN_RACK_ZOOM, MAX_RACK_ZOOM);
   const setUiScale = scaleSetter('uiScale', MIN_UI_SCALE, MAX_UI_SCALE);
+
+  /** Typed by the architecture set, so a generation added there cannot reach
+      the TONE3000 card without a line saying what it is. */
+  const ARCHITECTURE_TIPS: Record<Tone3000Architecture, string> = {
+    '2': 'Current Neural Amp Modeler captures',
+    '1': 'Legacy captures never published as A2',
+    custom: 'Captures trained on a non-standard network',
+  };
 
   // Discrete choices rather than sliders: every write rewrites settings.json
   // over the bridge, so a dragged control would hammer it.
@@ -324,6 +335,38 @@
           onSelect={setTheme}
         />
       </CardRow>
+    </Card>
+    <!-- TONE3000's Select flow lists one model architecture at a time, so a
+         tone only ever published as A1 or Custom cannot be found while
+         browsing for A2. Here
+         rather than beside each Browse button because it is a standing
+         preference, not a per-trip choice — and there are several Browse
+         buttons. Takes effect on the next Browse: the engine rebuilds the
+         window, since an open one is already showing the other catalogue. -->
+    <Card>
+      <p
+        class="px-[.6rem] py-[.35rem] text-[.625rem] font-semibold tracking-[.14em] text-muted uppercase"
+      >
+        TONE3000
+      </p>
+      <CardRow label="Browse models" class="font-sans text-[.8rem] font-medium">
+        <SegmentedControl
+          label="TONE3000 model architecture"
+          value={appSettings.tone3000Architecture}
+          options={TONE3000_ARCHITECTURES.map((value) => ({
+            value,
+            label: ARCHITECTURE_LABELS[value],
+            tip: ARCHITECTURE_TIPS[value],
+          }))}
+          onSelect={(value) => onSetAppSettings({ tone3000Architecture: value })}
+        />
+      </CardRow>
+      <p
+        class="mt-[-.15rem] px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
+      >
+        A1 finds older captures that were never published as A2, Custom those trained on a
+        non-standard network.
+      </p>
     </Card>
     <!-- Auto Standby. Named after the amp switch it behaves like, and off by
          default: nothing may silence or unload a rig on stage unless the user
