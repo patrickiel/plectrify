@@ -1753,7 +1753,13 @@ list, the search that was typed, the scroll position, all still there. Only
 signing out destroys it (its profile holds that account's cookie). The one case
 that cannot be resumed is a *picked* tone: that spends the flow's
 `authorization_id`, so `flowSpent` sends the next showing through a fresh
-authorization, and then back to where the user was.
+authorization, and then back to where the user was. Keeping the page takes an
+opt-in: JUCE's `WebBrowserComponent` default navigates a hidden browser to
+`about:blank` and goes *back* through history when it is shown again, and for a
+user who has not signed in yet the page behind it is the authorize URL — so
+closing and reopening the window re-requested it and landed on "Error code: 9".
+The browser options therefore carry `withKeepPageLoadedWhenBrowserIsHidden()`
+on every platform, and `getCurrentUrl()` reads `about:blank` as no page.
 
 **A fresh authorization always means a fresh window** (`openBrowserWindow`, the
 only place one is constructed). A web view that has already carried one answers

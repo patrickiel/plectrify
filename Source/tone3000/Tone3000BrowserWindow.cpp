@@ -62,7 +62,11 @@ public:
         goToURL (url);
     }
 
-    juce::String getCurrentUrl() const { return currentUrl; }
+    /** The page this view is on, or empty when it is on no page worth
+        reopening — never "about:blank", which is what a blanked view reports
+        and must read as empty, or the owner would show it instead of building
+        a fresh window. */
+    juce::String getCurrentUrl() const { return currentUrl == "about:blank" ? juce::String() : currentUrl; }
 
     /** Arm the callback again for a new sign-in in this same browser.
 
@@ -196,7 +200,18 @@ Tone3000BrowserWindow::Tone3000BrowserWindow (const juce::String& startUrl,
         // Deliberately no native integration and no resource provider: this
         // window shows a third party's pages, and nothing on them may reach
         // Plectrify's bridge or its file sandbox.
-        ;
+        //
+        // And the page stays loaded while the window is hidden, which JUCE's
+        // default does not do: it navigates a hidden browser to about:blank
+        // (a relic of silencing Flash) and, on the next showing, goes *back*
+        // through history. For a user who has not signed in yet the entry
+        // behind about:blank is the authorize URL itself, so reopening the
+        // window re-requested it — the second authorize navigation TONE3000
+        // answers with a bare "Error code: 9". Every backend has the same
+        // default, so this is not guarded per platform. Closing the window is
+        // meant to keep the page exactly as it was left (see
+        // Tone3000Service::connect), and this is what makes that true.
+        .withKeepPageLoadedWhenBrowserIsHidden();
 
     // A native title bar on both platforms, like PluginEditorWindow: this is
     // someone else's page, and dressing it in Plectrify's chrome would imply we

@@ -333,11 +333,12 @@ void Tone3000Service::connect (const juce::var& payload)
     // page, the search that was typed and the scroll position are all still
     // exactly as they were left.
     //
-    // A window holding no page is not that window. It is what a view left for a
-    // long time comes back as (WebView2 discards a hidden one's content under
-    // memory pressure), and re-navigating it to a fresh authorize URL is
-    // precisely the move that earns an "Error code: 9" — so it falls through to
-    // the fresh path below, which builds a new one.
+    // A window holding no page is not that window. It is what a view that was
+    // blanked comes back as (the browser is built to keep its page while
+    // hidden — see the options in Tone3000BrowserWindow — but a view can still
+    // lose one), and re-navigating it to a fresh authorize URL is precisely the
+    // move that earns an "Error code: 9" — so it falls through to the fresh
+    // path below, which builds a new one.
     if (browserWindow != nullptr && ! flowSpent && browserWindow->getCurrentUrl().isNotEmpty())
     {
         Tone3000WindowState::trace ("connect: showing the window again, page intact");
