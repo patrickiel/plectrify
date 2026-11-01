@@ -1871,14 +1871,16 @@ fetches both selections and merges by id, whichever generation is being browsed.
 That single value is also why **the generation is a setting**
 (`AppSettings.tone3000Architecture`, Settings → TONE3000): the Select flow
 lists one at a time, so a tone only ever published as A1 cannot be found while
-browsing for A2. The page states it on every Browse — `'2'` by default, `'1'`
-when switched, never omitted — and it is what the authorize URL and
+browsing for A2 (or for a Custom-only one). The page states it on every Browse
+— `'2'` by default, `'1'` or `'custom'` when switched, each TONE3000's own value
+and never omitted — and it is what the authorize URL and
 `chooseModel` are given. A change cannot reuse the open window, whose flow was
 authorized under the old filter, so `connect` rebuilds it through the fresh
 path; and it drops the remembered place, a list read under the other filter.
 The engine keeps the generation in `state.json` beside that place for the same
-reason. TONE3000's third option, omitting it (A1 + Custom), is deliberately not
-offered.
+reason. Omitting it (TONE3000's legacy A1 + Custom selection) is deliberately
+not offered: it adds nothing switching between A1 and Custom does not, and would
+need a token of our own to say "send nothing".
 
 **Plectrify ships non-commercial, so search is off.** TONE3000's free tier permits
 only the OAuth prompt flows and the bounded list endpoints — `favorited`,

@@ -233,7 +233,8 @@
       pluginId: namPlugin?.id,
       // Always stated, never omitted: TONE3000 reads a missing architecture as
       // its legacy A1 + Custom selection and hides every modern capture. A2
-      // unless the user switched to A1 in Settings to reach older captures.
+      // unless the user switched to A1 or Custom in Settings to reach captures
+      // never published as A2.
       architecture: appSettings.tone3000Architecture,
     });
   }
