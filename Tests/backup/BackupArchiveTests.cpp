@@ -387,7 +387,7 @@ void testResetRemovesTargetsAndSparesTheRest()
     // Every target, in whichever shape it takes on disk.
     for (const auto* name : { "settings.json", "working-rack.json", "presets.json", "lastSession.rig",
                               "working-history.json", "restore_in_progress",
-                              "working-rack.quarantine.json", "audio_settings.xml" })
+                              "working-rack.quarantine.json", "audio_settings.xml", "window.json" })
         write (root.getChildFile (name), "x");
 
     write (root.getChildFile ("rigs/index.json"), "[]");

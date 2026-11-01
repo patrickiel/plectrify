@@ -5,6 +5,7 @@
 #include "CrashReporter.h"
 #include "MainComponent.h"
 #include "WindowLookAndFeel.h"
+#include "WindowPlacement.h"
 
 /**
     Standalone entry point for the Plectrify guitar-rig host. Creates a single
@@ -128,13 +129,29 @@ public:
 
             setResizable (true, false);
             setResizeLimits (760, 480, 32768, 32768);
-            centreWithSize (getWidth(), getHeight());
-            setVisible (true);
+            restorePlacement();
         }
 
         ~MainWindow() override
         {
+            // First, while the peer still exists: on Linux whether the window
+            // is maximised is a question for the window manager. Every way out
+            // of the app passes through here — the close button, a system quit
+            // and the reset relaunch alike.
+            savePlacement();
             setLookAndFeel (nullptr);
+        }
+
+        void moved() override
+        {
+            juce::DocumentWindow::moved();
+            trackRestoredBounds();
+        }
+
+        void resized() override
+        {
+            juce::DocumentWindow::resized();
+            trackRestoredBounds();
         }
 
         void closeButtonPressed() override
@@ -164,6 +181,69 @@ public:
         }
 
     private:
+        static juce::File placementFile()
+        {
+            return plectrify::appDataDir().getChildFile ("window.json");
+        }
+
+        /** Opens the window where it was left (WindowPlacement::place checks
+            the saved rectangle against the displays attached now), or centred
+            at the content's own size on a first launch. */
+        void restorePlacement()
+        {
+            namespace wp = plectrify::WindowPlacement;
+
+            const auto saved = wp::fromVar (juce::JSON::parse (placementFile()));
+
+            const auto* primary = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
+            const auto fallback = juce::Rectangle<int> (getWidth(), getHeight())
+                                      .withCentre (primary != nullptr
+                                                       ? primary->userBounds.toNearestInt().getCentre()
+                                                       : juce::Point<int> (getWidth() / 2, getHeight() / 2));
+
+            restoredBounds = wp::place (saved, wp::attachedDisplays(), fallback);
+            setBounds (restoredBounds);
+
+            setVisible (true);
+
+            // After the bounds, so un-maximising comes back to them.
+            if (saved.maximised)
+                wp::maximiseOnceShown (*this);
+
+            // From here on, moves and resizes are the user's.
+            placementReady = true;
+        }
+
+        /** Remembers the un-maximised rectangle. While maximised the window's
+            own bounds are the screen's, which is not a size to come back to,
+            so that state rides the saved flag instead. */
+        void trackRestoredBounds()
+        {
+            if (! placementReady || isMinimised() || plectrify::WindowPlacement::isMaximised (*this))
+                return;
+
+            if (getWidth() >= plectrify::WindowPlacement::Bounds::minimumSize
+                && getHeight() >= plectrify::WindowPlacement::Bounds::minimumSize)
+                restoredBounds = plectrify::WindowPlacement::restorableBounds (*this);
+        }
+
+        void savePlacement()
+        {
+            if (! placementReady)
+                return;
+
+            plectrify::WindowPlacement::Bounds bounds;
+            bounds.x = restoredBounds.getX();
+            bounds.y = restoredBounds.getY();
+            bounds.width = restoredBounds.getWidth();
+            bounds.height = restoredBounds.getHeight();
+            bounds.maximised = plectrify::WindowPlacement::isMaximised (*this);
+
+            const auto file = placementFile();
+            file.getParentDirectory().createDirectory();
+            file.replaceWithText (juce::JSON::toString (plectrify::WindowPlacement::toVar (bounds)));
+        }
+
         // Repaints the JUCE-drawn chrome in the UI's colour theme. The window
         // controls are children of this window, so one repaint covers them.
         // On macOS this leaves only the frame colour behind the web view: the
@@ -179,6 +259,11 @@ public:
         }
 
         WindowLookAndFeel windowLookAndFeel;
+
+        // The window's un-maximised rectangle, and whether the constructor has
+        // placed it yet (layout passes before that are nobody's choice).
+        juce::Rectangle<int> restoredBounds;
+        bool placementReady = false;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
     };

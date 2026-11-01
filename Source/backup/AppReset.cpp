@@ -31,6 +31,9 @@ const juce::StringArray& targets()
         // what reopens the setup wizard.
         "audio_settings.xml",
 
+        // Where the main window was. A fresh installation opens centred.
+        "window.json",
+
         // Recordings.
         "looper-sessions",
 

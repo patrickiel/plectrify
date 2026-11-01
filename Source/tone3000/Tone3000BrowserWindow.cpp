@@ -146,17 +146,7 @@ const juce::String scrollExpression =
 const juce::String readPlaceScript =
     "(() => (" + scrollExpression + ") + ' ' + location.href)()";
 
-juce::Array<juce::Rectangle<int>> attachedDisplays()
-{
-    juce::Array<juce::Rectangle<int>> areas;
-
-    for (const auto& display : juce::Desktop::getInstance().getDisplays().displays)
-        // The *user* area, so a window is never restored underneath the Windows
-        // taskbar or the mac menu bar, where its title bar cannot be grabbed.
-        areas.add (display.userBounds.toNearestInt());
-
-    return areas;
-}
+using plectrify::WindowPlacement::attachedDisplays;
 } // namespace
 
 //==============================================================================
@@ -235,12 +225,13 @@ Tone3000BrowserWindow::Tone3000BrowserWindow (const juce::String& startUrl,
                                 + juce::String (attachedDisplays().size()));
 
     setBounds (restoredBounds);
+
     setVisible (true);
 
     // After the bounds, or the un-maximised size the user comes back to would
     // be whatever the window happened to be created at.
     if (saved.maximised)
-        setFullScreen (true);
+        plectrify::WindowPlacement::maximiseOnceShown (*this);
 
     toFront (true);
 
@@ -426,14 +417,15 @@ Tone3000WindowState::Bounds Tone3000BrowserWindow::getPlacement() const
 {
     // Read fresh unless maximised, where the live rectangle is the screen's and
     // the size to come back down to is the tracked one.
-    const auto rectangle = isFullScreen() ? restoredBounds : getBounds();
+    const auto maximised = plectrify::WindowPlacement::isMaximised (*this);
+    const auto rectangle = maximised ? restoredBounds : plectrify::WindowPlacement::restorableBounds (*this);
 
     Tone3000WindowState::Bounds bounds;
     bounds.x = rectangle.getX();
     bounds.y = rectangle.getY();
     bounds.width = rectangle.getWidth();
     bounds.height = rectangle.getHeight();
-    bounds.maximised = isFullScreen();
+    bounds.maximised = maximised;
     return bounds;
 }
 
@@ -463,7 +455,7 @@ void Tone3000BrowserWindow::reportPlace()
     // The floor is a second line of defence rather than a preference: a
     // transient layout size reported mid-construction or mid-teardown is never
     // a window anyone sat in front of, and this is state that persists.
-    if (! isFullScreen())
+    if (! plectrify::WindowPlacement::isMaximised (*this))
     {
         // A last floor on top of `ready`, because this is state that persists:
         // a rectangle too small to have been dragged by anyone is not reported
@@ -472,7 +464,7 @@ void Tone3000BrowserWindow::reportPlace()
             || getHeight() < Tone3000WindowState::Bounds::minimumSize)
             return;
 
-        restoredBounds = getBounds();
+        restoredBounds = plectrify::WindowPlacement::restorableBounds (*this);
     }
 
     if (callbacks.onPlaceChanged)

@@ -2,6 +2,8 @@
 
 #include <JuceHeader.h>
 
+#include "WindowPlacement.h"
+
 /**
     What the TONE3000 window remembers between openings: where it was, and what
     it was showing.
@@ -23,40 +25,13 @@
 */
 namespace Tone3000WindowState
 {
-/** A window's last known placement. `maximised` is stored separately from the
-    rectangle, which is the un-maximised size to come back to. */
-struct Bounds
-{
-    int x = 0, y = 0, width = 0, height = 0;
-    bool maximised = false;
-
-    /** A floor rather than "not empty", and it earns its keep twice: it rejects
-        a stub size a transient layout pass could have written, and it repairs
-        one already on disk — a build that saved a 128×128 teardown artefact
-        would otherwise keep reopening at 128×128 for ever. */
-    static constexpr int minimumSize = 320;
-
-    bool isValid() const { return width >= minimumSize && height >= minimumSize; }
-    juce::Rectangle<int> toRectangle() const { return { x, y, width, height }; }
-};
-
-juce::var toVar (const Bounds&);
-Bounds fromVar (const juce::var&);
-
-/** Where the window should actually open.
-
-    @param saved      what was stored last time, valid or not
-    @param displays   the user areas of the displays attached right now
-    @param fallback   where to put a window with nothing usable saved
-
-    A saved rectangle is accepted when enough of it lands on one display for the
-    user to grab it — a fifth of its area, which is generous enough to keep a
-    window deliberately straddling two monitors and strict enough to reject one
-    left on a monitor that is now gone. It is then clamped to that display's
-    size, since the same window may be coming back to a smaller screen. */
-juce::Rectangle<int> place (const Bounds& saved,
-                            const juce::Array<juce::Rectangle<int>>& displays,
-                            juce::Rectangle<int> fallback);
+// The placement rules are the main window's too, so they live in app/
+// (WindowPlacement); these names stay so the window and its tests read as
+// before.
+using Bounds = plectrify::WindowPlacement::Bounds;
+using plectrify::WindowPlacement::fromVar;
+using plectrify::WindowPlacement::place;
+using plectrify::WindowPlacement::toVar;
 
 /** Append a line to `tone3000/window.log`, in Debug builds only.
 

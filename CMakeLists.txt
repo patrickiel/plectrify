@@ -240,9 +240,13 @@ juce_add_binary_data(PlectrifyAssets
 set(PLECTRIFY_ENGINE_SOURCES
     Source/app/BuildInfo.cpp
     Source/app/EngineWebView.cpp
+    Source/app/LinuxWindowState.cpp
     Source/app/LooperSessionStore.cpp
     Source/app/MidiInputManager.cpp
     Source/app/PlectrifyEngine.cpp
+    Source/app/WindowPlacement.cpp
+    Source/app/WindowPlacementNative.cpp
+    Source/app/WindowsWindowState.cpp
     Source/audio/LooperProcessor.cpp
     Source/audio/MetronomeProcessor.cpp
     Source/audio/RackProcessor.cpp
@@ -471,6 +475,14 @@ function(plectrify_configure_target target)
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # Xlib for LinuxWindowState: JUCE cannot tell when the window manager
+        # has maximised a window, so its _NET_WM_STATE is read directly. Same
+        # libX11 JUCE dlopens, so one copy in the process either way.
+        find_package(X11 REQUIRED)
+        target_link_libraries(${target} PRIVATE X11::X11)
+    endif()
 
     if (WIN32)
         # GetProcessMemoryInfo for the status-bar RAM readout.
@@ -887,6 +899,7 @@ if (BUILD_TESTING)
         Source/tone3000/Tone3000Library.cpp
         Source/tone3000/Tone3000SelectUrl.cpp
         Source/tone3000/Tone3000WindowState.cpp
+        Source/app/WindowPlacement.cpp
         Tests/tone3000/Tone3000LibraryTests.cpp)
     # Source/app for AppPaths.h, which the slice's Debug-only window trace
     # writes through — the same per-user root the app itself uses.

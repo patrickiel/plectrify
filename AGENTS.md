@@ -1301,6 +1301,22 @@ OS.
   `patches.ts` — they name what is on users' disks, not what Plectrify writes, so
   a later rename must leave them alone.
 - `settings.json` — app preferences (e.g. rack zoom).
+- `window.json` — the standalone window's un-maximised rectangle and whether it
+  was maximised, written by `MainWindow` (`Source/app/Main.cpp`) on the way out
+  and checked on launch against the displays attached now
+  (`WindowPlacement::place`, the same rule the TONE3000 window uses). Machine
+  state, so a reset removes it and a backup leaves it out. Two Linux traps live
+  in `Source/app/WindowPlacement*`: JUCE's `isFullScreen()` never sees a
+  maximise the window manager did (the native title bar's button, Super+Up), so
+  the state is read from `_NET_WM_STATE` (`LinuxWindowState`, plain Xlib); and
+  the saved position must be the *frame's*, because JUCE reports the client
+  area while the WM places a requested position at the frame — saving the
+  client's walked the window down one title bar per launch. Restoring
+  maximised waits until JUCE's first paint is behind it, since that paint
+  re-sends the bounds and the WM takes them as the new un-maximised size.
+  On Windows the state comes from `WindowsWindowState`, because
+  `isFullScreen()` reads false for a maximised window minimised to the taskbar;
+  `WPF_RESTORETOMAXIMIZED` still knows.
 - `audio_settings.xml` — last audio device state, which input channel the guitar
   is on, input/output gain, the noise gate's settings and tuner state
   (`MainComponent`). **Its absence is
