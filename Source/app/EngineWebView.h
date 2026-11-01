@@ -24,13 +24,14 @@ namespace plectrify
         catches up with a live resize. WebBrowserComponent's default fallback
         paint is hardcoded white.
 
-        It also turns a page that cannot load into words. A failed load is
-        logged, and its reason painted on this surface — which is what shows
-        when there is no native view over it at all: on Linux, a WebKitGTK
-        that cannot be loaded reports here once (see
-        juce-linux-webkit-versioned-sonames.patch) instead of leaving the
-        window black. Where a native view does exist it covers the message,
-        and JUCE's own error page shows as before. */
+        It also turns a web view that cannot start into words. Every failed
+        load is logged. On Linux, a WebKitGTK that cannot be loaded, or whose
+        process does not start, reports here once (see
+        juce-linux-webkit-versioned-sonames.patch) and leaves no native view
+        behind, so the reason is painted on this surface instead of a black
+        window. Only that case is painted: wherever a native view exists,
+        this surface is what shows through during a resize, and JUCE's own
+        error page already reports a failed load there. */
     class AmpWebBrowserComponent final : public juce::WebBrowserComponent
     {
     public:
@@ -42,6 +43,8 @@ namespace plectrify
 
     private:
         juce::String loadError;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AmpWebBrowserComponent)
     };
 
     /** Serves the built Svelte app from the staged ui directory under

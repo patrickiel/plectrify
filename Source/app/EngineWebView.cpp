@@ -33,8 +33,16 @@ void AmpWebBrowserComponent::paint (juce::Graphics& graphics)
 bool AmpWebBrowserComponent::pageLoadHadNetworkError (const juce::String& errorInfo)
 {
     juce::Logger::writeToLog ("Web view: page load failed: " + errorInfo);
-    loadError = errorInfo.isNotEmpty() ? errorInfo : juce::String ("Unknown error.");
-    repaint();
+
+   #if JUCE_LINUX
+    // The backend adds its XEmbed view as a child once its process is up, so
+    // no child means nothing will ever cover this surface.
+    if (getNumChildComponents() == 0)
+    {
+        loadError = errorInfo.isNotEmpty() ? errorInfo : juce::String ("Unknown error.");
+        repaint();
+    }
+   #endif
 
     // Keep JUCE's own error page wherever there is a view to show it in.
     return true;
