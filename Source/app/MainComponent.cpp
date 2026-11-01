@@ -1,6 +1,8 @@
 #include "MainComponent.h"
 #include "AppPaths.h"
+#include "AppReset.h"
 #include "AudioSetupRules.h"
+#include "DataRootLease.h"
 #include "PipeWireJack.h"
 #include "EngineHelpers.h"
 #include "EngineWebView.h"
@@ -13,6 +15,14 @@
 #endif
 
 #include <map>
+
+#if ! JUCE_WINDOWS
+ #include <cerrno>
+ #include <fcntl.h>
+ #include <string>
+ #include <sys/resource.h>
+ #include <unistd.h>
+#endif
 
 namespace
 {
@@ -341,7 +351,7 @@ void MainComponent::handleSetWindowTheme (const juce::var& payload)
 }
 
 void MainComponent::emitBackupState (const juce::String& action, const juce::String& phase,
-                                     const plectrify::backup::Result& result)
+                                     const plectrify::backup::Result& result, const juce::String& detail)
 {
     auto* state = new juce::DynamicObject();
     state->setProperty ("action", action);
@@ -349,6 +359,7 @@ void MainComponent::emitBackupState (const juce::String& action, const juce::Str
     state->setProperty ("path", result.path.getFullPathName());
     state->setProperty ("platform", result.platform);
     state->setProperty ("error", result.error);
+    state->setProperty ("detail", detail);
 
     auto* counts = new juce::DynamicObject();
     counts->setProperty ("rigs", result.rigs);
@@ -430,6 +441,185 @@ void MainComponent::handleRestoreBackup (const juce::var&)
 
         emitBackupState ("restore", result.ok ? "done" : "failed", result);
     });
+}
+
+namespace
+{
+    /** Starts `exe` with one argument as a process that outlives this one, and
+        says honestly whether it started.
+
+        Not juce::File::startAsProcess on the POSIX systems, for two reasons.
+        On macOS it opens a bundle through NSWorkspace with no completion
+        handler and returns true unconditionally, so a launch LaunchServices
+        refused (a translocated or quarantined bundle, a dismissed Gatekeeper
+        prompt) would quit this app into nothing with the reset still armed and
+        the page's "relaunch" error never shown. On Linux it forks a shell
+        without closing anything, so the new instance inherits every descriptor
+        the old one — and every plugin it hosted — had open without CLOEXEC,
+        and keeps them for its own lifetime: a device the old instance held
+        stays held, and a target of the reset it is about to perform may be a
+        file it now holds open itself.
+
+        So: fork, close every descriptor past the standard three, start a
+        session of its own (a terminal's hang-up must not take it down with the
+        old instance), and exec the executable — ours, so this is also a direct
+        launch of the binary on macOS rather than a LaunchServices request. A
+        pipe with CLOEXEC set is the classic honest signal: the exec closes it
+        and the parent reads end-of-file; a failed exec writes errno through it
+        first. Everything between fork and exec is async-signal-safe. */
+   #if JUCE_WINDOWS
+    bool startDetached (const juce::File& exe, const juce::String& argument)
+    {
+        // ShellExecute, which reports failure.
+        return exe.startAsProcess (argument);
+    }
+   #else
+    bool startDetached (const juce::File& exe, const juce::String& argument)
+    {
+        int signal[2];
+        if (::pipe (signal) != 0)
+            return false;
+
+        ::fcntl (signal[0], F_SETFD, FD_CLOEXEC);
+        ::fcntl (signal[1], F_SETFD, FD_CLOEXEC);
+
+        // Converted before the fork: nothing in the child may allocate.
+        const std::string path = exe.getFullPathName().toStdString();
+        const std::string arg  = argument.toStdString();
+
+        const pid_t pid = ::fork();
+
+        if (pid < 0)
+        {
+            ::close (signal[0]);
+            ::close (signal[1]);
+            return false;
+        }
+
+        if (pid == 0)
+        {
+            ::setsid();
+
+            struct rlimit limit {};
+            const auto highest = (::getrlimit (RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY)
+                                     ? (int) juce::jmin<rlim_t> (limit.rlim_cur, (rlim_t) (1 << 20))
+                                     : 65536;
+            for (int fd = 3; fd < highest; ++fd)
+                if (fd != signal[1])
+                    ::close (fd);
+
+            char* const argv[] = { const_cast<char*> (path.c_str()), const_cast<char*> (arg.c_str()), nullptr };
+            ::execv (path.c_str(), argv);
+
+            const int error = errno;
+            const auto written = ::write (signal[1], &error, sizeof (error));
+            juce::ignoreUnused (written);
+            ::_exit (127);
+        }
+
+        ::close (signal[1]);
+
+        int error = 0;
+        ssize_t got;
+        do
+        {
+            got = ::read (signal[0], &error, sizeof (error));
+        } while (got < 0 && errno == EINTR);
+
+        ::close (signal[0]);
+
+        // End-of-file is the exec having happened; anything read is its errno.
+        return got == 0;
+    }
+   #endif
+}
+
+void MainComponent::handleResetApp (const juce::var&)
+{
+    emitBackupState ("reset", "working", {});
+
+    const auto dataRoot = plectrify::appDataDir();
+
+    plectrify::backup::Result failure;
+
+    // A Plectrify plugin running in a DAW reads and writes this root too, and
+    // would write what it still holds in memory straight back over the wipe
+    // (DataRootLease.h). The row is hidden inside the DAW; this is what stops
+    // the standalone from doing it to the DAW.
+    if (plectrify::dataRootInUseElsewhere (dataRoot))
+    {
+        failure.error = "inUse";
+        emitBackupState ("reset", "failed", failure);
+        return;
+    }
+
+    // The same one level of undo a restore leaves, and kept by the reset
+    // itself. The confirm row promised it, so a snapshot that could not be
+    // written is a reset that does not happen — with one exception: an
+    // installation with no rigs or patches yet has nothing to snapshot
+    // ("empty"), and that is no reason to refuse.
+    const auto snapshot = plectrify::backup::writeArchive (dataRoot.getChildFile (plectrify::reset::snapshotName),
+                                                           dataRoot, JUCE_APPLICATION_VERSION_STRING);
+    if (! snapshot.ok && snapshot.error != "empty")
+    {
+        failure.error = "snapshot";
+        emitBackupState ("reset", "failed", failure);
+        return;
+    }
+
+    if (! plectrify::reset::schedule (dataRoot))
+    {
+        failure.error = "reset";
+        emitBackupState ("reset", "failed", failure);
+        return;
+    }
+
+    // Started before this instance quits, and told to wait for it (Main.cpp).
+    // The executable itself everywhere — on macOS the binary inside the
+    // bundle, not the bundle through LaunchServices; see startDetached.
+    const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+    if (! startDetached (exe, plectrify::reset::relaunchFlag))
+    {
+        // Nothing would come back up to finish the job, and quitting would
+        // leave the user with a closed app and a reset waiting on whenever
+        // they next open it. Undo the scheduling and say so instead.
+        plectrify::reset::cancel (dataRoot);
+        failure.error = "relaunch";
+        emitBackupState ("reset", "failed", failure);
+        return;
+    }
+
+    juce::Logger::writeToLog ("Reset: scheduled, restarting");
+
+    // Out of the bridge callback before the window — and the web view this
+    // event arrived through — is torn down.
+    juce::MessageManager::callAsync ([]
+    {
+        if (auto* app = juce::JUCEApplication::getInstance())
+            app->systemRequestedQuit();
+    });
+}
+
+void MainComponent::reportResetLeftovers (const juce::StringArray& leftBehind)
+{
+    resetLeftBehind = leftBehind;
+}
+
+void MainComponent::handleRequestBackupState()
+{
+    if (resetLeftBehind.isEmpty())
+        return;
+
+    // The launch that performed the reset could not remove these. Said on the
+    // page's first request and again on every later one: a reloaded page has
+    // the same right to know as the first, and the names are what the user
+    // needs to finish the job by hand.
+    plectrify::backup::Result result;
+    result.error = "incomplete";
+    emitBackupState ("reset", "failed", result,
+                     "Still there: " + resetLeftBehind.joinIntoString (", ")
+                         + ". Quit Plectrify and delete it from "
+                         + plectrify::appDataDir().getFullPathName() + " by hand.");
 }
 
 void MainComponent::handleStartWindowResize (const juce::var& payload)

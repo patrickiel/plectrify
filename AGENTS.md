@@ -1314,6 +1314,9 @@ OS.
   under this root is the page's own, and a bearer token is not. See *TONE3000*.
 - `backup-before-restore.plectrifybackup` — the one level of undo a restore
   leaves behind; see *Backup and restore* below.
+- `backup-before-reset.plectrifybackup` and, only between a reset being asked
+  for and the relaunch that performs it, `reset_pending` — see *Resetting the
+  app* below.
 
 Outside the per-user root, under the machine-wide content root —
 `%PROGRAMDATA%/Plectrify/` on Windows, `/Users/Shared/Plectrify/` on macOS,
@@ -1399,6 +1402,85 @@ rest of the app is usable.
 and a file input, so the confirm, the progress and the result line are all
 drivable in `pnpm dev`. Its archive is plain JSON and is **not** interchangeable
 with the app's zip — its "disk" is `localStorage`, so it never could be.
+
+### Resetting the app
+
+Settings → **Reset** puts the standalone back the way a fresh installation finds
+it: rigs, patches, songs, preferences, the working session, the audio setup (so
+the first-run device choice and the setup wizard run again), the looper's
+recordings and the TONE3000 account, its window state and its cookie profile.
+The list is named, not discovered — `plectrify::reset::targets()` in
+`Source/backup/AppReset.h`, whose header also explains what it deliberately
+spares: everything under the content root (installed packages and downloaded
+captures are the user's, the uninstallers' promise), `known_plugins.xml` and the
+scan sentinel (dropping them would empty the drawer until a Rescan, since a
+launch with packages present settles the starter install without its full scan,
+and would re-load a plugin that crashed the last one), both undo archives, the
+page's own WebView2 profiles (one may be held by a DAW right now), the log and
+`crashes/`. The legacy layouts the page still migrates (`presets/`,
+`presets.json`, `lastSession.rig`, `working-history.json`) are targets, or the
+next launch would bring the old patches and session back.
+
+**The running app cannot clear its own data**, so a reset is scheduled and then
+performed by the next process. The shell writes `audio_settings.xml` on the way
+out, the TONE3000 window saves its state on close, the page autosaves on a
+debounce, and a WebView2 profile cannot be deleted under its browser process.
+So `MainComponent::handleResetApp` snapshots the data root into
+`backup-before-reset.plectrifybackup` (kept by the reset itself), writes the
+`reset_pending` marker, starts a new instance with `--plectrify-after-reset`
+and quits. That flag makes `moreThanOneInstanceAllowed()` say yes for that one
+process, which then takes the very lock JUCE's instance check holds
+(`"juceAppLock_" + name`) and blocks until the old process has released it —
+the moment its last write is behind it — and keeps it, so later launches still
+step aside. `Main.cpp` then runs `performIfScheduled` before the main window
+exists, so nothing has read the data root yet. Any launch that finds the marker
+performs it, which is what makes the relaunch's failure modes harmless: a reset
+interrupted half-way finishes next time, because the marker goes last; and it
+goes whatever the pass managed, because a file some other process holds must
+not turn every future launch into another wipe — but what it could not remove
+is handed to the shell (`reportResetLeftovers`) and reported to the page, with
+the names, when it asks on boot (`requestBackupState`): the TONE3000 browser
+profile is the likeliest leftover, and an app that looks fresh while their site
+still knows the account would be a reset that lied. A relaunch that fails to
+start cancels the marker and reports `relaunch` instead of quitting into
+nothing — and the relaunch is honest about failing: on macOS and Linux it is a
+fork/exec of the executable itself with every inherited descriptor closed and
+an exec-failure pipe, because `startAsProcess` there either returns true
+unconditionally (NSWorkspace, no completion handler) or hands the new instance
+every file and device the old one and its plugins had open. The snapshot it
+takes first is `writeArchive`'s, so loop recordings and the audio setup are not
+in it and the confirm row says so; a snapshot that fails for any reason but an
+empty root refuses the reset (`snapshot`).
+
+**A reset is refused while a Plectrify plugin runs in a DAW** (`inUse`). The
+plugin reads and writes the same root, holds all of it in memory, and would
+write it straight back over the wipe on its next autosave; hiding the row inside
+the DAW says nothing about what the standalone may do to the DAW. So every
+plugin instance holds a `DataRootLease` (`Source/backup/DataRootLease.h`): a
+*shared* lock on `data-root.lock` in the data root, which the OS releases with
+its handle however the DAW exits, and `handleResetApp` probes it first by
+trying for the exclusive lock without waiting. Shared rather than exclusive,
+and per handle (`flock` / `LockFileEx`) rather than `juce::InterProcessLock`'s
+per-process fcntl lock or named mutex, because a mac DAW hosting both
+`Plectrify.vst3` and `Plectrify.component` has one copy of every static per
+bundle — so "one lock per process" cannot be arranged, a process-owned lock
+would be granted to the second bundle trivially and released for both when
+either closed, and a second DAW that found an exclusive lock taken would hold
+nothing and vanish from the probe when the first quit. Any number of leases
+coexist and the root reads as in use until the last is gone;
+`testLeaseIsCountedPerHandle` pins the two-in-one-process case. A relaunch that
+cannot take the app lock within 30 s cancels the marker rather than leaving it
+armed for a later launch to wipe work the snapshot predates.
+
+It rides the `backupState` stream as action `reset`, gated by the same
+`HostCapabilities::backup` and for the same reason, and only ever reports
+`working` or `failed` — success is the page ceasing to exist. The page suspends
+its autosave on the `working` push, not before sending the event, so a reset the
+engine never answers cannot leave the session unsaveable. `MockEngine`
+clears its `plectrify.*` localStorage keys and reloads, which is the relaunch's
+browser equivalent. One gap on macOS: WKWebView keeps TONE3000's site cookie in
+the system's per-app store, outside the data root, so their website may still
+recognise the account after Plectrify has forgotten it.
 
 ### Installed patches
 
@@ -1858,8 +1940,8 @@ as the signed-in user, with their token, against their own rate limit.
 - **Native**: two console-app CTest targets under `Tests/` —
   `Plectrify.TunerDetector` (tuner DSP on synthetic tones),
   `Plectrify.Backup` (which zip entries a restore may write into the data root,
-  the manifest's version ceiling, and a full archive round trip over two
-  temporary trees),
+  the manifest's version ceiling, a full archive round trip over two
+  temporary trees, and what a scheduled reset removes and spares),
   `Plectrify.NamStateCodec` / `Plectrify.Tone3000Auth` / `Plectrify.Tone3000Library`
   (the TONE3000 slice's pure rules — state rewriting, PKCE, download paths,
   which model gets picked, where the browser window reopens) and

@@ -1,6 +1,8 @@
 #include <JuceHeader.h>
 
+#include "AppReset.h"
 #include "BackupArchive.h"
+#include "DataRootLease.h"
 
 #include <iostream>
 
@@ -358,6 +360,111 @@ void testHostileArchiveIsFiltered()
     check (! target.dir.getChildFile ("rigs/nested/deep.rig").existsAsFile(),
            "a nested rig entry is not written");
 }
+
+//==============================================================================
+// Reset. The danger runs both ways: a reset that leaves a target behind brings
+// the old installation back on the next launch, and one that reaches past its
+// list deletes the scan cache, the crash blacklist or the only undo archive.
+void testResetDoesNothingUnlessScheduled()
+{
+    ScratchDir scratch ("reset-unscheduled");
+    const auto root = scratch.dir;
+    write (root.getChildFile ("settings.json"), "{}");
+    write (root.getChildFile ("rigs/index.json"), "[]");
+
+    const auto outcome = plectrify::reset::performIfScheduled (root);
+
+    check (! outcome.ran, "an unscheduled pass reports that it did nothing");
+    check (root.getChildFile ("settings.json").existsAsFile(), "an unscheduled pass keeps settings.json");
+    check (root.getChildFile ("rigs/index.json").existsAsFile(), "an unscheduled pass keeps the rigs");
+}
+
+void testResetRemovesTargetsAndSparesTheRest()
+{
+    ScratchDir scratch ("reset-scheduled");
+    const auto root = scratch.dir;
+
+    // Every target, in whichever shape it takes on disk.
+    for (const auto* name : { "settings.json", "working-rack.json", "presets.json", "lastSession.rig",
+                              "working-history.json", "restore_in_progress",
+                              "working-rack.quarantine.json", "audio_settings.xml" })
+        write (root.getChildFile (name), "x");
+
+    write (root.getChildFile ("rigs/index.json"), "[]");
+    write (root.getChildFile ("rigs/a-1.rig"), "{}");
+    write (root.getChildFile ("patches/p.patch"), "{}");
+    write (root.getChildFile ("presets/p.preset"), "{}");
+    write (root.getChildFile ("looper-sessions/take.wav"), "RIFF");
+    write (root.getChildFile ("tone3000/credentials.json"), "{\"token\":\"t\"}");
+    write (root.getChildFile ("WebView2-Tone3000/EBWebView/Cookies"), "c");
+    write (root.getChildFile ("WebKit-Tone3000/cookies.sqlite"), "c");
+
+    // What a reset must leave alone.
+    const juce::StringArray kept { "known_plugins.xml", "scan_in_progress.txt", "plectrify.log",
+                                   "backup-before-restore.plectrifybackup",
+                                   plectrify::reset::snapshotName, "WebView2/Local State",
+                                   "WebView2-Plugin/Local State", "crashes/crash.txt" };
+    for (const auto& name : kept)
+        write (root.getChildFile (name), "keep");
+
+    check (plectrify::reset::schedule (root), "a reset can be scheduled");
+    check (plectrify::reset::isScheduled (root), "a scheduled reset is visible");
+
+    const auto outcome = plectrify::reset::performIfScheduled (root);
+
+    check (outcome.ran, "a scheduled pass reports that it ran");
+    check (outcome.leftBehind.isEmpty(), "nothing was left behind: " + outcome.leftBehind.joinIntoString (", "));
+    check (! plectrify::reset::isScheduled (root), "the marker is gone after the pass");
+
+    for (const auto& name : plectrify::reset::targets())
+        check (! root.getChildFile (name).exists(), "the reset removed " + name);
+
+    for (const auto& name : kept)
+        check (root.getChildFile (name).existsAsFile(), "the reset kept " + name);
+
+    // A second launch after a completed reset touches nothing new.
+    write (root.getChildFile ("settings.json"), "{}");
+    check (! plectrify::reset::performIfScheduled (root).ran, "a finished reset does not run again");
+    check (root.getChildFile ("settings.json").existsAsFile(), "the next launch's settings survive");
+}
+
+void testResetCanBeCancelled()
+{
+    ScratchDir scratch ("reset-cancelled");
+    const auto root = scratch.dir;
+    write (root.getChildFile ("settings.json"), "{}");
+
+    check (plectrify::reset::schedule (root), "a reset can be scheduled before cancelling");
+    plectrify::reset::cancel (root);
+
+    check (! plectrify::reset::performIfScheduled (root).ran, "a cancelled reset does not run");
+    check (root.getChildFile ("settings.json").existsAsFile(), "a cancelled reset keeps settings.json");
+}
+// The lease is what stops a standalone resetting the root under a plugin.
+// The case that matters is two leases in one process — a mac DAW hosting the
+// VST3 and the AU holds one per bundle — because process-owned locks are
+// granted trivially to the second and dropped for both when either closes.
+void testLeaseIsCountedPerHandle()
+{
+    ScratchDir scratch ("lease");
+    const auto root = scratch.dir;
+
+    check (! plectrify::dataRootInUseElsewhere (root), "an unleased root is free");
+
+    auto first = std::make_unique<plectrify::DataRootLease> (root);
+    check (first->isHeld(), "the first lease is taken");
+    check (plectrify::dataRootInUseElsewhere (root), "one lease makes the root in use");
+
+    auto second = std::make_unique<plectrify::DataRootLease> (root);
+    check (second->isHeld(), "a second lease in the same process coexists with the first");
+
+    first.reset();
+    check (plectrify::dataRootInUseElsewhere (root), "dropping one lease leaves the other counted");
+
+    second.reset();
+    check (! plectrify::dataRootInUseElsewhere (root), "the root is free once the last lease is gone");
+    check (! plectrify::reset::targets().contains ("data-root.lock"), "the lock file is not a reset target");
+}
 } // namespace
 
 int main()
@@ -369,6 +476,10 @@ int main()
     testEmptyRootIsRefused();
     testBadArchivesCostNothing();
     testHostileArchiveIsFiltered();
+    testResetDoesNothingUnlessScheduled();
+    testResetRemovesTargetsAndSparesTheRest();
+    testResetCanBeCancelled();
+    testLeaseIsCountedPerHandle();
 
     juce::File::getSpecialLocation (juce::File::tempDirectory)
         .getChildFile ("PlectrifyBackupTests")

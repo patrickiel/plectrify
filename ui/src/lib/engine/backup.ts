@@ -19,9 +19,18 @@
  * leave an error on the panel. */
 export type BackupPhase = 'idle' | 'choosing' | 'working' | 'done' | 'failed' | 'cancelled';
 
-/** Which of the two operations a state belongs to. They share a stream because
-    only one can ever be in flight — both are gated behind a modal file dialog. */
-export type BackupAction = 'backup' | 'restore';
+/** Which operation a state belongs to. They share a stream because only one
+    can ever be in flight: the first two are gated behind a modal file dialog,
+    and a reset ends the process.
+
+    A reset reports `working` and, when it was refused or could not be
+    scheduled or restarted, `failed`. It never reports `done` — success is the
+    app restarting, and this page goes with it. The launch after a reset that
+    could not remove everything reports `failed` too, once the page asks
+    (`incomplete`, with the leftovers in `detail`). */
+export type BackupAction = 'backup' | 'restore' | 'reset';
+
+const ACTIONS: BackupAction[] = ['backup', 'restore', 'reset'];
 
 export interface BackupState {
   phase: BackupPhase;
@@ -36,6 +45,9 @@ export interface BackupState {
   platform: string;
   /** A short token from the engine; run it through describeBackupError. */
   error?: string;
+  /** More, when the engine has it — the names a reset could not remove, and
+      where to find them. A sentence in its own right, shown after the error's. */
+  detail: string;
 }
 
 /** Nothing has happened yet. Also what a panel resets to when it closes. */
@@ -45,6 +57,7 @@ export const IDLE_BACKUP: BackupState = {
   path: '',
   counts: { rigs: 0, patches: 0 },
   platform: '',
+  detail: '',
 };
 
 const str = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -65,11 +78,14 @@ export function reduceBackupState(previous: BackupState, event: unknown): Backup
   const counts = (raw.counts ?? {}) as Record<string, unknown>;
   return {
     phase,
-    action: str(raw.action) === 'restore' ? 'restore' : 'backup',
+    action: ACTIONS.includes(str(raw.action) as BackupAction)
+      ? (str(raw.action) as BackupAction)
+      : 'backup',
     path: str(raw.path),
     counts: { rigs: num(counts.rigs), patches: num(counts.patches) },
     platform: str(raw.platform),
     error: str(raw.error) || undefined,
+    detail: str(raw.detail),
   };
 }
 
@@ -91,6 +107,16 @@ export function describeBackupError(error: string | undefined): string {
       return "Couldn't open the Plectrify data folder, so nothing was changed.";
     case 'damaged':
       return 'The backup could not be unpacked; it may be damaged.';
+    case 'reset':
+      return "Couldn't prepare the reset, so nothing was changed. Check the Plectrify data folder can be written to.";
+    case 'relaunch':
+      return "Couldn't restart Plectrify, so nothing was reset. Quit and reopen it, then try again.";
+    case 'inUse':
+      return 'A Plectrify plugin is open in another app, so nothing was reset. Close that app, then try again.';
+    case 'snapshot':
+      return "Couldn't save the backup a reset takes first, so nothing was reset. Check there is room on the disk.";
+    case 'incomplete':
+      return 'The reset could not remove everything.';
     default:
       return error || 'Something went wrong.';
   }

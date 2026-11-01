@@ -306,6 +306,8 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         // hiding the surface — the standalone shell owns the chooser.
         .withEventListener ("createBackup",  onActivity ([this] (juce::var v) { if (host.capabilities().backup) host.handleCreateBackup (v); }))
         .withEventListener ("restoreBackup", onActivity ([this] (juce::var v) { if (host.capabilities().backup) host.handleRestoreBackup (v); }))
+        .withEventListener ("resetApp",      onActivity ([this] (juce::var v) { if (host.capabilities().backup) host.handleResetApp (v); }))
+        .withEventListener ("requestBackupState", [this] (juce::var) { host.handleRequestBackupState(); })
         // The setup wizard's own view of the audio stack. Asked for when it
         // opens and by its Refresh button; `rescan` re-enumerates the driver
         // families, which loads every ASIO driver on the machine and is far too

@@ -543,8 +543,22 @@ export interface EngineBridge {
       state reports `done`: the engine has replaced the files under it, and the
       reload is what re-reads them. */
   restoreBackup(): void;
-  /** Subscribe to the progress and outcome of the two calls above. Returns an
-      unsubscribe function. */
+  /** Erase this installation's rigs, patches, songs, settings, audio setup,
+      loop recordings and TONE3000 sign-in, and restart as a fresh install
+      would — setup wizard included. Installed plugins and downloaded captures
+      stay, and so does the plugin scan.
+
+      Destructive and total — the engine snapshots rigs, patches, songs and
+      settings into a backup beside the data root first (what a backup holds;
+      loop recordings and the audio setup are not in it). Confirm before
+      calling, saying so. Refused while a Plectrify plugin runs in another
+      app, which shares the data root. The app restarts on success, so the
+      only outcome that ever arrives is a `failed` one (action `reset`) — or,
+      on the launch after a reset that could not remove everything, a `failed`
+      one naming what is still there. */
+  resetApp(): void;
+  /** Subscribe to the progress and outcome of the three calls above. Returns
+      an unsubscribe function. */
   subscribeBackup(listener: (state: BackupState) => void): () => void;
 
   /** Update application preferences. These are persisted independently of

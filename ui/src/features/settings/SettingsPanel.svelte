@@ -3,6 +3,7 @@
     ArchiveIcon,
     ArrowCounterClockwiseIcon,
     CaretLeftIcon,
+    EraserIcon,
     MinusIcon,
     PianoKeysIcon,
     PlugIcon,
@@ -134,6 +135,7 @@
   // honest picture: nothing is blocked until the OS file dialog opens.
   let backup = $state<BackupState>({ ...IDLE_BACKUP });
   let confirmRestore = $state(false);
+  let confirmReset = $state(false);
   onMount(() =>
     engine.subscribeBackup((state) => {
       backup = state;
@@ -153,12 +155,18 @@
   // rather than queueing a second run behind the first.
   const busy = $derived(backup.phase === 'choosing' || backup.phase === 'working');
   const restored = $derived(backup.action === 'restore' && backup.phase === 'done');
+  // A reset rides the same stream but reports in its own card, so the Backup
+  // card keeps its standing description while one is in flight or has failed.
+  const resetting = $derived(backup.action === 'reset' && backup.phase === 'working');
+  const resetFailed = $derived(backup.action === 'reset' && backup.phase === 'failed');
 
   /** The one line under the rows. It is the card's whole feedback channel, so
       it carries the standing description as well as every outcome — one line
       that changes rather than a line that appears, which would make the card
       grow and shrink under the pointer. */
   const statusLine = $derived.by(() => {
+    if (backup.action === 'reset')
+      return 'Rigs, patches, songs and settings, in one file. Plugins and downloaded captures are not included.';
     if (backup.phase === 'choosing')
       return backup.action === 'backup' ? 'Choose where to save it…' : 'Choose a backup…';
     if (backup.phase === 'working')
@@ -399,9 +407,9 @@
         {/if}
       </Card>
     {/if}
-    <!-- Backup. Last, because it is the one card nobody opens Settings to
-         reach until the day they need it — and the only one whose second row
-         can undo everything above it.
+    <!-- Backup. At the bottom, with Reset under it, because they are the
+         cards nobody opens Settings to reach until the day they need them —
+         and the only ones that can undo everything above them.
 
          Gated away in a DAW: a session's rack rides the project document, so
          an archive of the *global* rigs and settings is not what that session
@@ -448,13 +456,63 @@
           </RowButton>
         {/if}
         <p
-          class="px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] {backup.phase === 'failed'
+          class="px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] {backup.phase === 'failed' &&
+          !resetFailed
             ? 'text-warn'
             : 'text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]'}"
           role="status"
           title={backup.path || undefined}
         >
           {statusLine}
+        </p>
+      </Card>
+      <!-- Reset. Its own card, below Backup, so the one action in Settings that
+           erases everything sits apart from the rows that only ever add a file
+           — and directly under the row that would save a copy first.
+
+           Gated with Backup and for the same reason: the data root is global,
+           and erasing it from inside a DAW would pull it out from under every
+           other instance in the session. -->
+      <Card>
+        <p
+          class="px-[.6rem] py-[.35rem] text-[.625rem] font-semibold tracking-[.14em] text-muted uppercase"
+        >
+          Reset
+        </p>
+        {#if confirmReset}
+          <InlineConfirmRow
+            stacked
+            message="Erase every rig, patch, song and setting, delete the loop recordings, forget the audio setup and sign out of TONE3000? Plectrify restarts as a fresh install. Rigs, patches, songs and settings are backed up first; loop recordings and the audio setup are not."
+            confirmLabel="Reset & restart"
+            onConfirm={() => {
+              confirmReset = false;
+              engine.resetApp();
+            }}
+            onCancel={() => (confirmReset = false)}
+          />
+        {:else}
+          <RowButton
+            class="gap-2 rounded-none text-[.8rem]"
+            disabled={busy}
+            onclick={() => (confirmReset = true)}
+          >
+            <EraserIcon size={15} aria-hidden="true" />
+            Reset Plectrify…
+          </RowButton>
+        {/if}
+        <p
+          class="px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] {resetFailed
+            ? 'text-warn'
+            : 'text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]'}"
+          role="status"
+        >
+          {#if resetting}
+            Restarting…
+          {:else if resetFailed}
+            {describeBackupError(backup.error)}{backup.detail ? ` ${backup.detail}` : ''}
+          {:else}
+            Start over as a fresh install. Installed plugins and downloaded captures stay.
+          {/if}
         </p>
       </Card>
     {/if}

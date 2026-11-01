@@ -761,6 +761,9 @@ export class JuceEngine implements EngineBridge {
     b?.emitEvent('requestAppInfo', {});
     b?.emitEvent('requestMidiDevices', {});
     b?.emitEvent('requestTone3000', {});
+    // Anything the backupState stream owes a page that was not there to hear
+    // it: a reset the launch could not finish.
+    b?.emitEvent('requestBackupState', {});
     // The input probe lives in the engine and outlives this document, so a page
     // reloaded (dev HMR, a WebView recovery) while the wizard's input step was
     // open would leave it metering every channel for nobody. Nothing here ever
@@ -2464,6 +2467,18 @@ export class JuceEngine implements EngineBridge {
     backend()?.emitEvent('restoreBackup', {});
   }
 
+  resetApp(): void {
+    // Flush the working session first, as createBackup does: the engine
+    // snapshots the data root from disk before it schedules anything, and an
+    // autosave still on its debounce would otherwise be in neither the
+    // snapshot nor the root — the `working` push that follows suppresses it.
+    // Autosave is suspended when that push arrives (onBackupState), not here:
+    // a reset the engine never answers — no backend, or an event it dropped —
+    // must not leave this page unable to save anything for the rest of the
+    // session.
+    void this.flushSessionSave().then(() => backend()?.emitEvent('resetApp', {}));
+  }
+
   subscribeBackup(listener: (state: BackupState) => void): () => void {
     this.backupListeners.add(listener);
     listener(this.backup);
@@ -2473,12 +2488,20 @@ export class JuceEngine implements EngineBridge {
   private onBackupState(data: unknown): void {
     this.backup = reduceBackupState(this.backup, data);
 
-    // A restore the user backed out of, or one that refused the file: the page
-    // is still the authority on what is on disk, so autosaving may resume.
-    const restoreEndedBadly =
-      this.backup.action === 'restore' &&
+    // A reset the engine has taken on: same reasoning as restoreBackup —
+    // nothing this page still holds may be written into the data root once
+    // the engine has started on it. The files are cleared on the next launch
+    // anyway; this keeps the snapshot honest.
+    if (this.backup.action === 'reset' && this.backup.phase === 'working')
+      this.restoringBackup = true;
+
+    // A restore the user backed out of, one that refused the file, or a reset
+    // that was refused or could not be scheduled: the page is still the
+    // authority on what is on disk, so autosaving may resume.
+    const endedBadly =
+      (this.backup.action === 'restore' || this.backup.action === 'reset') &&
       (this.backup.phase === 'cancelled' || this.backup.phase === 'failed');
-    if (restoreEndedBadly) this.restoringBackup = false;
+    if (endedBadly) this.restoringBackup = false;
 
     for (const listener of this.backupListeners) listener(this.backup);
 
@@ -2487,8 +2510,11 @@ export class JuceEngine implements EngineBridge {
     // backup went, and a *successful* restore still owes a reload whoever asks.
     // A restore that failed or was cancelled owes nothing and changed nothing,
     // so replaying it would pop its dialog open again every time the panel is
-    // reopened, over a machine that was never touched.
-    if (restoreEndedBadly) this.backup = { ...IDLE_BACKUP };
+    // reopened, over a machine that was never touched. A failed reset is kept:
+    // it has no dialog, and the one reported by the launch after an incomplete
+    // reset names files the user has to go and delete — it arrives before
+    // Settings has ever been opened, and must still be there when it is.
+    if (endedBadly && this.backup.action === 'restore') this.backup = { ...IDLE_BACKUP };
   }
 
   startWindowResize(edge: WindowResizeEdge): void {

@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include <PlectrifyAssets.h>
 #include "AppPaths.h"
+#include "AppReset.h"
 #include "CrashReporter.h"
 #include "MainComponent.h"
 #include "WindowLookAndFeel.h"
@@ -16,7 +17,11 @@ public:
 
     const juce::String getApplicationName() override    { return "Plectrify"; }
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
-    bool moreThanOneInstanceAllowed() override          { return false; }
+    // One instance, except for the one a reset relaunches: that process starts
+    // while the instance that scheduled the reset is still quitting, and the
+    // stock check would hand it that instance's window and exit. It waits for
+    // the other to be gone instead — see waitForResettingInstance().
+    bool moreThanOneInstanceAllowed() override          { return isRelaunchAfterReset(); }
 
     void initialise (const juce::String&) override
     {
@@ -29,7 +34,38 @@ public:
         juce::Logger::setCurrentLogger (logger.get());
         plectrify::installCrashHandler();
 
-        mainWindow = std::make_unique<MainWindow> (getApplicationName());
+        if (isRelaunchAfterReset() && ! waitForResettingInstance())
+        {
+            // The old instance is still up after half a minute (or the lock
+            // could not be taken at all). Clearing the data under a running
+            // app is exactly what the reset is scheduled to avoid — and so is
+            // leaving the marker armed: the user, seeing nothing happen, keeps
+            // playing in that instance and saves work the snapshot predates,
+            // which the next ordinary launch would then wipe. So the reset is
+            // called off, not deferred; the snapshot stays where the Reset
+            // card can find it and the user asks again.
+            juce::Logger::writeToLog ("Reset: the previous instance did not quit; the reset is cancelled");
+            plectrify::reset::cancel (plectrify::appDataDir());
+            quit();
+            return;
+        }
+
+        // Before anything reads the data root — the device setup, the plugin
+        // cache, the page's settings — so this launch starts as a fresh
+        // installation would (AppReset.h). A no-op on every launch that follows
+        // no reset.
+        const auto reset = plectrify::reset::performIfScheduled (plectrify::appDataDir(), 20, 250);
+        if (reset.ran)
+            juce::Logger::writeToLog (reset.leftBehind.isEmpty()
+                                          ? juce::String ("Reset: data root cleared")
+                                          : "Reset: could not remove " + reset.leftBehind.joinIntoString (", "));
+
+        // What it could not remove is the page's to show, not just the log's:
+        // the TONE3000 profile is the likeliest leftover, and an app that
+        // looks fresh while their site still knows the account is a reset that
+        // lied. The window hands it to the shell, which reports it when the
+        // page asks for its backup state.
+        mainWindow = std::make_unique<MainWindow> (getApplicationName(), reset.leftBehind);
     }
 
     void shutdown() override
@@ -50,7 +86,7 @@ public:
     class MainWindow : public juce::DocumentWindow
     {
     public:
-        explicit MainWindow (juce::String name)
+        MainWindow (juce::String name, const juce::StringArray& resetLeftBehind)
             : juce::DocumentWindow (name,
                                     juce::Colour (0xff020305),
                                     juce::DocumentWindow::allButtons)
@@ -86,6 +122,7 @@ public:
                 setIcon (appIcon);
 
             auto* content = new MainComponent();
+            content->reportResetLeftovers (resetLeftBehind);
             content->onWindowThemeChanged = [this] (bool light) { setChromeTheme (light); };
             setContentOwned (content, true);
 
@@ -147,7 +184,27 @@ public:
     };
 
 private:
+    static bool isRelaunchAfterReset()
+    {
+        return getCommandLineParameterArray().contains (plectrify::reset::relaunchFlag);
+    }
+
+    /** Blocks until the instance that scheduled the reset has exited, by taking
+        the very lock JUCE's single-instance check holds for a running app
+        ("juceAppLock_" + the app name, juce_ApplicationBase.cpp). That lock is
+        released when the old process finishes shutting down, which is the
+        moment its last write to the data root is behind it. Kept for this
+        process's lifetime, so a launch after this one still finds an instance
+        running and steps aside exactly as it would for any other. */
+    bool waitForResettingInstance()
+    {
+        instanceLock = std::make_unique<juce::InterProcessLock> ("juceAppLock_" + getApplicationName());
+        return instanceLock->enter (30000);
+    }
+
     std::unique_ptr<juce::FileLogger> logger;
+    // Only ever set on a relaunch after a reset; see waitForResettingInstance().
+    std::unique_ptr<juce::InterProcessLock> instanceLock;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

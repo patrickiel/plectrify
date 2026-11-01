@@ -1343,11 +1343,33 @@ export class MockEngine implements EngineBridge {
 
     // Same as JuceEngine: a restore that failed or was cancelled is delivered
     // and then forgotten, so reopening the panel does not reopen its dialog.
+    // A failed reset stays, as it does there.
     if (
       this.backup.action === 'restore' &&
       (this.backup.phase === 'cancelled' || this.backup.phase === 'failed')
     )
       this.backup = { ...IDLE_BACKUP };
+  }
+
+  /** The browser's stand-in for the app's reset-and-restart: every key this
+      engine keeps in localStorage goes, and a reload plays the part of the
+      relaunch — so the setup wizard and the empty first-run rack come back
+      exactly as the real reset brings them. There is no snapshot to take; the
+      mock's backup is a download, and a reset is no time to start one. */
+  private resetting = false;
+
+  resetApp(): void {
+    this.resetting = true;
+    this.setBackupState({ action: 'reset', phase: 'working', error: undefined });
+    try {
+      for (const key of Object.keys(localStorage))
+        if (key.startsWith('plectrify.')) localStorage.removeItem(key);
+    } catch {
+      this.resetting = false;
+      this.setBackupState({ phase: 'failed', error: 'reset' });
+      return;
+    }
+    setTimeout(() => location.reload(), 600);
   }
 
   subscribeBackup(listener: (state: BackupState) => void): () => void {
@@ -2134,6 +2156,9 @@ export class MockEngine implements EngineBridge {
       a persistence error rather than vanishing. The in-memory copy is kept
       either way, so the session survives until the reload. */
   private persist(key: string, value: unknown): boolean {
+    // A reset has emptied storage and the reload is on its way; a debounced
+    // autosave landing in between would hand the "fresh" page the old rack.
+    if (this.resetting) return true;
     try {
       localStorage.setItem(key, JSON.stringify(value));
       if (this.status.persistenceError === key) this.setPersistenceError(null);

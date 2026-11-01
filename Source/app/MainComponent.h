@@ -80,12 +80,27 @@ public:
     // and report the outcome on the backupState stream.
     void handleCreateBackup (const juce::var& payload) override;
     void handleRestoreBackup (const juce::var& payload) override;
+    // Snapshots the data root, schedules a reset (AppReset.h), starts a new
+    // instance and quits; the new one clears the data before reading any of
+    // it. Reported on the backupState stream as action "reset", which only
+    // ever reaches "failed" — on success the page is about to cease to exist.
+    // Refused outright while a Plectrify plugin in some DAW holds the data
+    // root (DataRootLease.h).
+    void handleResetApp (const juce::var& payload) override;
+    // Replays what the stream still owes a page that has just booted: the
+    // targets a reset performed at launch could not remove, if any.
+    void handleRequestBackupState() override;
+
+    /** What the reset this launch performed left behind (Main.cpp), to be
+        reported to the page once it asks — the push cannot be made before the
+        page exists. Nothing to report is the usual case. */
+    void reportResetLeftovers (const juce::StringArray& leftBehind);
 
 private:
     /** One backupState push. `phase` is one of the BackupPhase strings the page
         reduces over (see ui/src/lib/engine/backup.ts). */
     void emitBackupState (const juce::String& action, const juce::String& phase,
-                          const plectrify::backup::Result& result);
+                          const plectrify::backup::Result& result, const juce::String& detail = {});
     // The device manager broadcasts a change when the audio setup is edited
     // (buffer size, driver, device); the About block would otherwise keep
     // reporting the device that was open at boot.
@@ -163,6 +178,9 @@ private:
     // operation: only one dialog is ever open, and replacing it here is what
     // releases the last one.
     std::unique_ptr<juce::FileChooser> fileChooser;
+
+    // See reportResetLeftovers.
+    juce::StringArray resetLeftBehind;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "AppPaths.h"
+#include "DataRootLease.h"
 #include "HostServices.h"
 #include "PlectrifyEngine.h"
 
@@ -110,6 +112,13 @@ private:
     void markProjectDirty();
 
     std::unique_ptr<PlectrifyEngine> engine;
+
+    // Tells a standalone that this instance is reading and writing the data
+    // root, so it refuses to reset it meanwhile (DataRootLease.h). One per
+    // instance: the leases are shared locks, so any number coexist and the
+    // root reads as in use until the last of them — in this bundle, in the
+    // other format's bundle, in another DAW — is gone.
+    plectrify::DataRootLease dataRootLease { plectrify::appDataDir() };
 
     std::atomic<double> preparedSampleRate { 0.0 };
     std::atomic<int>    preparedBlockSize  { 0 };

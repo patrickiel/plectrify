@@ -260,14 +260,15 @@ set(PLECTRIFY_ENGINE_SOURCES
     Source/tone3000/Tone3000Service.cpp
     Source/tone3000/Tone3000WindowState.cpp)
 
-# Deliberately not in PLECTRIFY_ENGINE_SOURCES: backing up the per-user data
-# root is a standalone-only feature (HostCapabilities::backup), so the plugin
-# neither offers it nor compiles it.
+# Deliberately not in PLECTRIFY_ENGINE_SOURCES: backing up and resetting the
+# per-user data root are standalone-only features (HostCapabilities::backup),
+# so the plugin neither offers nor compiles them.
 target_sources(Plectrify PRIVATE
     ${PLECTRIFY_ENGINE_SOURCES}
     Source/app/Main.cpp
     Source/app/MainComponent.cpp
     Source/app/WindowLookAndFeel.cpp
+    Source/backup/AppReset.cpp
     Source/backup/BackupArchive.cpp)
 
 # ---------------------------------------------------------------------------
@@ -807,15 +808,17 @@ if (BUILD_TESTING)
         juce::juce_recommended_warning_flags)
     add_test(NAME Plectrify.Catalogue COMMAND PlectrifyCatalogueTests)
 
-    # Backup and restore: which zip entries may be written into the data root,
-    # the manifest's version ceiling, and a full write/read round trip over two
-    # temporary trees. The entry allow-list is a trust boundary of the same kind
-    # as the catalogue's — the destination is the web page's file sandbox — so
-    # it is compiled with Catalogue.cpp, whose isSafeArchiveEntryName it builds
-    # on rather than restating.
+    # Backup, restore and reset: which zip entries may be written into the data
+    # root, the manifest's version ceiling, a full write/read round trip over
+    # two temporary trees, and what a scheduled reset removes and spares. The
+    # entry allow-list is a trust boundary of the same kind as the catalogue's
+    # — the destination is the web page's file sandbox — so it is compiled with
+    # Catalogue.cpp, whose isSafeArchiveEntryName it builds on rather than
+    # restating.
     juce_add_console_app(PlectrifyBackupTests PRODUCT_NAME "Plectrify Backup Tests")
     juce_generate_juce_header(PlectrifyBackupTests)
     target_sources(PlectrifyBackupTests PRIVATE
+        Source/backup/AppReset.cpp
         Source/backup/BackupArchive.cpp
         Source/plugins/Catalogue.cpp
         Tests/backup/BackupArchiveTests.cpp)

@@ -55,6 +55,29 @@ describe('reduceBackupState', () => {
     expect(next.error).toBe('damaged');
   });
 
+  it('reads a reset push as its own action', () => {
+    const next = reduceBackupState(IDLE_BACKUP, {
+      phase: 'failed',
+      action: 'reset',
+      error: 'relaunch',
+    });
+
+    expect(next.action).toBe('reset');
+    expect(next.error).toBe('relaunch');
+  });
+
+  it('carries the detail of an incomplete reset, and none otherwise', () => {
+    const incomplete = reduceBackupState(IDLE_BACKUP, {
+      phase: 'failed',
+      action: 'reset',
+      error: 'incomplete',
+      detail: 'Still there: WebView2-Tone3000.',
+    });
+    expect(incomplete.detail).toBe('Still there: WebView2-Tone3000.');
+
+    expect(reduceBackupState(IDLE_BACKUP, { phase: 'done', action: 'backup' }).detail).toBe('');
+  });
+
   it('carries no counts when the engine sends none', () => {
     expect(reduceBackupState(IDLE_BACKUP, { phase: 'cancelled' }).counts).toEqual({
       rigs: 0,
@@ -73,6 +96,11 @@ describe('describeBackupError', () => {
       'newerFormat',
       'dataRoot',
       'damaged',
+      'reset',
+      'relaunch',
+      'inUse',
+      'snapshot',
+      'incomplete',
     ]) {
       const text = describeBackupError(token);
       expect(text).not.toBe(token);

@@ -31,11 +31,11 @@ struct HostCapabilities
     bool windowChrome = true;   ///< resize handles, window theme mirroring
     bool autoStandby  = true;   ///< the idle park/wake machinery
 
-    // Backup and restore of the per-user data root. Declined by the plugin:
-    // what a DAW session owns rides its project document, so a panel there
-    // would offer to archive rigs and settings the session is not using and to
-    // replace them under every other instance at once.
-    bool backup = true;         ///< the Settings panel's backup/restore rows
+    // Backup, restore and reset of the per-user data root. Declined by the
+    // plugin: what a DAW session owns rides its project document, so a panel
+    // there would offer to archive rigs and settings the session is not using
+    // and to replace — or erase — them under every other instance at once.
+    bool backup = true;         ///< the Settings panel's backup/restore/reset rows
 
     // The three practice tools. Each is a fixed graph node plus a panel, and
     // each is declined by the plugin for a reason of its own — see
@@ -134,6 +134,14 @@ public:
     // for reaches outside the data root is untouched.
     virtual void handleCreateBackup (const juce::var&) {}
     virtual void handleRestoreBackup (const juce::var&) {}
+    // Schedules a reset of the data root (Source/backup/AppReset.h) and
+    // restarts the app, which clears it on the way back up. Gated with the two
+    // above, and for the same reason.
+    virtual void handleResetApp (const juce::var&) {}
+    // The page asking, on boot, for anything the backupState stream still owes
+    // it: a reset the previous launch could not finish is reported here, since
+    // the push that would have said so predates the page.
+    virtual void handleRequestBackupState() {}
     virtual void handleSetWindowTheme (const juce::var&) {}
     // The inverse gate of the two above: served by the plugin, no-op in the
     // standalone (whose window the OS resizes). AUv2 gives a host no way to
