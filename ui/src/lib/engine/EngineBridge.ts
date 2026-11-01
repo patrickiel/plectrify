@@ -276,8 +276,9 @@ export interface EngineBridge {
     moduleId?: string;
     /** The installed Neural Amp Modeler to build the state from. */
     pluginId?: string;
-    /** "1", "2" or "custom". Omitting it is not "all": TONE3000 then applies
-        its legacy A1 + Custom selection and hides every A2 capture. Also what
+    /** "1", "2", "custom", or "legacy" for TONE3000's A1 + Custom selection
+        (the engine sends no architecture for it). Omitting the field keeps the
+        current choice — it is not "all", and it is not "legacy". Also what
         decides which model is picked when a tone carries several. */
     architecture?: string;
   }): void;

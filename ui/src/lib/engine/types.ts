@@ -421,11 +421,12 @@ export type MidiActionId =
 /** How much setup chrome a performance tool shows around its live controls. */
 export type ToolViewMode = 'simple' | 'expert';
 
-/** TONE3000's `architecture` values Plectrify browses by: "2" is current
-    Neural Amp Modeler, "1" the legacy generation. Single-valued on their side —
-    there is no "both", and omitting it is their legacy A1 + Custom selection,
-    not "all". */
-export type Tone3000Architecture = '1' | '2';
+/** Which generation the TONE3000 window browses: "2" is current Neural Amp
+    Modeler, "1" the legacy generation, and "legacy" TONE3000's A1 + Custom
+    selection. Single-valued on their side — there is no "all" — and "legacy" is
+    our token for the one selection reached by *omitting* the parameter, which
+    the engine does for it (see Tone3000Library::selectArchitectureParam). */
+export type Tone3000Architecture = '1' | '2' | 'legacy';
 
 /** User preferences for the application itself. These survive restarts but are
     deliberately excluded from saved rigs and the working session. */

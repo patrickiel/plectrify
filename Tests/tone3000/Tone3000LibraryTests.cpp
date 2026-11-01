@@ -164,6 +164,22 @@ void testModelChoice()
 }
 
 //==============================================================================
+// What each browse generation sends to TONE3000 and prefers among a tone's
+// models. Legacy is the one that is not TONE3000's own value.
+void testBrowseArchitecture()
+{
+    check (selectArchitectureParam ("2") == "2", "A2 is sent as itself");
+    check (selectArchitectureParam ("1") == "1", "A1 is sent as itself");
+    check (selectArchitectureParam (legacyArchitecture).isEmpty(),
+           "legacy sends no architecture, which TONE3000 reads as A1 + Custom");
+
+    check (preferredModelArchitecture ("2") == "2", "browsing A2 prefers A2 models");
+    check (preferredModelArchitecture ("1") == "1", "browsing A1 prefers A1 models");
+    check (preferredModelArchitecture (legacyArchitecture) == "1",
+           "legacy prefers A1 — the tone was found as a legacy tone");
+}
+
+//==============================================================================
 // Where the TONE3000 window opens. The interesting cases are all about a
 // display that is no longer there, which is exactly what cannot be tested by
 // opening a window.
@@ -298,6 +314,7 @@ int main()
     testGarbageCollection();
     testRoot();
     testModelChoice();
+    testBrowseArchitecture();
     testWindowPlacement();
     testSelectUrls();
 

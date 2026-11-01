@@ -196,8 +196,9 @@ private:
     juce::String browsePluginId;
     /** The architecture the window was opened for, and what `chooseModel`
         prefers. Single-valued, and **omitting it is not "all"** — see
-        Tone3000Auth::AuthorizeOptions. The page's Settings choose it (A2 or
-        A1) and every open states it; it is persisted in state.json beside
+        Tone3000Auth::AuthorizeOptions. The page's Settings choose it — "2",
+        "1", or `Tone3000Library::legacyArchitecture`, which sends none and so
+        gets TONE3000's A1 + Custom selection — and every open states it; it is persisted in state.json beside
         `windowPlace` because that place was read under it, and a change
         discards both the place and the open window's flow. */
     juce::String browseArchitecture { "2" };
