@@ -1,0 +1,158 @@
+Load WebKitGTK by its versioned sonames, and say so when it cannot load.
+
+JUCE 8.0.14's WebKitGTK backend dlopens libwebkit2gtk-4.1.so,
+libjavascriptcoregtk-4.1.so, libsoup-3.0.so, libgtk-3.so and libglib-2.0.so.
+Those unversioned names are linker symlinks that Debian and Ubuntu ship only in
+the -dev packages. A machine with just the runtime libraries, which is all the
+.deb depends on, found none of them: the web view never started, every
+navigation returned early, and the window stayed black with nothing in the log
+(issue #12). Open the sonames instead (libwebkit2gtk-4.1.so.0 and friends),
+exactly as upstream JUCE does since commit 146fdea5.
+
+The other half makes the failure visible. The loader records which library or
+symbol was missing and writes it to the log, and so does a web view process
+that fails to start. The first navigation then reports the reason through
+WebBrowserComponent::pageLoadHadNetworkError, so the component can show it
+rather than stay black. That still matters with the right names: a
+distribution that drops webkit2gtk-4.1 for webkitgtk-6.0 lands here too.
+
+On a JUCE bump past 146fdea5 this patch stops applying, which is the cue to
+drop the soname hunk and keep the reporting.
+
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+@@ -47,6 +47,10 @@
+     //==============================================================================
+     bool isWebKitAvailable() const noexcept  { return webKitIsAvailable; }
+ 
++    // PLECTRIFY_WEBKIT_VERSIONED_SONAMES: why the backend could not be loaded,
++    // empty while it is available.
++    const String& getUnavailableReason() const noexcept  { return unavailableReason; }
++
+     //==============================================================================
+     JUCE_GENERATE_FUNCTION_WITH_DEFAULT (webkit_settings_new, juce_webkit_settings_new,
+                                          (), WebKitSettings*)
+@@ -452,6 +456,16 @@
+             return true;
+         }
+ 
++        // PLECTRIFY_WEBKIT_VERSIONED_SONAMES: keep the first attempt's error.
++        // It names the library every supported distribution ships, and it has
++        // to be read now: the reset below dlcloses what did open, and a
++        // successful dlclose clears the pending error.
++        if (webKitLoadError.isEmpty())
++        {
++            const auto* error = dlerror();
++            webKitLoadError = error != nullptr ? String (error) : String ("unknown error");
++        }
++
+         for (auto* l : { &webkitLib, &jsLib, &soupLib })
+             *l = {};
+ 
+@@ -461,20 +475,52 @@
+     //==============================================================================
+     DylibHandle webkitLib, jsLib, soupLib;
+ 
+-    DylibHandle gtkLib    { "libgtk-3.so" },
+-                glib      { "libglib-2.0.so" };
++    // PLECTRIFY_WEBKIT_VERSIONED_SONAMES: open every library by its soname.
++    // The unversioned names are linker symlinks that Debian and Ubuntu ship
++    // only in the -dev packages, so a machine with just the runtime libraries
++    // found none of them and the web view stayed black without a word.
++    // Backported from upstream JUCE 146fdea5.
++    DylibHandle gtkLib    { "libgtk-3.so.0" },
++                glib      { "libglib-2.0.so.0" };
++
++    // Records why loading failed and puts it in the log, so a missing library
++    // is no longer silent. Declared before webKitIsAvailable, whose
++    // initialiser calls it.
++    String unavailableReason, webKitLoadError;
++
++    bool unavailable (const String& reason)
++    {
++        unavailableReason = reason;
++        Logger::writeToLog ("WebBrowserComponent: " + reason);
++        return false;
++    }
+ 
+-    const bool webKitIsAvailable =    (   openWebKitAndDependencyLibraries ({ "libwebkit2gtk-4.1.so",
+-                                                                              "libjavascriptcoregtk-4.1.so",
+-                                                                              "libsoup-3.0.so" })
+-                                       || openWebKitAndDependencyLibraries ({ "libwebkit2gtk-4.0.so",
+-                                                                              "libjavascriptcoregtk-4.0.so",
+-                                                                              "libsoup-2.4.so" }))
+-                                   && loadWebkitSymbols()
+-                                   && loadGtkSymbols()
+-                                   && loadJsLibSymbols()
+-                                   && loadSoupLibSymbols()
+-                                   && loadGlibSymbols();
++    // Only the WebKitGTK library itself is worth an install hint; when a
++    // dependency is what failed, the package that holds it varies.
++    String webKitLoadFailure() const
++    {
++        auto reason = "WebKitGTK could not be loaded (" + webKitLoadError + ").";
++
++        if (webKitLoadError.startsWith ("libwebkit2gtk-4.1.so.0:"))
++            reason << " Install libwebkit2gtk-4.1-0.";
++
++        return reason;
++    }
++
++    const bool webKitIsAvailable =    (   openWebKitAndDependencyLibraries ({ "libwebkit2gtk-4.1.so.0",
++                                                                              "libjavascriptcoregtk-4.1.so.0",
++                                                                              "libsoup-3.0.so.0" })
++                                       || openWebKitAndDependencyLibraries ({ "libwebkit2gtk-4.0.so.37",
++                                                                              "libjavascriptcoregtk-4.0.so.18",
++                                                                              "libsoup-2.4.so.1" })
++                                       || unavailable (webKitLoadFailure()))
++                                   && (gtkLib || unavailable ("GTK 3 could not be loaded (libgtk-3.so.0)."))
++                                   && (glib   || unavailable ("GLib could not be loaded (libglib-2.0.so.0)."))
++                                   && (loadWebkitSymbols()  || unavailable ("WebKitGTK lacks a required function."))
++                                   && (loadGtkSymbols()     || unavailable ("GTK 3 lacks a required function."))
++                                   && (loadJsLibSymbols()   || unavailable ("JavaScriptCore lacks a required function."))
++                                   && (loadSoupLibSymbols() || unavailable ("libsoup lacks a required function."))
++                                   && (loadGlibSymbols()    || unavailable ("GLib lacks a required function."));
+ 
+     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WebKitSymbols)
+ };
+@@ -1571,6 +1617,14 @@
+         if (actual != (ssize_t) sizeof (windowHandle))
+         {
+             killChild();
++
++            // PLECTRIFY_WEBKIT_VERSIONED_SONAMES: the libraries loaded but the
++            // web view process did not start (no X display, a crash in GTK).
++            // Treat the backend as unavailable from here on, so nothing writes
++            // to the dead child and the first navigation reports why.
++            webKitIsAvailable = false;
++            unavailableReason = "The web view process did not start.";
++            Logger::writeToLog ("WebBrowserComponent: " + unavailableReason);
+             return;
+         }
+ 
+@@ -1620,7 +1674,16 @@
+     void goToURL (const String& url, const StringArray* headers, const MemoryBlock* postData) override
+     {
+         if (! webKitIsAvailable)
++        {
++            // PLECTRIFY_WEBKIT_VERSIONED_SONAMES: tell the component, once,
++            // instead of dropping every navigation silently.
++            if (! std::exchange (reportedUnavailable, true))
++                browser.pageLoadHadNetworkError (unavailableReason.isNotEmpty()
++                                                     ? unavailableReason
++                                                     : WebKitSymbols::getInstance()->getUnavailableReason());
++
+             return;
++        }
+ 
+         DynamicObject::Ptr params = new DynamicObject;
+ 
+@@ -1849,6 +1912,8 @@
+ 
+     //==============================================================================
+     bool webKitIsAvailable = false;
++    bool reportedUnavailable = false; // PLECTRIFY_WEBKIT_VERSIONED_SONAMES
++    String unavailableReason;         // PLECTRIFY_WEBKIT_VERSIONED_SONAMES
+ 
+     WebBrowserComponent& browser;
+     String userAgent;

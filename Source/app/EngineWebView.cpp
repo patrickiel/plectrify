@@ -11,6 +11,53 @@ juce::Colour appBackgroundColour()
     return juce::Colour::fromRGB (2, 3, 5);
 }
 
+void AmpWebBrowserComponent::paint (juce::Graphics& graphics)
+{
+    juce::WebBrowserComponent::paint (graphics);
+    graphics.fillAll (appBackgroundColour());
+
+    if (loadError.isEmpty())
+        return;
+
+    juce::String message = "Plectrify could not show its window.\n\n" + loadError;
+
+    // The standalone logs to a file; the plugin build has no logger of its own.
+    if (auto* fileLogger = dynamic_cast<juce::FileLogger*> (juce::Logger::getCurrentLogger()))
+        message << "\n\nDetails are in " << fileLogger->getLogFile().getFullPathName();
+
+    graphics.setColour (juce::Colours::white.withAlpha (0.85f));
+    graphics.setFont (juce::FontOptions (15.0f));
+    graphics.drawFittedText (message, getLocalBounds().reduced (32), juce::Justification::centred, 12);
+}
+
+bool AmpWebBrowserComponent::pageLoadHadNetworkError (const juce::String& errorInfo)
+{
+    juce::Logger::writeToLog ("Web view: page load failed: " + errorInfo);
+
+   #if JUCE_LINUX
+    // The backend adds its XEmbed view as a child once its process is up, so
+    // no child means nothing will ever cover this surface.
+    if (getNumChildComponents() == 0)
+    {
+        loadError = errorInfo.isNotEmpty() ? errorInfo : juce::String ("Unknown error.");
+        repaint();
+    }
+   #endif
+
+    // Keep JUCE's own error page wherever there is a view to show it in.
+    return true;
+}
+
+void AmpWebBrowserComponent::pageFinishedLoading (const juce::String&)
+{
+    // A later load succeeded: nothing stale may show through during a resize.
+    if (loadError.isNotEmpty())
+    {
+        loadError = {};
+        repaint();
+    }
+}
+
 namespace
 {
     juce::String mimeForExtension (const juce::String& ext)

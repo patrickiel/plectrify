@@ -188,6 +188,11 @@ export const JUCE_PATCHES = [
     file: 'modules/juce_audio_devices/audio_io/juce_AudioDeviceManager.cpp',
     marker: 'PLECTRIFY_NO_ZERO_BLOCK_SPIN',
   },
+  {
+    patch: 'cmake/juce-linux-webkit-versioned-sonames.patch',
+    file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
+    marker: 'PLECTRIFY_WEBKIT_VERSIONED_SONAMES',
+  },
 ] as const;
 
 /** What `git diff --name-only` must report for the patched JUCE tree, and
