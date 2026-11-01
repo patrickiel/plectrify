@@ -426,7 +426,8 @@ export type ToolViewMode = 'simple' | 'expert';
     a non-standard network. Sent to TONE3000 as-is. Single-valued on their
     side — there is no "all", and omitting it is their legacy A1 + Custom
     selection, which hides every A2 capture. */
-export type Tone3000Architecture = '1' | '2' | 'custom';
+export const TONE3000_ARCHITECTURES = ['2', '1', 'custom'] as const;
+export type Tone3000Architecture = (typeof TONE3000_ARCHITECTURES)[number];
 
 /** User preferences for the application itself. These survive restarts but are
     deliberately excluded from saved rigs and the working session. */

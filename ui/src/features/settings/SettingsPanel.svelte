@@ -18,7 +18,10 @@
     HostCapabilities,
     MidiTrigger,
     ThemeName,
+    Tone3000Architecture,
   } from '../../lib/engine/types';
+  import { TONE3000_ARCHITECTURES } from '../../lib/engine/types';
+  import { ARCHITECTURE_LABELS } from '../../lib/engine/tone3000';
   import {
     MAX_RACK_ZOOM,
     MAX_UI_SCALE,
@@ -97,6 +100,14 @@
   };
   const setRackZoom = scaleSetter('rackZoom', MIN_RACK_ZOOM, MAX_RACK_ZOOM);
   const setUiScale = scaleSetter('uiScale', MIN_UI_SCALE, MAX_UI_SCALE);
+
+  /** Typed by the architecture set, so a generation added there cannot reach
+      the TONE3000 card without a line saying what it is. */
+  const ARCHITECTURE_TIPS: Record<Tone3000Architecture, string> = {
+    '2': 'Current Neural Amp Modeler captures',
+    '1': 'Legacy captures never published as A2',
+    custom: 'Captures trained on a non-standard network',
+  };
 
   // Discrete choices rather than sliders: every write rewrites settings.json
   // over the bridge, so a dragged control would hammer it.
@@ -342,11 +353,11 @@
         <SegmentedControl
           label="TONE3000 model architecture"
           value={appSettings.tone3000Architecture}
-          options={[
-            { value: '2', label: 'A2', tip: 'Current Neural Amp Modeler captures' },
-            { value: '1', label: 'A1', tip: 'Legacy captures never published as A2' },
-            { value: 'custom', label: 'Custom', tip: 'Captures trained on a non-standard network' },
-          ]}
+          options={TONE3000_ARCHITECTURES.map((value) => ({
+            value,
+            label: ARCHITECTURE_LABELS[value],
+            tip: ARCHITECTURE_TIPS[value],
+          }))}
           onSelect={(value) => onSetAppSettings({ tone3000Architecture: value })}
         />
       </CardRow>

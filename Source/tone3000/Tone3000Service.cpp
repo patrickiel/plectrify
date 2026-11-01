@@ -34,6 +34,15 @@ const juce::String redirectUri { PLECTRIFY_TONE3000_REDIRECT_URI };
     both and no second plugin is involved. */
 const juce::String namPluginName { "NeuralAmpModeler" };
 
+/** The `architecture` values the window may browse by — TONE3000's own, and
+    the same three the page's Settings offer. Anything else, from the page or
+    from state.json, is ignored rather than sent to TONE3000 (which would answer
+    "not supported") and persisted for every later opening. */
+bool isBrowsableArchitecture (const juce::String& architecture)
+{
+    return architecture == "1" || architecture == "2" || architecture == "custom";
+}
+
 /** Where TONE3000 sends a flow it will not honour any more — a page saying
     "your session has expired, go back to the app and try again".
 
@@ -190,7 +199,7 @@ void Tone3000Service::loadSession()
 
         // The generation that place was read under. A file from before the
         // switch existed has none, and everything then was browsed as A2.
-        if (const auto architecture = stringProperty (stored, "architecture"); architecture.isNotEmpty())
+        if (const auto architecture = stringProperty (stored, "architecture"); isBrowsableArchitecture (architecture))
             browseArchitecture = architecture;
     }
 
@@ -336,7 +345,7 @@ void Tone3000Service::connect (const juce::var& payload)
     // filter (whose own query may well carry it), so restoring it would put the
     // user back on the catalogue they just switched away from.
     if (const auto architecture = stringProperty (payload, "architecture");
-        architecture.isNotEmpty() && architecture != browseArchitecture)
+        isBrowsableArchitecture (architecture) && architecture != browseArchitecture)
     {
         Tone3000WindowState::trace ("connect: architecture " + browseArchitecture + " -> " + architecture);
         browseArchitecture = architecture;
@@ -348,6 +357,7 @@ void Tone3000Service::connect (const juce::var& payload)
 
     pendingToneId = {};
     pendingModelId = {};
+    pendingArchitecture = {};
 
     // Already there — the window is hidden, not gone. Nothing to rebuild: the
     // page, the search that was typed and the scroll position are all still
@@ -765,6 +775,7 @@ void Tone3000Service::handleCallback (const juce::String& url)
 
     pendingToneId = callback.toneId;
     pendingModelId = callback.modelId;
+    pendingArchitecture = browseArchitecture;
 
     // A pick is not an exit. The tone downloads and lands on the module behind
     // this window, and the window stays open on the page it was on, so choosing
@@ -836,10 +847,11 @@ void Tone3000Service::probeApiAccess()
     // A sign-in with no tone attached is just a sign-in: the user opened the
     // window and closed the flow without picking anything.
     if (const auto toneId = pendingToneId.getLargeIntValue(); toneId > 0)
-        beginInstall (toneId, pendingModelId.getLargeIntValue());
+        beginInstall (toneId, pendingModelId.getLargeIntValue(), pendingArchitecture);
 
     pendingToneId = {};
     pendingModelId = {};
+    pendingArchitecture = {};
 }
 
 void Tone3000Service::disconnect()
@@ -861,7 +873,7 @@ void Tone3000Service::disconnect()
 }
 
 //==============================================================================
-void Tone3000Service::beginInstall (juce::int64 toneId, juce::int64 modelId)
+void Tone3000Service::beginInstall (juce::int64 toneId, juce::int64 modelId, const juce::String& architecture)
 {
     if (run.active)
         return;
@@ -889,7 +901,7 @@ void Tone3000Service::beginInstall (juce::int64 toneId, juce::int64 modelId)
 
     client.getJson (
         "/api/v1/tones/" + juce::String (toneId),
-        [this, toneId, modelId] (Tone3000Client::Response toneResponse)
+        [this, toneId, modelId, architecture] (Tone3000Client::Response toneResponse)
         {
             if (! toneResponse.ok)
                 return failInstall (toneResponse.status == 404 || toneResponse.status == 403
@@ -916,7 +928,7 @@ void Tone3000Service::beginInstall (juce::int64 toneId, juce::int64 modelId)
                             models->add (model);
             };
 
-            const auto pick = [this, tone, models, modelId]
+            const auto pick = [this, tone, models, modelId, architecture]
             {
                 run.models = *models;
 
@@ -937,7 +949,7 @@ void Tone3000Service::beginInstall (juce::int64 toneId, juce::int64 modelId)
                                    stringProperty (model, "architecture_version"),
                                    stringProperty (model, "size") });
 
-                const auto index = Tone3000Library::chooseModel (choices, browseArchitecture);
+                const auto index = Tone3000Library::chooseModel (choices, architecture);
 
                 if (index < 0)
                     return failInstall ("TONE3000 has no model for that tone that Plectrify can load");

@@ -1,3 +1,5 @@
+import type { Tone3000Architecture } from './types';
+
 /**
  * TONE3000 — the types the UI works in, and the pure rules that go with them.
  *
@@ -217,7 +219,7 @@ export function gearLabel(gear: string): string {
     default, A1 the legacy one, and Custom covers user-supplied architectures.
     Their vocabulary, printed their way — "Architecture 2" is our paraphrase and
     does not appear anywhere the user might have read it. */
-export const ARCHITECTURE_LABELS: Record<string, string> = {
+export const ARCHITECTURE_LABELS: Record<Tone3000Architecture, string> = {
   '1': 'A1',
   '2': 'A2',
   custom: 'Custom',
@@ -225,7 +227,7 @@ export const ARCHITECTURE_LABELS: Record<string, string> = {
 
 export function architectureLabel(architecture: string | undefined): string {
   if (!architecture) return '';
-  return ARCHITECTURE_LABELS[architecture] ?? architecture;
+  return (ARCHITECTURE_LABELS as Record<string, string>)[architecture] ?? architecture;
 }
 
 /** The knob mapping a TONE3000 patch starts from — the factory value of the

@@ -9,6 +9,7 @@ import type {
   ToolId,
   TunerDisplayMode,
 } from './types';
+import { TONE3000_ARCHITECTURES } from './types';
 import { isMidiTrigger } from './midi';
 import { normalizePositions } from './knobLayout';
 import { namDefaultKnobs } from './tone3000';
@@ -254,8 +255,8 @@ function templateKnobs(value: unknown): KnobDef[] {
     is A2: that is what the window always browsed by, and an empty value would
     be TONE3000's legacy selection, which hides every modern capture. */
 function tone3000Architecture(value: unknown): Tone3000Architecture {
-  return value === '1' || value === '2' || value === 'custom'
-    ? value
+  return (TONE3000_ARCHITECTURES as readonly unknown[]).includes(value)
+    ? (value as Tone3000Architecture)
     : DEFAULT_APP_SETTINGS.tone3000Architecture;
 }
 
