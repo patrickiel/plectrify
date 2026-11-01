@@ -820,6 +820,23 @@ records the substitution it made.
   - `juce-no-zero-block-spin.patch` — the guard on the other side of that:
     `CallbackMaxSizeEnforcer` passes a block through whole when its maximum
     is 0 rather than looping, for the next backend that reports one.
+  - `juce-linux-webkit-versioned-sonames.patch` — JUCE 8.0.14's WebKitGTK
+    backend dlopens `libwebkit2gtk-4.1.so`, `libgtk-3.so` and their
+    dependencies by their **unversioned** names, which Debian and Ubuntu ship
+    only in the `-dev` packages. The .deb depends on the runtime libraries
+    alone, so on a machine that never built anything the backend found
+    nothing, every navigation returned early, and the window stayed black
+    with a clean log (issue #12). It now opens the sonames
+    (`libwebkit2gtk-4.1.so.0` and friends), the names upstream JUCE switched
+    to in `146fdea5` — so a JUCE bump past that commit makes this patch stop
+    applying, which is the cue to keep only its other half. That half reports
+    a backend that cannot load: the loader logs which library or function was
+    missing, and the first navigation hands the reason to
+    `WebBrowserComponent::pageLoadHadNetworkError`, which
+    `AmpWebBrowserComponent` paints over the empty window. The next way to
+    land there is a distribution dropping webkit2gtk-4.1 for webkitgtk-6.0,
+    which JUCE 8.0.14 does not know. Never fix this class of bug by adding a
+    `-dev` package to the .deb's `Depends:`.
 
   After changing the JUCE tag, regenerate them all against the new sources and
   delete `build*/_deps/juce-*` so FetchContent re-populates. Editing a

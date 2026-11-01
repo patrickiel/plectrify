@@ -97,6 +97,10 @@ FetchContent_Declare(
     #     playback buffer, so every block is written where the hardware is
     #     already reading - steady crackle on a USB interface until a reopen
     #     happens to land on a better phase (Linux).
+    #   - linux-webkit-versioned-sonames: the WebKitGTK backend dlopens the
+    #     unversioned .so names only -dev packages provide, so an installed
+    #     .deb showed a black window; it now opens the sonames and reports a
+    #     backend that cannot load instead of failing silently (Linux).
     PATCH_COMMAND  "${CMAKE_COMMAND}"
                    "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
                    "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-disable-webview2-zoom.patch"
@@ -150,6 +154,11 @@ FetchContent_Declare(
            COMMAND "${CMAKE_COMMAND}"
                    "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
                    "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-no-zero-block-spin.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-linux-webkit-versioned-sonames.patch"
                    "-DSOURCE_DIR=<SOURCE_DIR>"
                    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
 )

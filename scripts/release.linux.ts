@@ -310,8 +310,12 @@ const installedKb = Number(capture('du', ['-sk', '--exclude=DEBIAN', stage]).spl
 
 // Each runtime library under both its pre- and post-t64 name (Ubuntu 24.04
 // renamed them for the 64-bit time_t transition), so one package installs on
-// either side of it. WebKitGTK and curl are what NEEDS_WEB_BROWSER/NEEDS_CURL
-// link; JACK is dlopened and therefore only recommended.
+// either side of it. curl is linked. WebKitGTK and GTK are dlopened at runtime
+// by soname (cmake/juce-linux-webkit-versioned-sonames.patch), so the runtime
+// packages are enough and no -dev package belongs here: stock JUCE asked for
+// the unversioned names only -dev packages provide, and an installed .deb
+// showed a black window (issue #12). JACK is dlopened too, and only
+// recommended.
 writeFileSync(
   join(debian, 'control'),
   `Package: plectrify
