@@ -10,9 +10,10 @@
  * machine you are standing at, and the artefact it produces is that platform's
  * `assets` entry. Running it on Windows drives the upstream installer
  * (hostPlugin.windows.ts); running it on a Mac mounts the .dmg or .pkg
- * (hostPlugin.macos.ts). Neither is a variant of the other, and neither can
- * stand in for the other: the shared flow in hostPlugin.ts pins, stages,
- * archives, records and uploads identically for both.
+ * (hostPlugin.macos.ts); running it on Linux unpacks the tarball
+ * (hostPlugin.linux.ts). None is a variant of another, and none can stand in
+ * for another: the shared flow in hostPlugin.ts pins, stages, archives,
+ * records and uploads identically for all three.
  *
  * WHY IT IS A SCRIPT. Doing this by hand is a ritual nobody remembers six
  * months later, and it has to be repeated on every upstream release. Scripted,
@@ -24,18 +25,19 @@ import { fail, hostPlugin, type HostPluginPlatform } from './hostPlugin.ts';
 const platforms: Record<string, () => Promise<{ default?: never } & Record<string, unknown>>> = {
   win32: () => import('./hostPlugin.windows.ts'),
   darwin: () => import('./hostPlugin.macos.ts'),
+  linux: () => import('./hostPlugin.linux.ts'),
 };
 
 const load = platforms[process.platform];
 if (!load) {
   fail(
-    `there is no re-hosting route for ${process.platform}: only windows-x64 and macos-arm64 have one; a linux-x64 asset is pinned by hand from an upstream build that unzips to a .vst3.`,
+    `there is no re-hosting route for ${process.platform}: only windows-x64, macos-arm64 and linux-x64 have one.`,
   );
 }
 
 // Named per module rather than a shared `default` so that opening either file
 // tells you which platform it is without reading the export.
 const module = await load();
-const impl = (module.windowsHost ?? module.macosHost) as HostPluginPlatform;
+const impl = (module.windowsHost ?? module.macosHost ?? module.linuxHost) as HostPluginPlatform;
 
 await hostPlugin(impl);

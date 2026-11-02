@@ -1,0 +1,39 @@
+{
+  "name": "Chorus",
+  "pluginName": "Lupex Chorus",
+  "displayName": "Chorus",
+  "color": "#1497b8",
+  "icon": "mod",
+  "knobs": [
+    {
+      "paramIndex": 3,
+      "label": "Low",
+      "pos": 0
+    },
+    {
+      "paramIndex": 2,
+      "label": "Level",
+      "isMeter": false,
+      "pos": 1
+    },
+    {
+      "paramIndex": 0,
+      "label": "Rate",
+      "pos": 3
+    },
+    {
+      "paramIndex": 1,
+      "label": "Depth",
+      "pos": 5
+    },
+    {
+      "paramIndex": 4,
+      "label": "High",
+      "pos": 4
+    }
+  ],
+  "category": "Effects",
+  "order": 10,
+  "pluginVersion": "0.1.0",
+  "state": "VkMyIToCAAA8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/PiA8VlNUM1BsdWdpblN0YXRlPjxJQ29tcG9uZW50PjM1MC5WTWpMZ2pRLi4uLk8rZldhckFoY2tJMmJvOGxhOEhSTHQuaUhmVGxhaThGWW80MVk4SFJVVFlUSzNIeE85LkJPQ2cxYXhVMmJTUVdYelVsTzcuVVBSRVRTZmpGWThIaFg0QVdYeU1tSGZYV1hyVVdZOEhCTHQuaUh1M0NPUEVqVEEwREhvUVZPaFBWWXZRR1poLmhjZ3dWY2swaUgzUGlLMi5DTHYuQ00wYnlNMUxpTTJIaUh1M0NPUEVqVEEwREhvUVZPaGZWWm1nbEhmWFdYclVXWThIUk12M0JMaDdoTzcuVVBSRVRTZmpGWThIQmFrWVdZcklCSDFFRmEwVVZPaERDTHYzQkxoN2hPNy5VUFJFVFNmakZZOEhCYXVjbUhmWFdYclVXWThIUk12M0JMaDdoTzcuVVBSRVRTZmpGWThIaGJnUVdZaC5oY2d3VmNrMGlIdzNSTXdqU040alNOMy5TTnhYU013UGlIdTNDT3VMRFp1SVdjeU1FY2dRV1k5Li4uLi4uLi4uLi4ublRVQ1VEVHhrbGNnUVdZREVGY2dBUC5BSFRkdkUxYnlBUC5BTC4uYy4uLi4uLi4uLmZSVU1UUVBJV1oxRUZja1FUWHpFRjwvSUNvbXBvbmVudD48L1ZTVDNQbHVnaW5TdGF0ZT4A"
+}

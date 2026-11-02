@@ -471,11 +471,14 @@ slug, and **no platform is the default**:
 
 Keys are written alphabetically so the file cannot be read as "Windows, plus
 some others". The slugs are `linux-x64`, `macos-arm64` and `windows-x64`
-(`ASSET_PLATFORMS`). A `linux-x64` asset is pinned by hand from an upstream
-build that unzips to a `.vst3` — `build-plugin`/`host-plugin` have no Linux
-route yet, which is why Surge XT and Dragonfly (tarballs upstream) are not
-offered there. No patch pack has a Linux folder yet either: each must be
-authored against `/var/lib/Plectrify`. At least one is required — a package offered nowhere is not a
+(`ASSET_PLATFORMS`). A `linux-x64` asset is either pinned from an upstream
+zip that unzips to a `.vst3`, or — when upstream ships a tarball, as Surge XT
+and Dragonfly do — re-hosted by `host-plugin`'s Linux half; `build-plugin` has
+no Linux route yet, which is why OpenSpatialDelay (source-only for every
+release that has ever had Linux in view) is not offered there. A patch pack
+whose patches bake no path (QDelay, Lupex Chorus, Dragonfly) carries a
+`.linux-x64` folder identical to its Windows one; one that does bake a path
+must be authored against `/var/lib/Plectrify`. At least one is required — a package offered nowhere is not a
 package — and a platform with no entry is not offered it: the row renders
 greyed with install disabled, visible rather than hidden, so the catalogue never
 looks quietly thinner per OS. Selection is one map lookup of
@@ -554,8 +557,8 @@ for licences that permit redistributing the binary; `validate` refuses a
 self-hosted copyleft plugin with no published source. Re-run it on each upstream
 release rather than hand-editing a hash.
 
-It is **one command that builds the platform it is run on**, and the two halves
-behind it have nothing in common but their purpose. On Windows
+It is **one command that builds the platform it is run on**, and the three
+halves behind it have nothing in common but their purpose. On Windows
 (`hostPlugin.windows.ts`) it is the rare case and the invasive one: the upstream
 installer is genuinely run on this machine, each VST3 it added or changed is
 copied out, and it is uninstalled — with every pre-existing bundle backed up
@@ -566,7 +569,14 @@ Nothing is uploaded if that cleanup does not complete. On macOS
 as plain data, and the bundle is copied out with its arm64 slice checked. That
 guard is not ceremony either: a mac bundle's permission bits, framework symlinks
 and signature seal would not survive extraction on another OS, and the result
-would hash fine, validate fine and fail to load.
+would hash fine, validate fine and fail to load. On Linux
+(`hostPlugin.linux.ts`) the payload is a tarball the app cannot unpack (it only
+unzips), already in VST3 bundle layout: it is unpacked as plain data, each
+bundle's `Contents/x86_64-linux/*.so` has its ELF header checked for x86-64 —
+upstreams ship arm64, armhf, i686 and riscv64 tarballs side by side — and the
+bundles are re-zipped with their exec bits. `--bundle` narrows the pick on
+macOS and Linux alike (Surge's tarball carries the synth beside the effects
+rack); the link-safe walk and that selection are shared in `hostPlugin.ts`.
 
 `build-plugin` is the harder case: a project that publishes **no** binary for a
 platform at all, only source. Neural Amp Modeler went that way after v0.7.13 — its

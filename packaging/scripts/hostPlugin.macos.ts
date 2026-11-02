@@ -16,8 +16,9 @@
  * load into the arm64-only Plectrify process.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { chooseBundles, findBundles } from './hostPlugin.ts';
 import type { Extraction, HostPluginContext, HostPluginPlatform } from './hostPlugin.ts';
 
 export const macosHost: HostPluginPlatform = {
@@ -44,42 +45,6 @@ export const macosHost: HostPluginPlatform = {
 function run(command: string, args: string[]): { ok: boolean; output: string } {
   const result = spawnSync(command, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return { ok: result.status === 0, output: `${result.stdout ?? ''}${result.stderr ?? ''}` };
-}
-
-/** Every .vst3 bundle directly reachable under `root` (not the copies nested
-    inside another bundle).
-
-    WALKED BY HAND, NEVER WITH `recursive: true`. Node's recursive readdir
-    descends through a directory symlink — the link's own Dirent reports
-    isDirectory() false, but the walk re-opens the path it names and reads
-    whatever is on the other side. An upstream .dmg is exactly where that
-    bites: the conventional "drag me there" layout puts an alias to
-    /Library/Audio/Plug-Ins/VST3 beside the payload, so a recursive read of
-    the mounted image enumerates THIS MACHINE'S installed plugins and the
-    re-host quietly archives somebody else's binaries — Plectrify's own among
-    them — into the package's asset. So a link is an entry, never a door: the
-    same rule pack.ts's `walk` follows, for a neighbouring reason. */
-function findBundles(root: string): string[] {
-  const out: string[] = [];
-
-  const visit = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name);
-      // lstat, so a link to a directory is not mistaken for one. (A Dirent
-      // whose type the filesystem reported as unknown is resolved by stat,
-      // which follows.)
-      if (!lstatSync(path).isDirectory()) continue;
-      if (entry.name.endsWith('.vst3')) {
-        // Nested copies belong to the bundle around them, not to the payload.
-        if (!out.some((outer) => path.startsWith(`${outer}/`))) out.push(path);
-        continue;
-      }
-      visit(path);
-    }
-  };
-
-  visit(root);
-  return out;
 }
 
 async function extract(context: HostPluginContext): Promise<Extraction | null> {
@@ -134,28 +99,12 @@ async function extract(context: HostPluginContext): Promise<Extraction | null> {
   }
 
   // --- Pick the bundles, check every slice -----------------------------------
-  const bundles = findBundles(extracted);
-  if (bundles.length === 0) fail('the payload contained no .vst3 bundle.');
-
-  // Everything the payload holds, by default — the same rule the Windows half
-  // applies to whatever the installer added, and for the same reason: a release
-  // shipping four reverbs ships four plugins, and a package that quietly
-  // delivered one of them would install a quarter of what its row promises.
-  // --bundle is the narrowing, for a payload that also carries something this
-  // package is not offering; it names bundles rather than picking one, so
-  // asking for two is not a special case.
-  const wanted = context.options.bundle as string[] | undefined;
-  const chosen = wanted?.length
-    ? bundles.filter((bundle) => wanted.includes(basename(bundle)))
-    : bundles;
-  const missing = (wanted ?? []).filter(
-    (name) => !bundles.some((bundle) => basename(bundle) === name),
+  // See chooseBundles for why the default is every bundle the payload holds.
+  const chosen = chooseBundles(
+    findBundles(extracted),
+    context.options.bundle as string[] | undefined,
+    fail,
   );
-  if (missing.length > 0) {
-    fail(
-      `--bundle named ${missing.join(', ')}, which the payload does not hold (it has: ${bundles.map((b) => basename(b)).join(', ')}).`,
-    );
-  }
 
   const collected: string[] = [];
   const sliceNotes: string[] = [];

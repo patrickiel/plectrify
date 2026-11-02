@@ -429,10 +429,17 @@
       "licenseId": "GPL-3.0-only",
       "licenseUrl": "https://raw.githubusercontent.com/surge-synthesizer/surge/main/LICENSE",
       "projectUrl": "https://github.com/surge-synthesizer/surge",
+      "sourceUrl": "https://github.com/surge-synthesizer/releases-xt/releases/download/1.3.4/surge-src-1.3.4.tar.gz",
       "include": [
         "**/Surge XT Effects.vst3/**"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/hosted/surge-xt-effects/surge-xt-effects-1.3.4-linux-x64.zip",
+          "sha256": "4248b3e1678060f72efa754f31de895ac442d525f0065fa32fc9c0f575b6daad",
+          "downloadBytes": 8081436,
+          "selfHosted": true
+        },
         "macos-arm64": {
           "url": "https://github.com/surge-synthesizer/releases-xt/releases/download/1.3.4/surge-xt-macos-1.3.4-pluginsonly.zip",
           "sha256": "37d8d809693adc86587b7bc75a2384fc4e905f259aa9b9a21777749d36fbf8aa",
@@ -445,9 +452,10 @@
         }
       },
       "_macNote": "BY FAR THE LARGEST DOWNLOAD IN THE CATALOGUE at 187 MB, against 49 MB on Windows, and that is upstream's packaging rather than a mistake: the mac pluginsonly zip carries VST3, AU, CLAP and a standalone .app for BOTH Surge XT and Surge XT Effects, all universal binaries. The include pattern is layout-neutral enough to inherit - on macOS the bundle sits at the archive root as 'Surge XT Effects.vst3/', and '**/' matches zero segments - so the same one line still selects the effects rack alone and drops the synth, the AU, the CLAP and the two .app files. The extracted bundle is about 40 MB. The _dataPathNote below applies here too and is likewise untested: the mac bundle's Resources hold only an icon, so it has no factory data folder either.",
+      "_linuxNote": "THE LINUX ASSET IS A RE-HOST, the only one of the three platforms we serve ourselves. Upstream's Linux pluginsonly build is surge-xt-linux-1.3.4-pluginsonly.tar.gz (97 MB: VST3, CLAP, LV2, the standalone and the CLI for both the synth and the effects rack), and the app only unzips. `host-plugin -- --bundle 'Surge XT Effects.vst3'` (hostPlugin.linux.ts) unpacked it as plain data, checked the .so is ELF x86-64 and re-zipped that one bundle unmodified with its exec bits - 8 MB, so on Linux the include pattern selects from an archive that already holds nothing else. WHAT FOLLOWS: Plectrify is the distributor of a GPL-3.0 binary on Linux, so section 6 attaches to us and sourceUrl is required - it names the same release's own surge-src-1.3.4.tar.gz (the full tree with submodules, 319 MB), which section 6d permits from upstream's server; if that asset ever disappears, mirror it into our bucket beside the archive and re-point sourceUrl rather than dropping the field. Windows and mac remain plain mirrors of upstream's zips. The _dataPathNote question is settled for Linux: the effects rack loads and processes audio under PlectrifyBypassProbe with no data folder installed anywhere on the machine.",
       "_includeNote": "THE ONLY ENTRY WHOSE include NAMES ONE PLUGIN RATHER THAN MATCHING *.vst3, and it must stay that way. This archive holds two VST3 bundles: 'Surge XT Effects.vst3' and 'Surge XT.vst3', the synthesiser. A guitar rig has no use for the synth - it is an instrument, it makes sound with no input - so the pattern selects the effects rack alone. Widening this to the usual '**/*.vst3/**' would silently install both. The CLAP builds, the two standalone .exe files and surge-xt-cli.exe in the same zip are dropped by the same pattern.",
       "_sourceNote": "The binary comes from surge-synthesizer/releases-xt while projectUrl points at surge-synthesizer/surge - the project splits code and releases across two repositories, and the code one publishes only a rolling 'Nightly' tag whose assets carry a date and commit in the filename. Pin the versioned releases-xt tag, never Nightly: its URL and hash both change on every build.",
-      "_dataPathNote": "UNVERIFIED IN A REAL INSTALL - test this one through the Packages panel before publishing. Surge normally gets a factory data folder from its own setup.exe; the pluginsonly zip pinned here contains no such folder, only the plugin bundles. On Windows SurgeStorage walks up from the loaded binary looking for a 'SurgeXTData' directory and then falls back to the shared library path, so an install that places only the .vst3 leaves it with neither. The effects rack needs none of the wavetables or patches that folder holds, and configuration.xml is compiled into the binary, so it is expected to run - but expected is not tested. If it turns out to need the folder, note that the walk-up passes through %PROGRAMDATA%/Plectrify, which a kind:'content' package with installDir 'SurgeXTData' would land in; that would be a second entry, not a change to this one."
+      "_dataPathNote": "UNVERIFIED IN A REAL INSTALL ON WINDOWS AND macOS - test this one through the Packages panel before publishing. (On Linux it is verified: see _linuxNote.) Surge normally gets a factory data folder from its own setup.exe; the pluginsonly zip pinned here contains no such folder, only the plugin bundles. On Windows SurgeStorage walks up from the loaded binary looking for a 'SurgeXTData' directory and then falls back to the shared library path, so an install that places only the .vst3 leaves it with neither. The effects rack needs none of the wavetables or patches that folder holds, and configuration.xml is compiled into the binary, so it is expected to run - but expected is not tested. If it turns out to need the folder, note that the walk-up passes through %PROGRAMDATA%/Plectrify, which a kind:'content' package with installDir 'SurgeXTData' would land in; that would be a second entry, not a change to this one."
     },
     {
       "id": "peakeater",
@@ -704,7 +712,7 @@
       ],
       "name": "Lupex Chorus patches",
       "purpose": "Chorus - a BBD chorus with rate, depth, level and shelf tone mapped",
-      "version": "4",
+      "version": "5",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -715,14 +723,20 @@
         "**/patch.json"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-5-linux-x64.zip",
+          "sha256": "5019677b9e724f2878f6e3361267e9557d380d4dda52fb0a58c3731725863694",
+          "downloadBytes": 1301,
+          "selfHosted": true
+        },
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-4-windows-x64.zip",
+          "url": "https://cdn.plectrify.com/plugins/v1/content/lupex-chorus-patches/plectrify-lupex-chorus-patches-5-windows-x64.zip",
           "sha256": "5019677b9e724f2878f6e3361267e9557d380d4dda52fb0a58c3731725863694",
           "downloadBytes": 1301,
           "selfHosted": true
         }
       },
-      "_macNote": "Windows-only because Lupex Chorus is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not."
+      "_macNote": "Windows and Linux only, because Lupex Chorus is. A patch is meaningless without the plugin it was captured from, which is what dependsOn says, and validate refuses a package offered on a platform its dependency is not. content/lupex-chorus-patches.linux-x64/ is a byte-for-byte copy of the windows-x64 folder, for the reason qdelay-patches' _macNote gives: the pack carries no assets, so its state names no path, and the Linux build reports the same plugin name ('Lupex Chorus'). The two folders must be edited together."
     },
     {
       "id": "lupex-delay",
@@ -811,7 +825,7 @@
       ],
       "name": "QDelay patches",
       "purpose": "Delay - a dual delay with time, feedback, mode and mix mapped",
-      "version": "5",
+      "version": "6",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -822,20 +836,26 @@
         "**/patch.json"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-6-linux-x64.zip",
+          "sha256": "2631f95f0a4df28eb6e4825445bcd6df8513662af9d393a7278b4897da56ca69",
+          "downloadBytes": 3424,
+          "selfHosted": true
+        },
         "macos-arm64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-5-macos-arm64.zip",
+          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-6-macos-arm64.zip",
           "sha256": "2631f95f0a4df28eb6e4825445bcd6df8513662af9d393a7278b4897da56ca69",
           "downloadBytes": 3424,
           "selfHosted": true
         },
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-5-windows-x64.zip",
+          "url": "https://cdn.plectrify.com/plugins/v1/content/qdelay-patches/plectrify-qdelay-patches-6-windows-x64.zip",
           "sha256": "2631f95f0a4df28eb6e4825445bcd6df8513662af9d393a7278b4897da56ca69",
           "downloadBytes": 3424,
           "selfHosted": true
         }
       },
-      "_macNote": "AUTHORED FOR BOTH PLATFORMS. content/qdelay-patches.windows-x64/ and .macos-arm64/ hold the same patch.json byte for byte, and that is legitimate here rather than a shortcut: the per-platform split exists because a patch's plugin state bakes the absolute path of whatever the plugin loaded, and THIS PACK CARRIES NO ASSETS - QDelay loads no capture and no impulse, so its state names no path and the same bytes serve both roots. VST3 state is required to be platform-independent, and the mac build reports the same plugin name ('QDelay') the document keys on. THE COST IS DRIFT: `host` has no OS-neutral shape for a patch (it refuses a patch.json in a bare content/<id>/ folder, because it cannot tell which root an ordinary patch was saved against), so the two folders must be edited together - changing one and publishing leaves the other platform pinned to the old tone. Same for dragonfly-reverb-patches; lupex-chorus-patches has one folder only because its plugin is Windows-only."
+      "_macNote": "AUTHORED FOR EVERY PLATFORM. content/qdelay-patches.windows-x64/, .macos-arm64/ and .linux-x64/ hold the same patch.json byte for byte, and that is legitimate here rather than a shortcut: the per-platform split exists because a patch's plugin state bakes the absolute path of whatever the plugin loaded, and THIS PACK CARRIES NO ASSETS - QDelay loads no capture and no impulse, so its state names no path and the same bytes serve both roots. VST3 state is required to be platform-independent, and the mac and Linux builds report the same plugin name ('QDelay') the document keys on. THE COST IS DRIFT: `host` has no OS-neutral shape for a patch (it refuses a patch.json in a bare content/<id>/ folder, because it cannot tell which root an ordinary patch was saved against), so the folders must be edited together - changing one and publishing leaves the other platforms pinned to the old tone. Same for dragonfly-reverb-patches and lupex-chorus-patches (Windows and Linux only, because its plugin is)."
     },
     {
       "id": "sirial",
@@ -974,6 +994,12 @@
         "*.vst3"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/hosted/dragonfly-reverb/dragonfly-reverb-3.2.10-linux-x64.zip",
+          "sha256": "9784e69384039a56cacb9cd8c9286d537836abf97d2df5da44409e3659adbea8",
+          "downloadBytes": 3220083,
+          "selfHosted": true
+        },
         "macos-arm64": {
           "url": "https://cdn.plectrify.com/plugins/v1/hosted/dragonfly-reverb/dragonfly-reverb-3.2.10-macos-arm64.zip",
           "sha256": "1004351210a32013018e38d41f63e0fe77085163ba73349923d3f93906d0491b",
@@ -987,6 +1013,7 @@
         }
       },
       "_macNote": "THE MAC ASSET IS A RE-HOST OF UPSTREAM'S OWN 3.2.10 UNIVERSAL DMG, not a build of ours and not another release. Release 3.2.10 ships mac only as .dmg images (universal and intel), which cannot back an asset url - the app will not mount a disk image on a user's behalf - so `host-plugin` mounted it here as plain data, expanded the dragonfly-reverb-AudioPlugins.pkg inside it, and re-zipped the four VST3 bundles unmodified (see PROVENANCE-macos-arm64.txt beside the archive, which records the dmg's own sha256). Nothing from the payload was executed. Note what was NOT done: release 3.2.7 ships dragonfly-reverb-mac-universal-3.2.7.zip, which would unzip perfectly well, and pinning it would have been wrong - one `version` covers every platform's payload, so this entry would say 3.2.10 while handing Macs a 3.2.7 binary, and every update check, install marker and support question downstream would inherit that lie. The universal dmg carries x86_64 and arm64; only the arm64 slice matters here and it is checked with lipo before archiving, which is why the asset is keyed macos-arm64 rather than by what else is in the binary.",
+      "_linuxNote": "THE LINUX ASSET IS A RE-HOST OF UPSTREAM'S OWN 3.2.10 dragonfly-reverb-3.2.10-linux-x86_64.tar.xz, for the same reason as the mac one: the app only unzips, and a tarball cannot back an asset url. `host-plugin` (hostPlugin.linux.ts) unpacked it as plain data, checked each bundle's .so is ELF x86-64 - the release ships arm64, armhf, i686 and riscv64 tarballs beside it, so that check is what stops the wrong one being re-hosted - and re-zipped the four bundles unmodified with their exec bits; PROVENANCE-linux-x64.txt beside the archive records the tarball's sha256. Same four plugins as on the other platforms, same parameter order (the patch pack's mappings line up), and all four load and process audio under PlectrifyBypassProbe.",
       "_hostingNote": "THE FIRST ENTRY SERVED FROM BOTH PLACES AT ONCE, which is what `selfHosted` sitting on the ASSET is for: mac comes from our bucket, Windows straight from the project's release page, and each asset says which. WHAT FOLLOWS FROM THE MAC HALF: Plectrify is the distributor of that binary, so GPL-3.0 section 6 attaches to us and the corresponding source must stay available for as long as we offer it - one self-hosted platform is enough for `validate` to demand a sourceUrl, which is the rule that makes a half-mirrored entry safe. sourceUrl names upstream's own 3.2.10 src.tar.xz, which section 6d permits (a different server, with clear directions next to the object code), but the obligation does not move with the file: if that asset ever disappears, mirror it into our bucket beside the archive and re-point sourceUrl. Do not simply drop the field. Four bundles, one package: Hall, Room, Plate and Early Reflections install together, exactly as they do from the Windows zip."
     },
     {
@@ -1002,7 +1029,7 @@
       ],
       "name": "Dragonfly Reverb patches",
       "purpose": "One patch each for the hall, room and plate reverbs",
-      "version": "5",
+      "version": "6",
       "licenseId": "CC0-1.0",
       "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/legalcode",
       "projectUrl": "https://plectrify.com",
@@ -1013,20 +1040,26 @@
         "**/patch.json"
       ],
       "assets": {
+        "linux-x64": {
+          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-6-linux-x64.zip",
+          "sha256": "793778d1d9295a2d9e6c3b9143e2a1867e692c6a60f90626b6f427014fa1057d",
+          "downloadBytes": 3321,
+          "selfHosted": true
+        },
         "macos-arm64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-5-macos-arm64.zip",
+          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-6-macos-arm64.zip",
           "sha256": "793778d1d9295a2d9e6c3b9143e2a1867e692c6a60f90626b6f427014fa1057d",
           "downloadBytes": 3321,
           "selfHosted": true
         },
         "windows-x64": {
-          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-5-windows-x64.zip",
+          "url": "https://cdn.plectrify.com/plugins/v1/content/dragonfly-reverb-patches/plectrify-dragonfly-reverb-patches-6-windows-x64.zip",
           "sha256": "793778d1d9295a2d9e6c3b9143e2a1867e692c6a60f90626b6f427014fa1057d",
           "downloadBytes": 3321,
           "selfHosted": true
         }
       },
-      "_macNote": "AUTHORED FOR BOTH PLATFORMS, the same way qdelay-patches is and for the same reason: these reverbs load no external file, so the saved state bakes no path and the two folders hold identical bytes. Read that entry's _macNote for why that is sound and for the drift it costs - the folders must move together, because `host` offers a patch no OS-neutral shape to share.",
+      "_macNote": "AUTHORED FOR EVERY PLATFORM, the same way qdelay-patches is and for the same reason: these reverbs load no external file, so the saved state bakes no path and the three folders hold identical bytes (the Linux build reports the same plugin names and parameter order). Read that entry's _macNote for why that is sound and for the drift it costs - the folders must move together, because `host` offers a patch no OS-neutral shape to share.",
       "_shapeNote": "Several patches in one package, because dragonfly-reverb installs four plugins - Hall, Room, Plate and Early Reflections are separate VST3s, and a patch names one plugin. So the source folder holds no patch.json of its own: one <packageId>_<name> folder per patch instead, shipped as it stands rather than wrapped. The underscore is what files a pack patch under its package in the drawer (drawerGroups.isPatchOfPackage), so no other name will do. Not every plugin needs a patch of its own: Early Reflections shipped one and no longer does, which changes nothing about the package - the plugin still installs with the other three, and a patch is only ever an opinion about one of them."
     },
     {
