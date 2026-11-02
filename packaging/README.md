@@ -56,23 +56,26 @@ fails Steinberg's VST3 conformance check. Each prints its own `assets` entry —
 `windows-x64` and `macos-arm64` — and they go in together, in one publish,
 because the shared `version` has to describe both binaries.
 
-**A release that can't be unzipped to a `.vst3`** — a Windows installer, or a
-mac `.dmg`/`.pkg`, which is most of them — can't be pointed at directly. Run
-`host-plugin` on that platform's machine and it extracts every VST3 bundle in
-the payload and re-hosts them. On a Mac nothing from the payload is executed;
-on Windows the installer genuinely runs, so read what that does before you use
-it:
+**A release that can't be unzipped to a `.vst3`** — a Windows installer, a
+mac `.dmg`/`.pkg` (which is most of them), or a Linux tarball — can't be
+pointed at directly. Run `host-plugin` on that platform's machine and it
+extracts every VST3 bundle in the payload and re-hosts them. On a Mac and on
+Linux nothing from the payload is executed; on Windows the installer genuinely
+runs, so read what that does before you use it:
 
 ```sh
 pnpm --dir packaging host-plugin -- \
-  --id <id> --version <v> --url <the .dmg/.pkg> --sha256 <its hash>
+  --id <id> --version <v> --url <the .dmg/.pkg/.tar.xz> --sha256 <its hash>
 ```
 
 It prints an `assets` entry carrying `selfHosted: true`, because from then on
 we serve that platform's bytes. Only that platform: the other one keeps
 whatever it had, which is how Dragonfly Reverb is a re-host on macOS and a
-plain link to the project's release on Windows. On a Mac, add `--bundle` (once
-per name) if the payload holds a VST3 the package should not ship.
+plain link to the project's release on Windows. On a Mac or Linux, add
+`--bundle` (once per name) if the payload holds a VST3 the package should not
+ship — Surge XT's Linux tarball needs `--bundle "Surge XT Effects.vst3"`, or
+the synth comes along. On Linux, pick the `x86_64` tarball: the script refuses
+any bundle whose `.so` is not x86-64.
 
 Before you run it, skim the release notes. If the release pulled in a new
 dependency under a restrictive licence, we may not be allowed to host the
@@ -183,7 +186,7 @@ getting catalogue updates — `verify-live` is what catches that.
 | `validate -- --verify-assets` | also re-download everything (all platforms) and re-hash it |
 | `test` | archive-determinism suite for the reproducible zipper |
 | `verify-live` | does the app's built-in key accept what's published? |
-| `host-plugin` | re-host a release that can't be unzipped to a `.vst3` — an installer on Windows, a `.dmg`/`.pkg` on a Mac. Builds whichever platform you run it on |
+| `host-plugin` | re-host a release that can't be unzipped to a `.vst3` — an installer on Windows, a `.dmg`/`.pkg` on a Mac, a tarball on Linux. Builds whichever platform you run it on |
 | `build-plugin` | compile a source-only plugin, for whichever platform you run it on |
 | `host-content` | rebuild the cabinet IR pack |
 | `host` | rebuild every pack we author from `content/`, and re-pin what changed |

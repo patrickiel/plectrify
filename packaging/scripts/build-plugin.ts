@@ -45,7 +45,7 @@ const platforms: Record<string, () => Promise<Record<string, unknown>>> = {
 const load = platforms[process.platform];
 if (!load) {
   fail(
-    `there is no build route for ${process.platform}: only windows-x64 and macos-arm64 have one; a linux-x64 asset is pinned by hand from an upstream build that unzips to a .vst3.`,
+    `there is no build route for ${process.platform}: only windows-x64 and macos-arm64 have one. A linux-x64 asset is pinned from an upstream zip, or re-hosted from an upstream tarball by host-plugin.`,
   );
 }
 

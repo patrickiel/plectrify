@@ -58,7 +58,16 @@ function isAssetFor(platform: string, name: string): boolean {
 
   if (platform === 'windows-x64') return /win|windows/.test(n) && /\.(zip|exe)$/.test(n);
   if (platform === 'macos-arm64') return /mac|osx|darwin/.test(n) && /\.(zip|dmg|pkg)$/.test(n);
-  if (platform === 'linux-x64') return /linux/.test(n) && !/arm|aarch64/.test(n) && /\.zip$/.test(n);
+  // Tarballs count: host-plugin re-hosts them (hostPlugin.linux.ts). The
+  // architecture filter has to name every other one upstreams ship side by side
+  // (Dragonfly's release carries arm64, armhf, i686, riscv64 and x86_64).
+  if (platform === 'linux-x64') {
+    return (
+      /linux/.test(n) &&
+      !/arm|aarch64|i[3-6]86|riscv|ppc|x86(?!_64|-64)/.test(n) &&
+      /\.(zip|tar\.(gz|xz|bz2|zst)|tgz)$/.test(n)
+    );
+  }
   return false;
 }
 
