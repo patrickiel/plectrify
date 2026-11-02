@@ -14,8 +14,11 @@
 # and played through it. This is the only way a release is built: `pnpm
 # release` refuses to run outside GitHub Actions.
 #
-# Needs no secrets beyond the built-in GITHUB_TOKEN: everything published here
-# goes to this repository's GitHub release. Release notes are the commit bullets
+# Needs one secret beyond the built-in GITHUB_TOKEN: APT_SIGNING_KEY, which
+# signs the Linux update channel (scripts/aptRepository.ts). It lives in the
+# `apt-signing` environment, which only the linux job names and which asks a
+# reviewer to approve each run, so nothing else in the repository can read it.
+# Everything published here goes to this repository's GitHub release. Release notes are the commit bullets
 # (the claude CLI that drafts them locally is not on the runners); edit them on
 # GitHub before promoting. Each job also keeps its artifacts on the run for a
 # while, for installing before promotion.
@@ -100,6 +103,7 @@ jobs:
     needs: windows
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    environment: apt-signing
     steps:
       # Windows runners check out with core.autocrlf=true, and Prettier (like
       # every other tool here) expects the LF the repository stores.
@@ -114,6 +118,8 @@ jobs:
 
       - name: Release
         run: pnpm release --version ${{ inputs.version }}
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
 
       - uses: actions/upload-artifact@v4
         if: always()

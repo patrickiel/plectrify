@@ -88,7 +88,9 @@ Grab the latest installer from the
   It installs the app plus the VST3 and AU plugins.
 - **Linux (x86-64; Ubuntu 24.04, Debian 13 or newer):** install
   `Plectrify-linux-x64.deb`, e.g.
-  `sudo apt install ./Plectrify-linux-x64.deb`.
+  `sudo apt install ./Plectrify-linux-x64.deb`. It adds Plectrify's APT
+  source, so updates arrive through Software Updater / `sudo apt upgrade`
+  (from 0.1.7; older installs need the newest `.deb` installed once).
 
 > [!IMPORTANT]
 > The macOS build is signed but **not notarized**, so macOS blocks the

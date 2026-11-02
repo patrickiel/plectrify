@@ -21,6 +21,12 @@
  *                                Linux host searches
  *   /var/lib/Plectrify           created 1777 by postinst: the shared content
  *                                root (CatalogueInstaller::contentRootDirectory)
+ *   /etc/apt/sources.list.d/plectrify.sources
+ *   /usr/share/keyrings/plectrify-archive-keyring.asc
+ *                                the update channel: the APT repository this
+ *                                script publishes beside the .deb, so later
+ *                                versions arrive through Software Updater
+ *                                (aptRepository.ts explains why)
  *
  * A .deb rather than an AppImage or a tarball for the same reason the Mac ships
  * a pkg rather than a DMG: something has to create directories outside the
@@ -40,6 +46,10 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import {
+  APT_KEYRING_PATH, APT_PUBLIC_KEY, APT_REPOSITORY_FILES, APT_SOURCES_PATH, aptSourcesEntry,
+  signAptRelease, writeAptIndex,
+} from './aptRepository.ts';
 import {
   JUCE_PATCHED_FILES, JUCE_PATCHES, ROOT, TEST_TARGETS, bundledPluginsMissingFor, capture, fail,
   pnpm, run,
@@ -71,6 +81,15 @@ const PLATFORM = 'linux-x64';
 
 if (values['skip-tests'] && !values['no-upload']) {
   fail('--skip-tests cannot publish; pair it with --no-upload. Run the full suite before uploading.');
+}
+// Checked before the build rather than after it: a release that cannot sign
+// its repository cannot ship, and finding out takes seconds, not a build.
+if (!existsSync(APT_PUBLIC_KEY)) {
+  fail(`the APT public key is missing at ${APT_PUBLIC_KEY}; see RELEASING.md (Linux update channel).`);
+}
+const aptSigningKey = process.env['APT_SIGNING_KEY']?.trim() ?? '';
+if (!aptSigningKey && !values['no-upload']) {
+  fail('APT_SIGNING_KEY is not set: the Linux job must run in the apt-signing environment (RELEASING.md).');
 }
 
 // --- Version, tree, licence: the same gates as the other two pipelines ------
@@ -303,6 +322,14 @@ StartupWMClass=Plectrify
 );
 writeHicolorIcons(join(ROOT, 'Assets/PlectrifyIcon.png'), join(stage, 'usr/share/icons/hicolor'));
 
+// The update channel (aptRepository.ts): the repository's public key and the
+// sources entry pointing at it. Plain package files, so an upgrade refreshes
+// them and removing the package takes the channel with it.
+mkdirSync(join(stage, APT_KEYRING_PATH, '..'), { recursive: true });
+copyFileSync(APT_PUBLIC_KEY, join(stage, APT_KEYRING_PATH));
+mkdirSync(join(stage, APT_SOURCES_PATH, '..'), { recursive: true });
+writeFileSync(join(stage, APT_SOURCES_PATH), aptSourcesEntry(repoSlug));
+
 // --- Package metadata ---------------------------------------------------------
 const debian = join(stage, 'DEBIAN');
 mkdirSync(debian, { recursive: true });
@@ -358,6 +385,12 @@ const debHash = createHash('sha256').update(readFileSync(debPath)).digest('hex')
 const checksumPath = join(outputDir, `${debName}.sha256`);
 writeFileSync(checksumPath, `${debHash}  ${debName}\n`, 'ascii');
 
+// --- The APT repository index ---------------------------------------------------
+writeAptIndex(debPath, outputDir);
+const aptFiles = APT_REPOSITORY_FILES.map((name) => join(outputDir, name));
+if (aptSigningKey) signAptRelease(outputDir, aptSigningKey);
+else rmSync(join(outputDir, 'InRelease'), { force: true });
+
 const manifestPath = join(outputDir, 'release-manifest-linux.json');
 writeFileSync(
   manifestPath,
@@ -391,7 +424,7 @@ if (values['no-upload']) {
 // above refuses a promoted version.
 run(`Uploading to the ${tag} release`, 'gh', [
   'release', 'upload', tag,
-  debPath, checksumPath, manifestPath,
+  debPath, checksumPath, manifestPath, ...aptFiles,
   '--repo', repoSlug, '--clobber',
 ]);
 console.log(`\nPublished ${debName} on https://github.com/${repoSlug}/releases/tag/${tag}`);

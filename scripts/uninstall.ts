@@ -281,6 +281,9 @@ if (windows) {
     add(`/usr/share/icons/hicolor/${size}x${size}/apps/plectrify.png`, `icon (${size} px)`, true);
   }
   add('/usr/lib/vst3/Plectrify.vst3', 'VST3 plug-in', true);
+  // The update channel (scripts/aptRepository.ts).
+  add('/etc/apt/sources.list.d/plectrify.sources', 'APT update source', true);
+  add('/usr/share/keyrings/plectrify-archive-keyring.asc', 'APT signing key', true);
 
   // The dev loop's `--plugin` install.
   add(join(home, '.vst3', 'Plectrify.vst3'), 'VST3 plug-in (dev build)');
