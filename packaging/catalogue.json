@@ -172,7 +172,7 @@
     "by 'the other platform'."
   ],
   "schemaVersion": 4,
-  "revision": 22,
+  "revision": 23,
   "_noticesComment": [
     "Licence disclosure travels WITH the catalogue rather than shipping in the",
     "installer. If the offered plugins change, the notices change with them - no new",
@@ -786,7 +786,7 @@
       ],
       "name": "QDelay",
       "purpose": "Dual delay - ping-pong, tap, reverse, diffusion and feedback EQ",
-      "version": "1.1.2",
+      "version": "1.2.3",
       "licenseId": "GPL-3.0-only",
       "licenseUrl": "https://raw.githubusercontent.com/tiagolr/qdelay/master/LICENSE",
       "projectUrl": "https://github.com/tiagolr/qdelay",
@@ -796,19 +796,19 @@
       ],
       "assets": {
         "linux-x64": {
-          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.1.2/qdelay-linux-v1.1.2.zip",
-          "sha256": "3127713fd2aa9dabfc8dc52912f40be983c9c057c1cee0c090bdc50c98b1c101",
-          "downloadBytes": 5451971
+          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.2.3/qdelay-linux-v1.2.3.zip",
+          "sha256": "c79035db01c072ac338bc5be54cc456588b47307722f3c0667995815c266794b",
+          "downloadBytes": 5462344
         },
         "macos-arm64": {
-          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.1.2/qdelay-macos-v1.1.2.zip",
-          "sha256": "44a6e68f62c60f14b6ae3da64e93387af51682aadcd421b51e53078fb6642fcf",
-          "downloadBytes": 8795936
+          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.2.3/qdelay-macos-v1.2.3.zip",
+          "sha256": "0987616a8b0d5dc41961ca33cce4880b4e30006a44aaf917fe1870a3e8a604aa",
+          "downloadBytes": 8877154
         },
         "windows-x64": {
-          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.1.2/qdelay-win-v1.1.2.zip",
-          "sha256": "629bd9c82daf1f0b6653f47e0a9df7ae8b33f2db847e2bb6c02d7784aec8f9ae",
-          "downloadBytes": 3341979
+          "url": "https://github.com/tiagolr/qdelay/releases/download/v1.2.3/qdelay-win-v1.2.3.zip",
+          "sha256": "e2589d38dc99c5e91654afd5e95feca1609532f6752c4526387f62cf36134121",
+          "downloadBytes": 3346241
         }
       }
     },
