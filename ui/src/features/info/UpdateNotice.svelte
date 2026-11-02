@@ -18,9 +18,19 @@
   let { engine, dismissedVersion, onDismiss }: Props = $props();
 
   let installed = $state('');
+  // Linux installs carry Plectrify's APT repository (scripts/aptRepository.ts),
+  // so a new version is not downloaded there: it arrives with the system's own
+  // updates. Sending the player to a .deb would be worse than useless — Ubuntu's
+  // App Center opens it and says "Installed" with no way to upgrade.
+  let linux = $state(false);
   // onMount rather than $effect: the engine outlives this component, so there
   // is nothing to react to — the returned unsubscribe is the teardown.
-  onMount(() => engine.subscribeAppInfo((info) => (installed = info.version)));
+  onMount(() =>
+    engine.subscribeAppInfo((info) => {
+      installed = info.version;
+      linux = info.platform === 'linux';
+    }),
+  );
 
   // The one check, at start-up. The app is left running for hours at a time; a
   // release landing mid-session is not worth polling for, let alone
@@ -51,9 +61,15 @@
     <div>
       <strong class="font-semibold">Plectrify {latest} is available</strong>
       <p class="mt-[.15rem] opacity-75">You are running {installed}.</p>
+      {#if linux}
+        <p class="mt-[.3rem] opacity-75">
+          It installs with your system updates: open Software Updater, or run
+          <code class="font-mono">sudo apt update &amp;&amp; sudo apt upgrade</code>.
+        </p>
+      {/if}
       <div class="mt-[.6rem] flex items-center gap-3">
         <Button size="sm" class="gap-1.5" onclick={download}>
-          Download
+          {linux ? "What's new" : 'Download'}
           <ArrowSquareOutIcon size={12} />
         </Button>
         <button

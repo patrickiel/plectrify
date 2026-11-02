@@ -47,9 +47,44 @@ serving the previous one, since GitHub's "latest" skips pre-releases.
 
 ## Notes
 
-**Secrets.** Steps 2 and 4 need nothing but the built-in `GITHUB_TOKEN`. The
-catalogue signing key is unrelated to releases and stays offline
-(`packaging/README.md`).
+**Secrets.** Step 4 needs nothing but the built-in `GITHUB_TOKEN`; step 2's
+Linux job also needs `APT_SIGNING_KEY` (below), and waits for a reviewer to
+approve it. The catalogue signing key is unrelated to releases and stays
+offline (`packaging/README.md`).
+
+**Linux update channel.** The .deb installs an APT source pointing at
+`/releases/latest/download/`, and the Linux job publishes a signed flat
+repository there (`Packages`, `Release`, `InRelease`) beside the .deb — see
+`scripts/aptRepository.ts`. So, like the download buttons, installed copies
+upgrade when a release is promoted, and promotion refuses a release missing
+those files. The public key is committed at
+`Assets/linux/plectrify-archive-keyring.asc` and ships in every .deb; the
+private key is the `APT_SIGNING_KEY` secret of the `apt-signing` environment,
+which only the Linux job names. The script refuses a secret whose fingerprint
+is not the committed key's. One-time setup, on a trusted machine:
+
+```sh
+export GNUPGHOME="$(mktemp -d)"
+gpg --batch --passphrase '' --quick-gen-key \
+  'Plectrify Releases <hello@plectrify.com>' ed25519 sign never
+gpg --armor --export > Assets/linux/plectrify-archive-keyring.asc
+gpg --armor --export-secret-keys | gh secret set APT_SIGNING_KEY --env apt-signing
+gpg --armor --gen-revoke "$(gpg --list-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')" \
+  > plectrify-apt-revoke.asc   # store offline with a key backup, then:
+rm -rf "$GNUPGHOME"
+```
+
+The key in use (fingerprint `0AB4F0B83B78B13695FB8BA8BA3F4B1D8C03FF84`) was
+made this way; its backup and revocation certificate are kept offline beside
+the catalogue key, as `~/.plectrify/apt-signing.key` and
+`apt-signing-revoke.asc`.
+
+Create the environment first (Settings → Environments → `apt-signing`, add
+yourself as a required reviewer). The key never expires on purpose: every
+installed copy trusts this one key, so replacing it means shipping a .deb that
+carries the new key while the old one still signs, and only then switching.
+Never sign with a different key without that overlap — installs would stop
+updating with nothing on screen to say why.
 
 **Mac signing.** There is no Apple Developer Program membership, so the mac
 build is ad-hoc signed: the pkg is unsigned, not notarized, and without the

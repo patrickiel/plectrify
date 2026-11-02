@@ -35,6 +35,7 @@ import {
   probe, run, sha256File,
 } from './shared.ts';
 import { assertWindows, findCMake, findCTest, powershell } from './windows.ts';
+import { APT_REPOSITORY_FILES } from './aptRepository.ts';
 
 assertWindows('release.windows.ts');
 
@@ -153,6 +154,9 @@ if (values.promote) {
         'Plectrify-linux-x64.deb',
         'Plectrify-linux-x64.deb.sha256',
         'release-manifest-linux.json',
+        // The update channel (aptRepository.ts): a latest release without
+        // these drops every installed copy off it.
+        ...APT_REPOSITORY_FILES,
       ],
     },
   ];

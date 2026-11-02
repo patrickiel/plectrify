@@ -183,7 +183,17 @@ TONE3000 knob template and every patch work unchanged — keep both in step with
 upstream. The core is C++20 and compiled as an OBJECT library, because its
 architecture registry lives in static initialisers a static archive drops.
 The release is a .deb (`scripts/release.linux.ts`, which explains why not an
-AppImage), asset slug `linux-x64`.
+AppImage), asset slug `linux-x64`. **Updates come through APT, not by
+re-downloading**: Ubuntu's App Center opens a newer local .deb and shows
+"Installed" with no upgrade, so the package installs a deb822 source plus the
+public key, pointing at a signed flat repository the Linux release job uploads
+beside the .deb (`Packages`, `Release`, `InRelease` at
+`/releases/latest/download/`). Promotion is therefore the switch for Linux
+users exactly as for the download buttons, and refuses a release without those
+files. The signing key is the `APT_SIGNING_KEY` secret of the `apt-signing`
+environment; `scripts/aptRepository.ts` and RELEASING.md carry the reasoning
+and the rotation rule. The update notice tells Linux users to use Software
+Updater instead of offering a download.
 
 **Window chrome is per-platform.** Windows gets Plectrify's own title bar, the
 themed surface `WindowLookAndFeel` draws, with square caption buttons; macOS
