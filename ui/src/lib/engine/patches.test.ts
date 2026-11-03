@@ -7,9 +7,12 @@ import {
   legacyPatchIdsFrom,
   legacyPatchPath,
   mergePatches,
+  patchFitsModule,
+  patchFitsPlugin,
   patchIdsFrom,
   patchPath,
   patchTitleOverride,
+  pluginIdentityKey,
   sharedPatchIdsFrom,
   storedFromModule,
   toPatch,
@@ -41,8 +44,12 @@ describe('storedFromModule', () => {
     expect(storedFromModule(module(), ' Lead ').name).toBe('Lead');
   });
 
-  it('captures the plugin the mapping was built for', () => {
+  it('captures the plugin the mapping was built for, format included', () => {
     expect(storedFromModule(module(), 'x').pluginName).toBe('Mock Amp');
+    // Always written, never left to the default: the document says what it was
+    // saved from, so a reader with a different default cannot mistake it.
+    expect(storedFromModule(module(), 'x').pluginFormat).toBe('vst3');
+    expect(storedFromModule(module({ format: 'legacy' }), 'x').pluginFormat).toBe('legacy');
   });
 
   it('normalizes knob positions so a saved layout survives gaps', () => {
@@ -380,5 +387,38 @@ describe('mergePatches', () => {
     const user = [p('mine')];
     mergePatches(user, [toPatch('amps_jtm45', stored('JTM45'), true)]);
     expect(user).toEqual([p('mine')]);
+  });
+});
+
+describe('plugin identity (name + format)', () => {
+  const vst3 = { pluginName: 'Foo', pluginFormat: 'vst3' as const };
+  const legacy = { pluginName: 'Foo', pluginFormat: 'legacy' as const };
+  const unstated = { pluginName: 'Foo' };
+
+  it('tells a .dll Foo from a .vst3 Foo', () => {
+    expect(pluginIdentityKey('Foo', 'vst3')).not.toBe(pluginIdentityKey('Foo', 'legacy'));
+    expect(patchFitsModule(vst3, { name: 'Foo', format: 'legacy' })).toBe(false);
+    expect(patchFitsModule(legacy, { name: 'Foo', format: 'legacy' })).toBe(true);
+    expect(patchFitsPlugin(legacy, { name: 'Foo', format: 'vst3' })).toBe(false);
+    expect(patchFitsPlugin(legacy, { name: 'Foo', format: 'legacy' })).toBe(true);
+  });
+
+  it('reads a document or module with no format as VST3, which is all there was', () => {
+    expect(pluginIdentityKey('Foo', undefined)).toBe(pluginIdentityKey('Foo', 'vst3'));
+    expect(patchFitsModule(unstated, { name: 'Foo' })).toBe(true);
+    expect(patchFitsModule(unstated, { name: 'Foo', format: 'vst3' })).toBe(true);
+    expect(patchFitsModule(unstated, { name: 'Foo', format: 'legacy' })).toBe(false);
+    expect(patchFitsPlugin(vst3, { name: 'Foo' })).toBe(true);
+  });
+
+  it('still needs the name to match', () => {
+    expect(patchFitsModule(legacy, { name: 'Bar', format: 'legacy' })).toBe(false);
+  });
+
+  it('accepts only the two known formats in a stored document', () => {
+    const base = stored('x');
+    expect(isStoredPatch({ ...base, pluginFormat: 'legacy' })).toBe(true);
+    expect(isStoredPatch({ ...base, pluginFormat: 'vst2' })).toBe(false);
+    expect(toPatch('id', { ...base, pluginFormat: 'legacy' }).pluginFormat).toBe('legacy');
   });
 });

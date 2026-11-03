@@ -31,8 +31,8 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
-  JUCE_PATCHED_FILES, JUCE_PATCHES, ROOT, TEST_TARGETS, bundledPluginsFor, capture, fail, pnpm,
-  probe, run, sha256File,
+  JUCE_PATCHED_FILES, JUCE_PATCHES, ROOT, TEST_TARGETS, bundledPluginsFor, capture, fail,
+  fstCommitOf, pinnedDependencyCommit, pnpm, probe, run, sha256File,
 } from './shared.ts';
 import { assertWindows, findCMake, findCTest, powershell } from './windows.ts';
 import { APT_REPOSITORY_FILES } from './aptRepository.ts';
@@ -67,14 +67,9 @@ const stageRoot = join(artifactRoot, 'stage');
 const cacheRoot = join(ROOT, '.release-cache');
 const dependenciesManifest = join(ROOT, 'packaging', 'windows', 'dependencies.json');
 
-// One source for the JUCE pin (release.macos.ts reads it the same way), so
-// bumping the tag in CMakeLists.txt cannot leave a stale gate here.
-const juceCommit = (() => {
-  const cmake = readFileSync(join(ROOT, 'CMakeLists.txt'), 'utf8');
-  const match = /GIT_TAG\s+([0-9a-f]{40})/.exec(cmake);
-  if (!match) fail('could not read the pinned JUCE commit from CMakeLists.txt.');
-  return match[1]!;
-})();
+// One source for the JUCE pin (the mac and Linux scripts read it the same
+// way), so bumping the tag in CMakeLists.txt cannot leave a stale gate here.
+const juceCommit = pinnedDependencyCommit('JUCE');
 
 // --- Version + flag gates (fail in a second, not after a full build) --------
 const declaredVersion = readFileSync(join(ROOT, 'VERSION'), 'utf8').trim();
@@ -486,6 +481,10 @@ if (juceChanged.join('\n') !== JUCE_PATCHED_FILES.join('\n')) {
 if (capture('git', ['-C', juceSourcePath, 'ls-files', '--others', '--exclude-standard']).trim() !== '') {
   fail('the JUCE checkout contains untracked files; refusing to publish ambiguous corresponding source.');
 }
+// The other pinned tree compiled into the binary (null when the older plugin
+// format is switched off), checked the same way and shipped in the archive.
+const fstCommit = fstCommitOf(buildPath);
+const fstSourcePath = join(buildPath, '_deps', 'fst-src');
 
 // --- Stage ---------------------------------------------------------------------------------
 copyFileSync(executablePath, join(stagePath, 'Plectrify.exe'));
@@ -519,6 +518,7 @@ const sourceWorkPath = join(stagePath, 'source-package');
 const sourceBundlePath = join(sourceWorkPath, `Plectrify-${version}-source`);
 const plectrifySourcePath = join(sourceBundlePath, 'plectrify');
 const juceBundlePath = join(sourceBundlePath, 'juce');
+const fstBundlePath = join(sourceBundlePath, 'fst');
 const trackedSourceZip = join(sourceWorkPath, 'plectrify-tracked.zip');
 mkdirSync(plectrifySourcePath, { recursive: true });
 mkdirSync(juceBundlePath, { recursive: true });
@@ -531,6 +531,12 @@ cpSync(juceSourcePath, juceBundlePath, {
   recursive: true,
   filter: (src) => !/(^|[\\/])\.git([\\/]|$)/.test(relative(juceSourcePath, src)),
 });
+if (fstCommit !== null) {
+  cpSync(fstSourcePath, fstBundlePath, {
+    recursive: true,
+    filter: (src) => !/(^|[\\/])\.git([\\/]|$)/.test(relative(fstSourcePath, src)),
+  });
+}
 writeFileSync(
   join(sourceBundlePath, 'SOURCE_BUILD_INFO.txt'),
   `Plectrify corresponding source
@@ -538,6 +544,7 @@ Version: ${version}
 Plectrify commit: ${gitCommit}
 JUCE commit: ${juceCommit} (JUCE 8.0.14)
 JUCE patches (already applied to juce/): ${JUCE_PATCHES.map(({ patch }) => `plectrify/${patch}`).join(', ')}
+FST commit: ${fstCommit ?? 'not built in'}${fstCommit ? ' (FST 0.177.0, unpatched, in fst/)' : ''}
 Plectrify licence: GNU AGPL version 3 only
 `,
 );
@@ -571,8 +578,11 @@ THIRD-PARTY PLUGINS
 This offer covers Plectrify itself — the standalone application and the
 Plectrify VST3 plug-in the installer offers, which are two builds of the same
 AGPLv3 source in the archive above. (Both are built against Steinberg's VST3
-SDK as bundled with JUCE, which Plectrify uses under the SDK's GPLv3 option;
-see THIRD_PARTY_NOTICES.md.) Plectrify's installer also contains one
+SDK as bundled with JUCE, which Plectrify uses under the SDK's GPLv3 option,
+and against FST — Free Studio Technology, IEM Graz, GPLv3-or-later — the
+header-only interface through which older single-file plugins are hosted; its
+source is in the archive above under fst/. See
+THIRD_PARTY_NOTICES.md.) Plectrify's installer also contains one
 third-party VST3 plugin, Neural Amp Modeler, under the MIT licence; its
 source, the exact version, and where that binary came from are recorded in
 THIRD_PARTY_NOTICES.md. At your request Plectrify can also download further
@@ -606,6 +616,7 @@ Version: ${version}
 Git commit: ${gitCommit}
 Git branch: ${gitBranch}
 JUCE commit: ${juceCommit} (JUCE 8.0.14)
+FST commit: ${fstCommit ?? 'not built in'}
 Plectrify licence: GNU AGPL version 3 only
 Corresponding source: ${sourceArchiveName}
 `,
@@ -647,6 +658,7 @@ writeFileSync(
       sourceBranch: gitBranch,
       juceCommit,
       jucePatches: JUCE_PATCHES.map(({ patch }) => patch),
+      fstCommit,
       binaryLicense: 'AGPL-3.0-only',
       platform: 'windows-x64',
       installer: basename(installerPath),

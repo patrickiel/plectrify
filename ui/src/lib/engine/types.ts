@@ -1,5 +1,6 @@
 import type { Tone3000Provenance } from './tone3000';
 import type { ModuleIcon, ModuleStyleVariant, ModuleTexture } from './moduleAppearance';
+import type { PluginFormat } from './legacyPlugins';
 
 /** One parameter the hosted plugin exposes — the raw material the user maps
     knobs onto. Mirrors AudioProcessorParameter (index + name). */
@@ -62,9 +63,14 @@ export interface MappedParam {
     `availableParams`. */
 export interface RackModule {
   id: string;
-  /** The hosted plugin's own name — the module's stable identity, used to match
-      saved patches. */
+  /** The hosted plugin's own name — with `format`, the module's stable
+      identity, used to match saved patches. */
   name: string;
+  /** Which format hosts it (see legacyPlugins.ts). Part of the identity a patch
+      matches against: a vendor ships the same name as a `.vst3` and a `.dll`,
+      and one's saved state means nothing to the other. Absent reads as
+      `'vst3'`, which every module was before the field existed. */
+  format?: PluginFormat;
   /** The hosted plugin's own version string, as it reports it. Engine-supplied
       and diagnostics-only: which build of a plugin is loaded is exactly what a
       "works here, breaks there" report needs. Absent while a module's plugin is
@@ -256,6 +262,9 @@ export interface Patch {
   name: string;
   /** The plugin this mapping was built for (param indices are plugin-specific). */
   pluginName: string;
+  /** …and in which format: a `.dll` "Foo" and a `.vst3` "Foo" are different
+      plugins with different state. Absent means `'vst3'` — see `RackModule`. */
+  pluginFormat?: PluginFormat;
   /** The module card's look this patch was saved from — title override,
       accent colour, style variant, icon and texture, as on `RackModule`.
       Loading applies whichever of these the patch carries; unset means the
@@ -306,6 +315,10 @@ export interface PluginInfo {
   id: string;
   name: string;
   manufacturer?: string;
+  /** `'vst3'` or `'legacy'` (`.dll` / `.vst` / `.so`); absent reads as
+      `'vst3'`. The drawer badges a legacy plugin with its extension — never a
+      format name, see legacyPlugins.ts. */
+  format?: PluginFormat;
   /** The catalogue package this plugin was installed from, joined natively
       against the install markers under the managed plugin directory. Absent
       for plugins the user installed by any other means — which is most of
@@ -851,6 +864,11 @@ export interface AppBuildInfo {
       low-latency driver) and the diagnostics omit the fact entirely. */
   asio: boolean;
   vst3: boolean;
+  /** Whether the older single-file plugin format (`.dll` / `.vst` / `.so`) is
+      compiled in — a build option, PLECTRIFY_HOST_LEGACY_PLUGINS. Shown as the
+      extension, never as a format name (see legacyPlugins.ts). Absent from
+      builds predating the option. */
+  legacyPlugins?: boolean;
 }
 
 /** The machine the host is running on. Deliberately carries no computer name,
@@ -985,6 +1003,12 @@ export interface BlacklistedPlugin {
   /** File name without its extension. The scan never got far enough to learn
       the plugin's own name, so this is all there is to show. */
   name: string;
+  /** Present when the scan *did* load the file and found it cannot run here
+      — a 32-bit binary, or one built for another processor — in which case a
+      retry is pointless and the dialog shows the reason instead (see
+      skippedPlugins.ts). Absent for a blacklisted file, which a retry may
+      well bring back. */
+  reason?: string;
 }
 
 /** Which host-owned facilities exist around the engine. The engine pushes this

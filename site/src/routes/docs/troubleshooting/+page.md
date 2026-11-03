@@ -36,9 +36,14 @@ See [audio setup and latency](/docs/audio-setup) for how to choose a buffer prop
 
 ## A plugin does not show up after scanning
 
-- Plectrify hosts **VST3 only**. VST2, AU and CLAP are not loaded, so a VST2-era plugin with no
-  VST3 build will never appear.
-- Check the plugin actually installed to a standard VST3 folder for your OS.
+- Plectrify loads VST3 plugins (`.vst3`) and older plugins shipped as `.dll` files (`.vst`
+  bundles on macOS, `.so` on Linux). AU and CLAP plugins are not loaded.
+- Check the plugin actually installed to a standard plugin folder for your OS — or add the folder
+  it is in under **Settings → Plugin folders**.
+- 32-bit plugins cannot load into a 64-bit app. The drawer's **skipped** link lists which ones
+  were found and why they cannot run; on Windows a bridge such as jBridge can load them.
+- A Windows `.dll` does not run on Linux without a bridge such as yabridge, and a plugin built for
+  Intel Macs only does not load on Apple Silicon.
 - Re-run the scan. Results are cached, so a plugin installed after the last scan is not known
   until you scan again.
 
@@ -53,8 +58,9 @@ again.
 
 ## A plugin's editor looks wrong or half-size
 
-Plugin windows on high-DPI displays are a genuine mess across the whole VST3 ecosystem, and some
-older plugin frameworks read the display scale exactly once while building their UI. Plectrify
+Plugin windows on high-DPI displays are a genuine mess across the whole plugin ecosystem, and some
+older plugin frameworks read the display scale exactly once while building their UI. The oldest
+`.dll` plugins have no high-DPI support at all and draw at 1:1 on a scaled display. Plectrify
 carries fixes for the two common cases: a plugin drawing at half size on a scaled Windows
 display, and a plugin drawing into the top-left quarter of its window on a Retina Mac.
 

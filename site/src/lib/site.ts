@@ -26,7 +26,7 @@ export const TAGLINE = 'Your pedalboard, without the DAW.';
  * padding. The TONE3000 sentence that completes the paragraph lives in
  * +page.svelte because it ends in their wordmark, which is markup.
  */
-export const IDENTITY = 'Chain your VST plugins and play.';
+export const IDENTITY = 'Chain your plugins and play.';
 
 /**
  * The `<meta name="description">` text, which is a different job from LEAD: it

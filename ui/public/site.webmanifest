@@ -1,7 +1,7 @@
 {
   "name": "Plectrify",
   "short_name": "Plectrify",
-  "description": "Standalone guitar-rig VST3 host",
+  "description": "Standalone guitar-rig plugin host",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#020305",

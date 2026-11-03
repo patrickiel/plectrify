@@ -52,7 +52,7 @@ import {
 } from './aptRepository.ts';
 import {
   JUCE_PATCHED_FILES, JUCE_PATCHES, ROOT, TEST_TARGETS, bundledPluginsMissingFor, capture, fail,
-  pnpm, run,
+  fstCommitOf, pinnedDependencyCommit, pnpm, run,
 } from './shared.ts';
 import {
   IN_TREE_PLUGINS,
@@ -205,12 +205,7 @@ if (!existsSync(join(vst3Built, 'Contents/x86_64-linux/Plectrify.so'))) {
 }
 
 // --- The published source must be the exact patched tree built from --------
-const juceCommitPin = (() => {
-  const cmake = readFileSync(join(ROOT, 'CMakeLists.txt'), 'utf8');
-  const match = /GIT_TAG\s+([0-9a-f]{40})/i.exec(cmake);
-  if (!match) fail('could not read the pinned JUCE commit from CMakeLists.txt.');
-  return match[1]!.toLowerCase();
-})();
+const juceCommitPin = pinnedDependencyCommit('JUCE');
 const juceSource = join(buildDir(CONFIG), '_deps/juce-src');
 const juceCommit = capture('git', ['-C', juceSource, 'rev-parse', 'HEAD']).trim().toLowerCase();
 if (juceCommit !== juceCommitPin) {
@@ -226,6 +221,9 @@ const juceChanged = capture('git', ['-C', juceSource, 'diff', '--name-only'])
 if (juceChanged.join('\n') !== JUCE_PATCHED_FILES.join('\n')) {
   fail('the JUCE checkout contains changes other than Plectrify\'s declared patches.');
 }
+// The other pinned tree compiled into the binary (null when the older plugin
+// format is switched off); the Windows script ships it in the source archive.
+const fstCommit = fstCommitOf(buildDir(CONFIG));
 if (capture('git', ['-C', juceSource, 'ls-files', '--others', '--exclude-standard']).trim() !== '') {
   fail('the JUCE checkout contains untracked files; refusing to publish ambiguous corresponding source.');
 }
@@ -270,9 +268,11 @@ ${url}
 ${sourceArchiveHash ? `\nSHA-256: ${sourceArchiveHash}\n` : ''}
 This offer covers Plectrify itself — the standalone application and the
 Plectrify VST3 plug-in this package installs, which are builds of the same
-AGPLv3 source. Both host VST3 plug-ins and are built against Steinberg's VST3
-SDK as bundled with JUCE, which Plectrify uses under the SDK's GPLv3 option; see
-THIRD_PARTY_NOTICES.md.
+AGPLv3 source. Both are built against Steinberg's VST3 SDK as bundled with
+JUCE, which Plectrify uses under the SDK's GPLv3 option, and against FST (Free
+Studio Technology, IEM Graz, GPLv3-or-later), the header-only interface through
+which older single-file plugins are hosted; FST's source is in the archive above
+under fst/. See THIRD_PARTY_NOTICES.md.
 
 The Neural Amp Modeler this package ships is Plectrify's own Linux build of that
 project's MIT-licensed DSP; its source is part of the archive above
@@ -287,6 +287,7 @@ Version: ${version}
 Git commit: ${commit}
 Git branch: ${branch}
 JUCE commit: ${juceCommit} (JUCE 8.0.14)
+FST commit: ${fstCommit ?? 'not built in'}
 Plectrify licence: GNU AGPL version 3 only
 Corresponding source: Plectrify-${version}-source.zip
 `;
@@ -312,7 +313,7 @@ writeFileSync(
 Type=Application
 Name=Plectrify
 GenericName=Guitar Rig
-Comment=Play your guitar through a chain of VST3 amps and effects
+Comment=Play your guitar through a chain of plugin amps and effects
 Exec=/opt/plectrify/Plectrify
 Icon=plectrify
 Terminal=false
@@ -355,8 +356,8 @@ Homepage: https://plectrify.com
 Installed-Size: ${installedKb}
 Depends: libwebkit2gtk-4.1-0, libgtk-3-0t64 | libgtk-3-0, libasound2t64 | libasound2, libcurl4t64 | libcurl4, libfreetype6, libfontconfig1, libx11-6, libxext6, libxrandr2, libxinerama1, libxcursor1
 Recommends: pipewire-jack | libjack-jackd2-0
-Description: Guitar-rig host for VST3 amps and effects
- Plectrify runs a chain of VST3 plugins live from a guitar input, with
+Description: Guitar-rig host for plugin amps and effects
+ Plectrify runs a chain of audio plugins live from a guitar input, with
  knob mapping, rigs, a tuner and TONE3000 captures. Installs the
  standalone application and the Plectrify VST3 plug-in.
 `,
@@ -402,6 +403,7 @@ writeFileSync(
       sourceBranch: branch,
       juceCommit,
       jucePatches: JUCE_PATCHES.map(({ patch }) => patch),
+      fstCommit,
       binaryLicense: 'AGPL-3.0-only',
       platform: PLATFORM,
       installer: debName,

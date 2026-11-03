@@ -1,10 +1,23 @@
 #include "PluginManager.h"
 #include "AppPaths.h"
+#include "PluginBinary.h"
 
 PluginManager::PluginManager() : juce::Thread ("Plectrify plugin scan")
 {
     formatManager.addFormat (std::make_unique<juce::VST3PluginFormat>());
+
+   #if JUCE_PLUGINHOST_VST
+    // The VST2-era format (.dll / .vst / .so), compiled against the FST header
+    // — see CMakeLists.txt for why that is possible and the rules that come
+    // with it. JUCE's own class: the scan, the cache, the blacklist and
+    // instantiation below know nothing format-specific, and a description's
+    // identifier string embeds the format name, so a .dll and a .vst3 of the
+    // same plugin are two entries that never stand in for each other.
+    formatManager.addFormat (std::make_unique<juce::VSTPluginFormat>());
+   #endif
+
     loadFromSettings();
+    loadUserFolders();
 
     // Uninstalled plugins drop out of the picker at launch, not only after
     // the user happens to rescan.
@@ -76,7 +89,107 @@ juce::FileSearchPath PluginManager::getDefaultSearchPaths() const
     if (const auto bundled = getBundledPluginDirectory(); bundled.isDirectory())
         paths.addIfNotAlreadyThere (bundled);
 
+    // The user's own folders. One that has gone (an unplugged drive) is simply
+    // not there to scan; the list keeps it, since the drive may come back.
+    for (const auto& folder : userFolders)
+        if (juce::File (folder).isDirectory())
+            paths.addIfNotAlreadyThere (folder);
+
     return paths;
+}
+
+juce::File PluginManager::getUserFoldersFile()
+{
+    return plectrify::appDataDir().getChildFile ("plugin_folders.json");
+}
+
+juce::StringArray PluginManager::getUserFolders() const
+{
+    return userFolders;
+}
+
+bool PluginManager::addUserFolder (const juce::File& folder)
+{
+    if (! folder.isDirectory() || userFolders.contains (folder.getFullPathName()))
+        return false;
+
+    userFolders.add (folder.getFullPathName());
+    saveUserFolders();
+    return true;
+}
+
+bool PluginManager::removeUserFolder (const juce::File& folder)
+{
+    if (isScanning() || ! userFolders.contains (folder.getFullPathName()))
+        return false;
+
+    userFolders.removeString (folder.getFullPathName());
+    saveUserFolders();
+
+    // Forget what was found there. The default locations and the other user
+    // folders are still searched, so anything that also lives under one of
+    // those is found again by the next scan — this only has to be right about
+    // what is no longer searched anywhere.
+    bool listChanged = false;
+    for (const auto& type : knownPlugins.getTypes())
+    {
+        if (juce::File::createFileWithoutCheckingPath (type.fileOrIdentifier).isAChildOf (folder))
+        {
+            knownPlugins.removeType (type);
+            listChanged = true;
+        }
+    }
+    for (const auto& blacklisted : knownPlugins.getBlacklistedFiles()) // copy; the loop mutates the list
+    {
+        if (juce::File::createFileWithoutCheckingPath (blacklisted).isAChildOf (folder))
+        {
+            knownPlugins.removeFromBlacklist (blacklisted);
+            listChanged = true;
+        }
+    }
+    {
+        const juce::ScopedLock lock (unloadableLock);
+        for (int i = unloadable.size(); --i >= 0;)
+        {
+            if (juce::File::createFileWithoutCheckingPath (unloadable.getReference (i).path).isAChildOf (folder))
+            {
+                unloadable.remove (i);
+                listChanged = true;
+            }
+        }
+    }
+
+    if (listChanged)
+        saveToSettings();
+
+    return true;
+}
+
+void PluginManager::loadUserFolders()
+{
+    userFolders.clear();
+
+    const auto file = getUserFoldersFile();
+    if (! file.existsAsFile())
+        return;
+
+    // A plain JSON array of absolute paths. Anything else in the file is
+    // ignored rather than fatal: this is a convenience list, not a document.
+    if (auto* list = juce::JSON::parse (file).getArray())
+        for (const auto& entry : *list)
+            if (entry.isString() && juce::File::isAbsolutePath (entry.toString()))
+                userFolders.addIfNotAlreadyThere (entry.toString());
+}
+
+void PluginManager::saveUserFolders() const
+{
+    juce::Array<juce::var> list;
+    for (const auto& folder : userFolders)
+        list.add (folder);
+
+    const auto file = getUserFoldersFile();
+    file.getParentDirectory().createDirectory();
+    file.replaceWithText (juce::JSON::toString (juce::var (list)));
 }
 
 bool PluginManager::scanAndAddPluginsAsync (const juce::FileSearchPath& paths,
@@ -109,6 +222,7 @@ void PluginManager::run()
     pedal.deleteFile();
 
     pruneMissingPlugins();
+    pruneFilesInsideBundles();
 
     auto lastCount = knownPlugins.getNumTypes();
 
@@ -118,6 +232,7 @@ void PluginManager::run()
                                               /*recursive*/ true,
                                               pedal,
                                               /*allowAsync*/ false);
+        scanner.setFilesOrIdentifiersToScan (filesToScan (*format));
 
         juce::String pluginBeingScanned;
         // Persist whenever a file adds plugins, so those found before a
@@ -138,15 +253,115 @@ void PluginManager::run()
         }
     }
 
+    if (! threadShouldExit())
+        recordUnloadablePlugins();
+
     saveToSettings();
     scanning.store (false); // before the callback, so a finish-triggered rescan can start
     if (finishedCallback != nullptr)
         finishedCallback();
 }
 
+bool PluginManager::isInsideAnotherFormatsBundle (const juce::String& path)
+{
+    // Walk the parents, not the file itself: the format's own bundle (a .vst
+    // on macOS) is fine, a binary *inside* some other format's bundle is not.
+    for (auto dir = juce::File::createFileWithoutCheckingPath (path).getParentDirectory();
+         dir.getFullPathName().isNotEmpty() && dir != dir.getParentDirectory();
+         dir = dir.getParentDirectory())
+    {
+        if (dir.hasFileExtension (".vst3") || dir.hasFileExtension (".component"))
+            return true;
+    }
+    return false;
+}
+
+juce::StringArray PluginManager::filesToScan (juce::AudioPluginFormat& format) const
+{
+    auto files = format.searchPathsForPlugins (pathsToScan, /*recursive*/ true, /*allowAsync*/ false);
+
+    // The older format's search is recursive and takes every .so (.dll) it
+    // finds, so on Linux it descended into each VST3 bundle and offered the
+    // VST3's own binary as a plugin of its kind — loading it a second time,
+    // under another format's entry point. The bundled NAM inside an installed
+    // Plectrify.vst3 is what crashed a scan and landed on the blacklist. A
+    // binary inside a .vst3 (or AU .component) bundle belongs to that bundle.
+    if (format.getName() != "VST3")
+        for (int i = files.size(); --i >= 0;)
+            if (isInsideAnotherFormatsBundle (files[i]))
+                files.remove (i);
+
+    return files;
+}
+
+void PluginManager::pruneFilesInsideBundles()
+{
+    // What scans before that rule left behind: known types and blacklist
+    // entries of the older format that name a binary inside a bundle.
+    for (const auto& type : knownPlugins.getTypes())
+        if (type.pluginFormatName != "VST3" && isInsideAnotherFormatsBundle (type.fileOrIdentifier))
+            knownPlugins.removeType (type);
+
+    for (const auto& blacklisted : knownPlugins.getBlacklistedFiles())
+        if (! blacklisted.endsWithIgnoreCase (".vst3") && isInsideAnotherFormatsBundle (blacklisted))
+            knownPlugins.removeFromBlacklist (blacklisted);
+}
+
 juce::StringArray PluginManager::getBlacklistedPlugins() const
 {
     return knownPlugins.getBlacklistedFiles();
+}
+
+juce::Array<PluginManager::UnloadablePlugin> PluginManager::getUnloadablePlugins() const
+{
+    const juce::ScopedLock lock (unloadableLock);
+    return unloadable;
+}
+
+void PluginManager::recordUnloadablePlugins()
+{
+    // The same walk the scanner made, so this sees exactly the files it saw:
+    // the format's own filter decides what counts as a plugin file (.vst3
+    // bundles; .dll / .vst / .so for the older format), and anything that
+    // filter admitted but the known list does not hold was found and not
+    // loaded. The blacklist is the other reason a file yields no type, and
+    // has its own row.
+    juce::Array<UnloadablePlugin> fresh;
+    const auto blacklist = knownPlugins.getBlacklistedFiles();
+
+    for (auto* format : formatManager.getFormats())
+    {
+        for (const auto& id : filesToScan (*format))
+        {
+            if (threadShouldExit())
+                return;
+            if (blacklist.contains (id) || knownPlugins.getTypeForFile (id) != nullptr)
+                continue;
+
+            const auto reason = plectrify::pluginbinary::whyUnloadable (juce::File (id));
+            if (reason.isNotEmpty())
+                fresh.add ({ id, reason });
+        }
+    }
+
+    const juce::ScopedLock lock (unloadableLock);
+
+    // Entries under the folders this scan covered are replaced wholesale — a
+    // file since fixed or removed drops out. A narrow scan (one folder) leaves
+    // the rest standing, exactly as it leaves the rest of the known list.
+    for (int i = unloadable.size(); --i >= 0;)
+    {
+        const auto file = juce::File::createFileWithoutCheckingPath (unloadable.getReference (i).path);
+        for (int d = 0; d < pathsToScan.getNumPaths(); ++d)
+        {
+            if (file.isAChildOf (pathsToScan[d]))
+            {
+                unloadable.remove (i);
+                break;
+            }
+        }
+    }
+    unloadable.addArray (fresh);
 }
 
 int PluginManager::unblacklistPlugins (const juce::StringArray& files)
@@ -257,6 +472,18 @@ void PluginManager::saveToSettings()
 {
     if (auto xml = knownPlugins.createXml())
     {
+        {
+            // Beside JUCE's PLUGIN and BLACKLISTED children, in a tag its
+            // reader ignores (recreateFromXml skips what loadFromXml rejects).
+            const juce::ScopedLock lock (unloadableLock);
+            for (const auto& entry : unloadable)
+            {
+                auto* e = xml->createNewChildElement ("UNLOADABLE");
+                e->setAttribute ("path", entry.path);
+                e->setAttribute ("reason", entry.reason);
+            }
+        }
+
         auto file = getCacheFile();
         file.getParentDirectory().createDirectory();
 
@@ -283,7 +510,15 @@ void PluginManager::loadFromSettings()
         return;
 
     if (auto xml = juce::XmlDocument::parse (file))
+    {
         knownPlugins.recreateFromXml (*xml);
+
+        const juce::ScopedLock lock (unloadableLock);
+        unloadable.clear();
+        for (auto* e : xml->getChildWithTagNameIterator ("UNLOADABLE"))
+            if (e->getStringAttribute ("path").isNotEmpty() && e->getStringAttribute ("reason").isNotEmpty())
+                unloadable.add ({ e->getStringAttribute ("path"), e->getStringAttribute ("reason") });
+    }
 }
 
 bool PluginManager::pruneMissingPlugins()
@@ -309,6 +544,19 @@ bool PluginManager::pruneMissingPlugins()
         {
             knownPlugins.removeFromBlacklist (blacklisted);
             removedAny = true;
+        }
+    }
+
+    {
+        const juce::ScopedLock lock (unloadableLock);
+        for (int i = unloadable.size(); --i >= 0;)
+        {
+            const auto& path = unloadable.getReference (i).path;
+            if (juce::File::isAbsolutePath (path) && ! juce::File (path).exists())
+            {
+                unloadable.remove (i);
+                removedAny = true;
+            }
         }
     }
 

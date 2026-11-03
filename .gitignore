@@ -37,3 +37,6 @@ Thumbs.db
 # Chromium/WebView2 writes this beside the working directory when its crash
 # handler cannot register; it is noise, not a log of ours.
 /debug.log
+
+# Personal outreach drafts — kept local, not published
+/PROMOTION.md

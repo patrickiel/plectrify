@@ -8,6 +8,7 @@ import {
 } from '../../lib/engine/drawerGroups';
 import type { CataloguePackage, CategoryNode } from '../../lib/engine/catalogue';
 import type { Patch, PluginInfo } from '../../lib/engine/types';
+import { pluginFormatOf } from '../../lib/engine/legacyPlugins';
 import { TONE3000_HEADING } from '../../lib/engine/tone3000';
 
 /**
@@ -137,10 +138,37 @@ function matchPatch(patch: Patch, q: string): boolean {
   );
 }
 
-function matchPlugin(plugin: PluginInfo, q: string): boolean {
-  return (
-    plugin.name.toLowerCase().includes(q) || (plugin.manufacturer ?? '').toLowerCase().includes(q)
-  );
+//
+// A plugin also answers to its file type, so typing ".so" (or ".dll", or
+// "vst3") narrows the list by format without the toggle. Matched as a whole
+// token — "so" alone must not pull every plugin whose type happens to be .so
+// into a search for "soulforce".
+function matchPlugin(plugin: PluginInfo, q: string, legacyExtension?: string): boolean {
+  if (
+    plugin.name.toLowerCase().includes(q) ||
+    (plugin.manufacturer ?? '').toLowerCase().includes(q)
+  )
+    return true;
+  const type =
+    pluginFormatOf(plugin.format) === 'legacy' ? legacyExtension?.toLowerCase() : '.vst3';
+  return type !== undefined && (q === type || q === type.slice(1));
+}
+
+/** Which plugin format the drawer shows. `legacy` is the older single-file
+    format, shown to the user only as its file extension (legacyPlugins.ts). */
+export type DrawerFormatFilter = 'all' | 'vst3' | 'legacy';
+
+/** Whether the library holds both formats — the only case the format toggle
+    has anything to choose between, and so the only case it is shown. */
+export function hasBothFormats(plugins: readonly PluginInfo[]): boolean {
+  let vst3 = false;
+  let legacy = false;
+  for (const p of plugins) {
+    if (pluginFormatOf(p.format) === 'legacy') legacy = true;
+    else vst3 = true;
+    if (vst3 && legacy) return true;
+  }
+  return false;
 }
 
 /** The drawer's whole tree for one set of lists and one filter string. */
@@ -149,10 +177,20 @@ export function buildDrawerTree(input: {
   plugins: readonly PluginInfo[];
   packages: readonly CataloguePackage[];
   filter: string;
+  /** Narrows the plugins section — and only it: patches are found by what
+      they sound like, not by the file type of the plugin under them. */
+  format?: DrawerFormatFilter;
+  /** The older format's extension on this OS, for the text filter. */
+  legacyExtension?: string;
 }): DrawerTree {
   const q = input.filter.trim().toLowerCase();
+  const format = input.format ?? 'all';
   const patches = q ? input.patches.filter((p) => matchPatch(p, q)) : input.patches;
-  const plugins = q ? input.plugins.filter((p) => matchPlugin(p, q)) : input.plugins;
+  const plugins = input.plugins.filter(
+    (p) =>
+      (format === 'all' || pluginFormatOf(p.format) === format) &&
+      (!q || matchPlugin(p, q, input.legacyExtension)),
+  );
 
   const roots = groupPatches(patches, input.packages)
     .map(toPatchNode)

@@ -7,6 +7,7 @@
   import { prefersReducedMotion } from 'svelte/motion';
   import { fade, slide } from 'svelte/transition';
   import { deviceScale, snapThickness } from '../../lib/pixelSnap';
+  import type { PluginPlatform } from '../../lib/engine/legacyPlugins';
   import { devicePixelRatio, trackDevicePixelRatio } from '../../lib/devicePixels.svelte';
   import {
     FAN_COLUMN_PX,
@@ -53,6 +54,7 @@
   import { normalizePositions } from '../../lib/engine/knobLayout';
   import type { CatalogueState } from '../../lib/engine/catalogue';
   import { patchGroups, type PatchGroup } from '../../lib/engine/drawerGroups';
+  import { patchFitsPlugin, pluginIdentityKey } from '../../lib/engine/patches';
   import { isPress, matchMidi, stepIndex, triggerOf } from '../../lib/engine/midi';
   import { playOrder, stepSong } from '../../lib/engine/songs';
   import {
@@ -106,6 +108,11 @@
     /** Plugin files the scanner skips (engine-owned, mirrored in App); the
         blacklist dialog here acts on it. */
     blacklistedPlugins: BlacklistedPlugin[];
+    /** The legacy plugin format's file extension on this platform — the badge
+        a legacy plugin's tile and module carry (see legacyPlugins.ts). */
+    legacyExtension?: string;
+    /** Which OS this is, for the Skipped plugins dialog's reason wording. */
+    platform?: PluginPlatform;
     /** Open the TONE3000 browser. `moduleId` names the module a chosen tone
         should replace in place; absent means it becomes a drawer patch. */
     onBrowseTone3000: (moduleId?: string, insertAt?: ModuleMoveTarget) => void;
@@ -166,6 +173,8 @@
     toneDirty,
     pluginScan,
     blacklistedPlugins,
+    legacyExtension,
+    platform,
     onBrowseTone3000,
     missingCaptures,
     onRepairPatch,
@@ -220,15 +229,18 @@
       per plugin rather than per card: several modules can host the same
       plugin, and they all get the same answer. */
   const patchSectionsByPlugin = $derived.by(() => {
+    // Keyed by plugin identity (name + format, see pluginIdentityKey): a
+    // `.dll` and a `.vst3` of one name are two plugins with two sets of patches.
     const byPlugin = new Map<string, Patch[]>();
     for (const patch of patches) {
-      const list = byPlugin.get(patch.pluginName);
+      const key = pluginIdentityKey(patch.pluginName, patch.pluginFormat);
+      const list = byPlugin.get(key);
       if (list) list.push(patch);
-      else byPlugin.set(patch.pluginName, [patch]);
+      else byPlugin.set(key, [patch]);
     }
     const out = new Map<string, PatchGroup[]>();
-    for (const [pluginName, list] of byPlugin)
-      out.set(pluginName, patchGroups(list, catalogue.items, appSettings.drawerPatchOrder));
+    for (const [key, list] of byPlugin)
+      out.set(key, patchGroups(list, catalogue.items, appSettings.drawerPatchOrder));
     return out;
   });
 
@@ -869,7 +881,10 @@
       return;
     }
 
-    const samePlugin = plugins.find((p) => p.id === drag.pluginId)?.name === m.name;
+    const dragged = plugins.find((p) => p.id === drag.pluginId);
+    const samePlugin =
+      dragged !== undefined &&
+      patchFitsPlugin({ pluginName: m.name, pluginFormat: m.format }, dragged);
     if (samePlugin && drag.patchId !== undefined) {
       // Nothing about the plugin changes, so nothing needs re-instantiating:
       // this is a patch load, which is instant and keeps the module's id — and
@@ -1589,6 +1604,7 @@
               <ModuleCard
                 module={m}
                 editing={editMode}
+                {legacyExtension}
                 onBypass={(b) => toggleBypass(m, b)}
                 bypassPending={bypassPending(m)}
                 moduleDragging={draggingModuleId === m.id}
@@ -1618,7 +1634,7 @@
                 onModuleMidiLearnToggle={() =>
                   toggleContentLearn({ kind: 'module', moduleId: m.id })}
                 onModuleMidiClear={() => engine.setModuleMidi(m.id, null)}
-                patchSections={patchSectionsByPlugin.get(m.name) ?? []}
+                patchSections={patchSectionsByPlugin.get(pluginIdentityKey(m.name, m.format)) ?? []}
                 onSavePatch={async (name) => {
                   // Show the freshly saved patch where it landed: the drawer
                   // scrolls to the tile and pulses it (same reveal a TONE3000
@@ -1910,7 +1926,7 @@
                         </Button>
                         <span
                           class="text-[.65rem] text-[color-mix(in_srgb,var(--color-muted)_78%,transparent)]"
-                          >No VST3 plugins found</span
+                          >No plugins found</span
                         >
                         <!-- With no plugins at all, scanning finds nothing and the
                          rack is a dead end. This is the way out: the Packages
@@ -2138,6 +2154,7 @@
               {catalogue}
               {pluginScan}
               blacklisted={blacklistedPlugins}
+              {legacyExtension}
               height={appSettings.drawerHeight}
               onSetHeight={(px) => onSetAppSettings({ drawerHeight: px })}
               collapsed={appSettings.drawerCollapsed}
@@ -2252,7 +2269,7 @@
   {#if scanDialogOpen}
     <TaskDialog
       state={pluginScan.status === 'complete' ? 'complete' : 'working'}
-      title={pluginScan.status === 'complete' ? 'Scan complete' : 'Scanning VST3 plugins'}
+      title={pluginScan.status === 'complete' ? 'Scan complete' : 'Scanning plugins'}
       description={pluginScan.status === 'complete'
         ? `${pluginScan.pluginCount} ${pluginScan.pluginCount === 1 ? 'plugin is' : 'plugins are'} ready to use.`
         : 'Checking the system plugin folders. Some plugins may take a moment to load.'}
@@ -2266,6 +2283,7 @@
     <BlacklistDialog
       entries={blacklistedPlugins}
       scanning={pluginScan.status === 'scanning'}
+      {platform}
       onRetry={retryBlacklisted}
       onClose={() => (blacklistOpen = false)}
     />

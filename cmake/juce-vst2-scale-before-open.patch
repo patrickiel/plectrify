@@ -1,0 +1,32 @@
+Tell a hosted plugin of the older format its display scale before it opens.
+
+JUCE sends the scale to a plugin that declares supportsViewDpiScaling through
+effVendorSpecific('PreS', 'AeCs'), but nativeScaleFactor is written only by
+NativeScaleFactorNotifier, which reports through MessageManager::callAsync.
+openPluginWindow() therefore sends 1.0 right before effEditOpen, and the real
+factor arrives a message loop after the editor was built. DPF reads the scale
+once, while constructing its UI, so its plugins drew at half size on a 200%
+display for the life of the window. The fix reads the peer's scale before
+opening — the twin of juce-vst3-scale-before-attach.patch for VST3.
+diff --git a/modules/juce_audio_processors/format_types/juce_VSTPluginFormat.cpp b/modules/juce_audio_processors/format_types/juce_VSTPluginFormat.cpp
+index 8c175221c..914ed3283 100644
+--- a/modules/juce_audio_processors/format_types/juce_VSTPluginFormat.cpp
++++ b/modules/juce_audio_processors/format_types/juce_VSTPluginFormat.cpp
+@@ -401,6 +401,17 @@ private:
+ 
+         pluginRespondsToDPIChanges = plugin.pluginCanDo ("supportsViewDpiScaling") > 0;
+ 
++        // PLECTRIFY_VST2_SCALE_BEFORE_OPEN: take the display scale straight from
++        // the peer before effEditOpen, for plugins that read it only while
++        // building their UI. nativeScaleFactor is otherwise written by
++        // NativeScaleFactorNotifier alone, which reports through callAsync and
++        // so lands a message loop after the editor has opened against the 1.0
++        // placeholder; DPF and other frameworks that apply the scale once then
++        // draw at 1:1 for the life of the window. Same fix as the VST3 one
++        // (juce-vst3-scale-before-attach.patch).
++        if (auto* peer = getTopLevelComponent()->getPeer())
++            nativeScaleFactor = (float) peer->getPlatformScaleFactor();
++
+         setContentScaleFactor();
+ 
+         Vst2::ERect* rect = nullptr;

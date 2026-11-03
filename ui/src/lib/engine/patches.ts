@@ -1,4 +1,5 @@
-import type { Patch, RackModule } from './types';
+import type { Patch, PluginInfo, RackModule } from './types';
+import { pluginFormatOf, type PluginFormat } from './legacyPlugins';
 import type { ModuleIcon, ModuleStyleVariant, ModuleTexture } from './moduleAppearance';
 import { asModuleIcon, asModuleTexture, asStyleVariant } from './moduleAppearance';
 import { normalizePositions } from './knobLayout';
@@ -43,6 +44,9 @@ const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 export interface StoredPatch {
   name: string;
   pluginName: string;
+  /** The plugin's format; absent in every document written before the legacy
+      format existed, all of which were `'vst3'`. See `Patch.pluginFormat`. */
+  pluginFormat?: PluginFormat;
   /** The card title the patch asks for, plus the card's look at capture time —
       accent colour, style variant, icon and texture. A patch is what gives a
       module its identity, and half of that identity is what the card says and
@@ -163,6 +167,7 @@ export function storedFromModule(module: RackModule, name: string): StoredPatch 
   return {
     name: resolved,
     pluginName: module.name,
+    pluginFormat: pluginFormatOf(module.format),
     displayName: resolved,
     color: module.color,
     styleVariant: module.styleVariant,
@@ -178,11 +183,47 @@ export function storedFromModule(module: RackModule, name: string): StoredPatch 
   };
 }
 
+/** The identity a patch is matched against: the plugin's name *and* format.
+    The name alone was the key until the legacy format arrived, and a vendor
+    that ships "Foo" as both a `.vst3` and a `.dll` has two plugins called Foo
+    whose saved state is not interchangeable — feeding one the other's blob is
+    at best ignored and at worst a crash. One function so every match in the
+    app (card menu, drawer tile, drop target, tone load) agrees, and so the
+    pre-field documents (`format` absent → `'vst3'`) read the same everywhere. */
+export function pluginIdentityKey(name: string, format: PluginFormat | undefined): string {
+  return `${pluginFormatOf(format)}\u0000${name}`;
+}
+
+/** Whether `patch` was built for the plugin `module` hosts. */
+export function patchFitsModule(
+  patch: Pick<Patch, 'pluginName' | 'pluginFormat'>,
+  module: Pick<RackModule, 'name' | 'format'>,
+): boolean {
+  return (
+    patch.pluginName === module.name &&
+    pluginFormatOf(patch.pluginFormat) === pluginFormatOf(module.format)
+  );
+}
+
+/** Whether `patch` was built for the installed plugin `plugin`. */
+export function patchFitsPlugin(
+  patch: Pick<Patch, 'pluginName' | 'pluginFormat'>,
+  plugin: Pick<PluginInfo, 'name' | 'format'>,
+): boolean {
+  return (
+    patch.pluginName === plugin.name &&
+    pluginFormatOf(patch.pluginFormat) === pluginFormatOf(plugin.format)
+  );
+}
+
 export function isStoredPatch(value: unknown): value is StoredPatch {
   const doc = value as Partial<StoredPatch> | null;
   return (
     typeof doc?.name === 'string' &&
     typeof doc?.pluginName === 'string' &&
+    (doc.pluginFormat === undefined ||
+      doc.pluginFormat === 'vst3' ||
+      doc.pluginFormat === 'legacy') &&
     (doc.displayName === undefined || typeof doc.displayName === 'string') &&
     (doc.color === undefined || typeof doc.color === 'string') &&
     // String-typed only, not union-validated: an id this build doesn't know
@@ -213,6 +254,7 @@ export function toPatch(id: string, doc: StoredPatch, readOnly = false, devSourc
     id,
     name: doc.name,
     pluginName: doc.pluginName,
+    pluginFormat: doc.pluginFormat,
     displayName: doc.displayName,
     color: doc.color,
     styleVariant: asStyleVariant(doc.styleVariant),

@@ -30,7 +30,7 @@
     },
     {
       title: 'Your plugins, any order',
-      body: 'Runs your own VST3 amps and effects, from any maker, in any chain you like.',
+      body: 'Runs your own plugin amps and effects, from any maker, in any chain you like.',
       art: 'chain',
     },
     {
@@ -359,7 +359,7 @@
         <div class="max-w-xl">
           <h2 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Download</h2>
           <p class="text-muted mt-4 leading-relaxed text-pretty">
-            {PRODUCT} is free, now and for every future release. Bring your own VST3 plugins, or play
+            {PRODUCT} is free, now and for every future release. Bring your own plugins, or play
             amp captures from TONE3000.
           </p>
           <!-- The old "what it isn't" strip's promises, kept at the point of

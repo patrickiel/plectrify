@@ -8,6 +8,15 @@
 
 namespace
 {
+    // The page's name for a description's format: 'vst3', or 'legacy' for the
+    // VST2-era .dll/.vst/.so format (JUCE calls that one "VST"). The page keys
+    // patches on name + format and badges a legacy plugin with its file
+    // extension — it never prints a format name for that one, see AGENTS.md.
+    juce::String pluginFormatTag (const juce::PluginDescription& desc)
+    {
+        return desc.pluginFormatName == "VST3" ? "vst3" : "legacy";
+    }
+
     // Every parameter the plugin exposes — the palette the user maps knobs from.
     // isBoolean is a property of the parameter (not the knob), so it lives here.
     juce::var availableParamsToVar (juce::AudioPluginInstance& inst)
@@ -287,6 +296,9 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         .withEventListener ("setWindowTheme",   [this] (juce::var v) { host.handleSetWindowTheme (v); })
         .withEventListener ("setEditorSize",    [this] (juce::var v) { host.handleSetEditorSize (v); })
         .withEventListener ("scanPlugins",      onActivity ([this] (juce::var)   { scanForPlugins(); }))
+        .withEventListener ("requestPluginFolders", [this] (juce::var) { emitPluginFolders(); })
+        .withEventListener ("addPluginFolder",  onActivity ([this] (juce::var v) { handleAddPluginFolder (v); }))
+        .withEventListener ("removePluginFolder", onActivity ([this] (juce::var v) { handleRemovePluginFolder (v); }))
         // Reads a list the scan thread owns while it runs, so it is answered
         // from the message thread like requestPlugins; the retry itself refuses
         // mid-scan (PluginManager::unblacklistPlugins).
@@ -383,10 +395,18 @@ juce::var PlectrifyEngine::buildRackState() const
             const auto desc = inst->getPluginDescription();
             mod->setProperty ("pluginVersion", desc.version);
             mod->setProperty ("pluginManufacturer", desc.manufacturerName);
+            mod->setProperty ("format", pluginFormatTag (desc));
         }
         else
         {
             mod->setProperty ("availableParams", juce::Array<juce::var>{});
+
+            // A placeholder keeps the description it failed to load, so its
+            // patches still file under the right plugin while it is missing.
+            if (slot.missing)
+                if (auto xml = juce::parseXML (slot.missingDescription))
+                    if (juce::PluginDescription desc; desc.loadFromXml (*xml))
+                        mod->setProperty ("format", pluginFormatTag (desc));
         }
 
         modules.add (juce::var (mod));
@@ -579,6 +599,7 @@ juce::var PlectrifyEngine::buildPluginsState()
         p->setProperty ("id", desc.createIdentifierString());
         p->setProperty ("name", desc.name);
         p->setProperty ("manufacturer", desc.manufacturerName);
+        p->setProperty ("format", pluginFormatTag (desc));
 
         // Which catalogue package installed this plugin, so the UI can file
         // its patches under that package's heading. Joined here rather than in
@@ -668,6 +689,10 @@ juce::var PlectrifyEngine::buildAppInfoState()
     provenance->setProperty ("asio", false);
    #endif
     provenance->setProperty ("vst3", JUCE_PLUGINHOST_VST3 != 0);
+    // Whether the VST2-era .dll/.vst/.so format is compiled in (it is a build
+    // option, PLECTRIFY_HOST_LEGACY_PLUGINS). The page prints it as the file
+    // extension, never as a format name — see AGENTS.md, *Legacy plugins*.
+    provenance->setProperty ("legacyPlugins", PLECTRIFY_HOST_LEGACY_PLUGINS != 0);
     info->setProperty ("buildInfo", juce::var (provenance));
 
     // --- The machine ------------------------------------------------------
@@ -758,6 +783,20 @@ juce::var PlectrifyEngine::buildPluginBlacklistState()
         entry->setProperty ("name", juce::File::isAbsolutePath (path)
                                         ? juce::File (path).getFileNameWithoutExtension()
                                         : path);
+        entries.add (juce::var (entry));
+    }
+
+    // The files the scan found and could not load, with the reason — on the
+    // same list because to the user they are the same thing, a plugin the
+    // drawer skipped; `reason` is what tells the page this one has no Retry.
+    for (const auto& item : pluginManager.getUnloadablePlugins())
+    {
+        auto* entry = new juce::DynamicObject();
+        entry->setProperty ("path", item.path);
+        entry->setProperty ("name", juce::File::isAbsolutePath (item.path)
+                                        ? juce::File (item.path).getFileNameWithoutExtension()
+                                        : item.path);
+        entry->setProperty ("reason", item.reason);
         entries.add (juce::var (entry));
     }
 
@@ -3087,6 +3126,74 @@ void PlectrifyEngine::requestFullRescan()
         pendingFullRescan = true;
 }
 
+void PlectrifyEngine::emitPluginFolders()
+{
+    juce::Array<juce::var> folders;
+    for (const auto& folder : pluginManager.getUserFolders())
+        folders.add (folder);
+    emit ("pluginFoldersChanged", juce::var (folders));
+}
+
+void PlectrifyEngine::handleAddPluginFolder (const juce::var&)
+{
+    // Start where the last added folder's parent is — a user adding two
+    // folders usually adds siblings — else at the home directory.
+    const auto existing = pluginManager.getUserFolders();
+    const auto startIn = existing.isEmpty()
+        ? juce::File::getSpecialLocation (juce::File::userHomeDirectory)
+        : juce::File (existing[existing.size() - 1]).getParentDirectory();
+
+    folderChooser = std::make_unique<juce::FileChooser> ("Add a plugin folder", startIn);
+
+    juce::WeakReference<PlectrifyEngine> safe (this);
+    folderChooser->launchAsync (juce::FileBrowserComponent::openMode
+                                    | juce::FileBrowserComponent::canSelectDirectories,
+                                [safe] (const juce::FileChooser& chooser)
+    {
+        if (safe == nullptr)
+            return;
+
+        // An empty result is Cancel; a file is a picker that could not say no.
+        const auto folder = chooser.getResult();
+        if (folder == juce::File() || ! folder.isDirectory())
+            return;
+
+        if (safe->pluginManager.addUserFolder (folder))
+            safe->emitPluginFolders();
+
+        // Scan it even if it was already listed: the user pointing at a folder
+        // again is the user asking what is in it now.
+        safe->scanPluginFolder (folder);
+    });
+}
+
+void PlectrifyEngine::handleRemovePluginFolder (const juce::var& payload)
+{
+    const auto path = payload.getProperty ("path", {}).toString();
+    if (path.isEmpty())
+        return;
+
+    if (pluginManager.removeUserFolder (juce::File (path)))
+    {
+        emitPluginsChanged();
+        emitPluginBlacklist();
+        emitAppInfo();  // the known count moved
+    }
+
+    // Always, so a removal the manager refused (a scan is running) leaves the
+    // page showing the list the engine actually holds, not the one it hoped for.
+    emitPluginFolders();
+}
+
+void PlectrifyEngine::scanPluginFolder (const juce::File& folder)
+{
+    juce::FileSearchPath path;
+    path.add (folder);
+
+    if (! startScan (path))
+        pendingFolderScans.addIfNotAlreadyThere (folder.getFullPathName());
+}
+
 void PlectrifyEngine::scanManagedPlugins()
 {
     juce::FileSearchPath path;
@@ -3128,11 +3235,18 @@ bool PlectrifyEngine::startScan (const juce::FileSearchPath& paths)
                     if (std::exchange (safe->pendingFullRescan, false))
                     {
                         safe->pendingManagedRescan = false;
+                        safe->pendingFolderScans.clear();   // on the search path already
                         safe->scanForPlugins();
                     }
                     else if (std::exchange (safe->pendingManagedRescan, false))
                     {
                         safe->scanManagedPlugins();
+                    }
+                    else if (! safe->pendingFolderScans.isEmpty())
+                    {
+                        const juce::File folder (safe->pendingFolderScans[0]);
+                        safe->pendingFolderScans.remove (0);
+                        safe->scanPluginFolder (folder);
                     }
                 }
             }

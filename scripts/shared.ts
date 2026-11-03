@@ -193,7 +193,58 @@ export const JUCE_PATCHES = [
     file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
     marker: 'PLECTRIFY_WEBKIT_VERSIONED_SONAMES',
   },
+  {
+    patch: 'cmake/juce-vst2-speaker-arrangement-size.patch',
+    file: 'modules/juce_audio_processors_headless/format_types/juce_VSTCommon.h',
+    marker: 'PLECTRIFY_VST2_SPEAKER_ARRANGEMENT_SIZE',
+  },
+  {
+    patch: 'cmake/juce-vst2-pin-properties-padding.patch',
+    file: 'modules/juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h',
+    marker: 'PLECTRIFY_VST2_PIN_PROPERTIES_PADDING',
+  },
+  {
+    patch: 'cmake/juce-vst2-scale-before-open.patch',
+    file: 'modules/juce_audio_processors/format_types/juce_VSTPluginFormat.cpp',
+    marker: 'PLECTRIFY_VST2_SCALE_BEFORE_OPEN',
+  },
 ] as const;
+
+/** The commit CMakeLists.txt pins a FetchContent dependency to, read out of
+    that dependency's own FetchContent_Declare block. By name, because the file
+    pins more than one (JUCE, and FST for the older plugin format): the first
+    GIT_TAG in the file happens to be JUCE's today, and a gate reading "the
+    first" would silently check the wrong tree the day the blocks move. */
+export function pinnedDependencyCommit(name: string): string {
+  const cmake = readFileSync(join(ROOT, 'CMakeLists.txt'), 'utf8');
+  const block = new RegExp(`FetchContent_Declare\\(\\s*${name}\\b([\\s\\S]*?)\\n\\s*\\)`).exec(cmake);
+  const match = block ? /GIT_TAG\s+([0-9a-fA-F]{40})/.exec(block[1]!) : null;
+  if (!match) fail(`could not read the pinned ${name} commit from CMakeLists.txt.`);
+  return match[1]!.toLowerCase();
+}
+
+/** The FST checkout the release was compiled against — FST being the
+    header-only interface for the older single-file plugin format (see
+    CMakeLists.txt) — verified the way the JUCE tree is: HEAD at the pin, and
+    untouched, since no patch is applied to it. Returns null when the build
+    was configured with PLECTRIFY_HOST_LEGACY_PLUGINS off, which is the
+    format's withdrawal switch and leaves no FST tree to verify. */
+export function fstCommitOf(buildDir: string): string | null {
+  const cachePath = join(buildDir, 'CMakeCache.txt');
+  const option = /^PLECTRIFY_HOST_LEGACY_PLUGINS:BOOL=(.*)$/m.exec(readFileSync(cachePath, 'utf8'))?.[1]?.trim();
+  if (option === undefined) fail(`${cachePath} does not record PLECTRIFY_HOST_LEGACY_PLUGINS.`);
+  if (!/^(ON|TRUE|YES|Y|1)$/i.test(option)) return null;
+
+  const source = join(buildDir, '_deps', 'fst-src');
+  if (!existsSync(join(source, 'fst', 'fst.h'))) fail(`configured FST source was not found at ${source}.`);
+  const pin = pinnedDependencyCommit('FST');
+  const commit = capture('git', ['-C', source, 'rev-parse', 'HEAD']).trim().toLowerCase();
+  if (commit !== pin) fail(`expected FST commit ${pin}, but the release build used '${commit}'.`);
+  if (capture('git', ['-C', source, 'status', '--porcelain']).trim() !== '') {
+    fail('the FST checkout contains changes or untracked files; refusing to publish ambiguous corresponding source.');
+  }
+  return commit;
+}
 
 /** What `git diff --name-only` must report for the patched JUCE tree, and
     nothing else — the sorted, *distinct* files JUCE_PATCHES touches.
@@ -223,6 +274,7 @@ export const TEST_TARGETS = [
   'PlectrifyStandbyTests',
   'PlectrifyAudioSetupTests',
   'PlectrifyNoiseGateTests',
+  'PlectrifyPluginBinaryTests',
 ] as const;
 
 /** A plugin Plectrify ships inside the installer rather than offers for download

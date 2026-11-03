@@ -29,6 +29,7 @@
   import SegmentedControl from '../../lib/components/SegmentedControl.svelte';
   import type { MidiLearnApi } from '../../lib/components/MidiLearn.svelte';
   import { learnRingClass, learnStateOf } from '../../lib/components/learnSkin';
+  import { legacyPluginExtension } from '../../lib/engine/legacyPlugins';
 
   interface Props {
     engine: EngineBridge;
@@ -37,6 +38,9 @@
     onSetAppSettings: (settings: Partial<AppSettings>) => void;
     /** Host version and build, for the Info panel. */
     appInfo: AppInfo;
+    /** The folders the user added to the plugin search path, for the
+        Settings panel's Plugin folders card. */
+    pluginFolders: string[];
     /** Which host-owned facilities exist, for the Settings panel's gates —
         already defaulted by App, so this is never absent here. */
     capabilities: HostCapabilities;
@@ -84,6 +88,7 @@
     appSettings,
     onSetAppSettings,
     appInfo,
+    pluginFolders,
     capabilities,
     getReport,
     looperMidiLearning = $bindable(false),
@@ -547,7 +552,11 @@
               {appSettings}
               {onSetAppSettings}
               {capabilities}
+              {pluginFolders}
               platform={appInfo.platform}
+              legacyExtension={appInfo.buildInfo?.legacyPlugins === true
+                ? legacyPluginExtension(appInfo.platform)
+                : undefined}
               view={settingsView}
               onShowMidi={openMidiView}
               {onOpenSetup}

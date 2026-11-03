@@ -6,9 +6,11 @@
 #include <functional>
 
 /**
-    Knows which VST3 plugins exist on this machine and how to instantiate them.
+    Knows which plugins exist on this machine and how to instantiate them.
 
-    Owns the format manager (VST3 only for now) and a KnownPluginList that is
+    Owns the format manager — VST3, plus the VST2-era .dll/.vst/.so format when
+    the build enables it (PLECTRIFY_HOST_LEGACY_PLUGINS; never named "VST" to
+    the user, see AGENTS.md) — and a KnownPluginList that is
     cached to disk, so scanning is a one-off cost rather than a per-launch one.
     Scanning instantiates each plugin in-process, so it runs on a background
     thread — a slow or hanging plugin must never freeze the UI — protected by a
@@ -83,9 +85,36 @@ public:
     static juce::File getBundledPluginDirectory();
 
     /** Default search paths for the registered formats (e.g. the system VST3
-        folders), plus getManagedPluginDirectory() and
-        getBundledPluginDirectory(). */
+        folders), plus getManagedPluginDirectory(), getBundledPluginDirectory()
+        and every folder the user added (getUserFolders()). */
     juce::FileSearchPath getDefaultSearchPaths() const;
+
+    /** Folders the user added to the search path, in the order they were added.
+
+        The formats' default locations cover what installers put in the
+        conventional places; a lot of what people actually own lives wherever
+        they unpacked it — a `D:\Plugins`, a `Common Files\VST2` nobody looks
+        in — and the legacy single-file format has no convention worth the
+        name. So the user names the folder and it is searched like the defaults
+        from then on. Machine state, like known_plugins.xml: persisted in
+        `plugin_folders.json` beside it under the data root, left out of
+        backups, removed by a reset. Message thread only. */
+    juce::StringArray getUserFolders() const;
+
+    /** Adds a folder; false (and nothing happens) when it is not a directory
+        or already listed. Persists. The caller scans it — this class never
+        starts a scan on its own. */
+    bool addUserFolder (const juce::File& folder);
+
+    /** Drops a folder and forgets the known plugins and blacklist entries
+        under it (pruneMissingPlugins cannot: the files are still there, they
+        are just no longer searched). Persists both files. False when the
+        folder was not listed — or while a scan runs, since the scan thread
+        owns the known list for its duration (the same rule as
+        unblacklistPlugins); the caller may try again when it ends. */
+    bool removeUserFolder (const juce::File& folder);
+
+    static juce::File getUserFoldersFile();
 
     /** Scans on a background thread. `onPluginScanned` fires after every
         scanned file with `listChanged` telling whether the known list gained
@@ -112,6 +141,27 @@ public:
         Message thread only, and a no-op (returns 0) while a scan is running:
         the scan thread owns the blacklist and the cache file for its duration. */
     int unblacklistPlugins (const juce::StringArray& files);
+
+    /** A plugin file the scan found and could not load, with the one reason we
+        can state with confidence (PluginBinary.h): "bits32" — a 32-bit binary
+        in this 64-bit process — or "wrongArch" — a 64-bit binary for another
+        processor (an Intel-only plugin on Apple Silicon). JUCE's scanner is
+        silent about these: no type, no error, no blacklist entry, so without
+        this the plugin simply is not in the drawer and the user has nothing
+        to go on. A file the scan yields nothing for and we cannot explain (a
+        helper library beside a plugin, a broken plugin) is not listed at all
+        rather than listed with a guess. */
+    struct UnloadablePlugin
+    {
+        juce::String path;
+        juce::String reason;
+    };
+
+    /** Any thread (a locked copy). Every scan rebuilds the entries under the
+        folders it covered — a file fixed or replaced drops out, one added
+        shows up — and the list is persisted in the cache beside the blacklist
+        so it survives a launch that runs no scan. */
+    juce::Array<UnloadablePlugin> getUnloadablePlugins() const;
 
     /** A live instance's description in the form a later createInstanceAsync
         accepts — what to persist, never inst.getPluginDescription() directly.
@@ -143,15 +193,36 @@ public:
 private:
     void run() override;
     juce::File getCacheFile() const;
+    void loadUserFolders();
+    void saveUserFolders() const;
 
     /** Drops known-list and blacklist entries whose file no longer exists on
         disk (uninstalled plugins). Returns true if anything was removed. */
     bool pruneMissingPlugins();
 
+    /** Scan thread, after every format has run over pathsToScan: walks the
+        same files the scanner did and records the ones that produced nothing
+        and whose binary says why. Replaces the entries under those folders. */
+    void recordUnloadablePlugins();
+
+    /** The files `format` would scan under pathsToScan, minus — for any format
+        but VST3 — binaries inside another format's bundle. Scan thread. */
+    juce::StringArray filesToScan (juce::AudioPluginFormat& format) const;
+
+    /** Drops older-format types and blacklist entries inside a bundle, which
+        scans before filesToScan's rule recorded. Scan thread. */
+    void pruneFilesInsideBundles();
+
+    /** Whether a parent directory of `path` is a .vst3 or .component bundle. */
+    static bool isInsideAnotherFormatsBundle (const juce::String& path);
+
     juce::AudioPluginFormatManager formatManager;
     juce::KnownPluginList knownPlugins;
 
     juce::FileSearchPath pathsToScan;
+    juce::StringArray userFolders;  // absolute paths; message thread only
+    juce::Array<UnloadablePlugin> unloadable;   // guarded by unloadableLock
+    mutable juce::CriticalSection unloadableLock;
     std::function<void (bool listChanged)> pluginScannedCallback;
     std::function<void()> finishedCallback;
     std::atomic<bool> scanning { false };

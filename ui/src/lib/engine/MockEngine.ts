@@ -651,6 +651,10 @@ const MOCK_PLUGINS: PluginInfo[] = [
   // Left blank on purpose: real scans turn up plugins with no vendor string,
   // and the drawer has to group those somewhere.
   { id: 'Mock Utility', name: 'Mock Utility', manufacturer: '' },
+  // One plugin in the legacy single-file format, so the extension badge and the
+  // name+format patch matching can be exercised in the browser. Same name as
+  // the VST3 above on purpose: that collision is the case the matching exists for.
+  { id: 'VST-Mock Drive', name: 'Mock Drive', manufacturer: 'Plectrify Labs', format: 'legacy' },
 ];
 
 // One skipped file so the drawer's blacklist notice and its dialog can be
@@ -658,6 +662,8 @@ const MOCK_PLUGINS: PluginInfo[] = [
 // loads cleanly does.
 const MOCK_BLACKLIST: BlacklistedPlugin[] = [
   { path: 'C:\\Program Files\\Common Files\\VST3\\Mock Crasher.vst3', name: 'Mock Crasher' },
+  // Found, loaded far enough to read its header, and 32-bit: no Retry, a reason.
+  { path: 'D:\\Audio\\Plugins\\Mock Cab 32.dll', name: 'Mock Cab 32', reason: 'bits32' },
 ];
 
 // Version strings the native engine reads off each instance. Distinct per
@@ -721,6 +727,7 @@ const MOCK_APP_INFO: AppInfo = {
     compiler: 'none (mock)',
     asio: false,
     vst3: false,
+    legacyPlugins: true, // the mock offers one, so the chips and the hint show
   },
   system: {
     os64Bit: true,
@@ -764,6 +771,7 @@ function makeModule(pluginId: string): RackModule {
   return {
     id: uid('mod'),
     name: plugin.name,
+    format: plugin.format,
     pluginVersion: MOCK_PLUGIN_VERSIONS[plugin.name],
     pluginManufacturer: plugin.manufacturer,
     bypassed: false,
@@ -815,6 +823,10 @@ export class MockEngine implements EngineBridge {
   private pluginScanListeners = new Set<(state: PluginScanState) => void>();
   private blacklistedPlugins: BlacklistedPlugin[] = [...MOCK_BLACKLIST];
   private blacklistListeners = new Set<(entries: BlacklistedPlugin[]) => void>();
+  // One folder so the Settings card has a row to show and remove; "adding"
+  // one invents a path, since a browser has no folder picker to offer.
+  private pluginFolders: string[] = ['D:\\Audio\\Plugins'];
+  private pluginFolderListeners = new Set<(folders: string[]) => void>();
 
   private catalogue: CatalogueState = {
     items: MOCK_CATALOGUE.map((item) => ({ ...item })),
@@ -841,7 +853,7 @@ export class MockEngine implements EngineBridge {
       {
         category: ['More plugins'],
         tags: ['Multi-effect'],
-        label: 'Browse free VST3 plugins',
+        label: 'Browse free plugins',
         url: 'https://kvraudio.com/',
         note: 'Plugins Plectrify does not install for you',
       },
@@ -2696,6 +2708,30 @@ export class MockEngine implements EngineBridge {
     for (const listener of this.blacklistListeners) listener(this.blacklistedPlugins);
     // A real retry rescans, which is what makes a cleared plugin reappear.
     this.scanPlugins();
+  }
+
+  subscribePluginFolders(listener: (folders: string[]) => void): () => void {
+    this.pluginFolderListeners.add(listener);
+    listener(this.pluginFolders);
+    return () => this.pluginFolderListeners.delete(listener);
+  }
+
+  refreshPluginFolders(): void {
+    for (const listener of this.pluginFolderListeners) listener(this.pluginFolders);
+  }
+
+  addPluginFolder(): void {
+    // A browser has no folder picker to offer, so the pick is invented; the
+    // real engine scans the new folder at once, and so does the mock.
+    const n = this.pluginFolders.length + 1;
+    this.pluginFolders = [...this.pluginFolders, `D:\\Audio\\More Plugins ${n}`];
+    this.refreshPluginFolders();
+    this.scanPlugins();
+  }
+
+  removePluginFolder(path: string): void {
+    this.pluginFolders = this.pluginFolders.filter((f) => f !== path);
+    this.refreshPluginFolders();
   }
 
   // --- Plugin catalogue -----------------------------------------------------

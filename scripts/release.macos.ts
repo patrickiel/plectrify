@@ -75,8 +75,8 @@ import {
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
-  JUCE_PATCHED_FILES, JUCE_PATCHES, ROOT, TEST_TARGETS, bundledPluginsFor, capture, fail, pnpm,
-  run, sha256File,
+  JUCE_PATCHED_FILES, JUCE_PATCHES, ROOT, TEST_TARGETS, bundledPluginsFor, capture, fail,
+  fstCommitOf, pinnedDependencyCommit, pnpm, run, sha256File,
 } from './shared.ts';
 import {
   appPath,
@@ -314,12 +314,7 @@ if (!existsSync(join(auBuilt, 'Contents/MacOS/Plectrify'))) {
 // and the file list proves nothing else was changed. Both patches are declared
 // on both platforms because CMake applies both everywhere — each is guarded
 // internally, so the tree, and this gate, are the same on either OS.
-const juceCommitPin = (() => {
-  const cmake = readFileSync(join(ROOT, 'CMakeLists.txt'), 'utf8');
-  const match = /GIT_TAG\s+([0-9a-f]{40})/.exec(cmake);
-  if (!match) fail('could not read the pinned JUCE commit from CMakeLists.txt.');
-  return match[1]!;
-})();
+const juceCommitPin = pinnedDependencyCommit('JUCE');
 const juceSource = join(buildDir(CONFIG), '_deps/juce-src');
 const juceCommit = capture('git', ['-C', juceSource, 'rev-parse', 'HEAD']).trim().toLowerCase();
 if (juceCommit !== juceCommitPin) {
@@ -338,6 +333,9 @@ if (juceChanged.join('\n') !== JUCE_PATCHED_FILES.join('\n')) {
 if (capture('git', ['-C', juceSource, 'ls-files', '--others', '--exclude-standard']).trim() !== '') {
   fail('the JUCE checkout contains untracked files; refusing to publish ambiguous corresponding source.');
 }
+// The other pinned tree compiled into the binary (null when the older plugin
+// format is switched off); the Windows script ships it in the source archive.
+const fstCommit = fstCommitOf(buildDir(CONFIG));
 
 /** The codesign flags every seal in this script shares.
 
@@ -435,10 +433,12 @@ THIRD-PARTY PLUGINS
 
 This offer covers Plectrify itself — the standalone application and the
 Plectrify VST3 and Audio Unit plug-ins this installer installs, which are
-builds of the same AGPLv3 source in the archive above. (All of them host VST3
-plug-ins and are built against Steinberg's VST3 SDK as bundled with JUCE,
-which Plectrify uses under the SDK's GPLv3 option; see
-THIRD_PARTY_NOTICES.md.) Plectrify ships one third-party VST3
+builds of the same AGPLv3 source in the archive above. (All of them are built
+against Steinberg's VST3 SDK as bundled with JUCE, which Plectrify uses under
+the SDK's GPLv3 option, and against FST — Free Studio Technology, IEM Graz,
+GPLv3-or-later — the header-only interface through which older single-file
+plugins are hosted; its source is in the archive above under fst/.
+See THIRD_PARTY_NOTICES.md.) Plectrify ships one third-party VST3
 plugin, Neural Amp Modeler, under the MIT licence; its source, the exact
 version, and where that binary came from are recorded in
 THIRD_PARTY_NOTICES.md. At your request
@@ -464,6 +464,7 @@ Version: ${version}
 Git commit: ${commit}
 Git branch: ${branch}
 JUCE commit: ${juceCommit} (JUCE 8.0.14)
+FST commit: ${fstCommit ?? 'not built in'}
 Plectrify licence: GNU AGPL version 3 only
 Corresponding source: ${sourceArchiveName}
 `,
@@ -659,6 +660,7 @@ writeFileSync(
       sourceBranch: branch,
       juceCommit,
       jucePatches: JUCE_PATCHES.map(({ patch }) => patch),
+      fstCommit,
       binaryLicense: 'AGPL-3.0-only',
       platform: 'macos-arm64',
       installer: pkgName,

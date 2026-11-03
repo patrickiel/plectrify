@@ -48,7 +48,7 @@ user's machine, roughly in order of how much a flaw there would cost:
 
 ## What is not a vulnerability
 
-- **A malicious VST3 doing damage.** Plectrify is a plugin host: it loads and runs
+- **A malicious plugin doing damage.** Plectrify is a plugin host: it loads and runs
   third-party native code that the user chose to install, in-process, with the
   user's full privileges. That is the entire product, and no host can sandbox it
   away. On macOS this requires the
@@ -58,7 +58,7 @@ user's machine, roughly in order of how much a flaw there would cost:
 - **Plugin scanning crashing on a broken plugin.** That is what the blacklist is
   for.
 - **Anything requiring an attacker to already have write access** to the user's
-  account, the VST3 folders, or `%PROGRAMDATA%`/`/Users/Shared`. Those paths are
+  account, the plugin folders, or `%PROGRAMDATA%`/`/Users/Shared`. Those paths are
   writable by every local account by design, so that installing a plugin needs
   no elevation; a local attacker who can write there can equally replace any
   other plugin on the machine.

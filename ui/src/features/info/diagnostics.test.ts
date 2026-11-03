@@ -17,6 +17,7 @@ const info: AppInfo = {
     compiler: 'MSVC 19.44',
     asio: true,
     vst3: true,
+    legacyPlugins: true,
   },
   system: {
     os64Bit: true,
@@ -125,7 +126,7 @@ describe('buildDiagnostics', () => {
     expect(row(report, 'App', 'Commit')).toBe('abc1234');
     expect(row(report, 'App', 'Engine')).toBe('JUCE v8.0.14');
     expect(row(report, 'App', 'Renderer')).toBe('WebView2 141.0.3485.44');
-    expect(row(report, 'App', 'Formats')).toBe('VST3 · ASIO built in');
+    expect(row(report, 'App', 'Formats')).toBe('VST3 · .dll · ASIO built in');
     expect(row(report, 'App', 'Uptime')).toBe('1 h 12 min');
 
     expect(row(report, 'System', 'OS')).toBe('Windows 11 · 64-bit');
@@ -181,14 +182,27 @@ describe('buildDiagnostics', () => {
     );
 
     expect(row(report, 'App', 'Renderer')).toBe('WebKit 605.1.15');
-    expect(row(report, 'App', 'Formats')).toBe('VST3');
+    // The legacy format is a .vst bundle there, and is only ever named by
+    // its extension.
+    expect(row(report, 'App', 'Formats')).toBe('VST3 · .vst');
   });
 
   it('still states the ASIO fact on Windows, where its absence explains a missing device type', () => {
     const report = buildDiagnostics(
       input({ info: { ...info, buildInfo: { ...info.buildInfo!, asio: false } } }),
     );
-    expect(row(report, 'App', 'Formats')).toBe('VST3 · no ASIO');
+    expect(row(report, 'App', 'Formats')).toBe('VST3 · .dll · no ASIO');
+  });
+
+  it('omits the legacy extension on a build without the format, and on one too old to say', () => {
+    const without = buildDiagnostics(
+      input({ info: { ...info, buildInfo: { ...info.buildInfo!, legacyPlugins: false } } }),
+    );
+    expect(row(without, 'App', 'Formats')).toBe('VST3 · ASIO built in');
+
+    const { legacyPlugins: _, ...older } = info.buildInfo!;
+    const old = buildDiagnostics(input({ info: { ...info, buildInfo: older } }));
+    expect(row(old, 'App', 'Formats')).toBe('VST3 · ASIO built in');
   });
 
   it('dashes every field the engine has not reported yet', () => {
