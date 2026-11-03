@@ -782,6 +782,23 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # module, and std::atomic<float> is a different type under C++17 and C++20,
     # which made every JUCE parameter class an ODR violation at link time.
     target_compile_features(PlectrifyNam_VST3 PRIVATE cxx_std_20)
+
+    # No STB_GNU_UNIQUE symbols, so two copies of this module can share a
+    # process. GCC marks every function-local static of an inline function
+    # (NAM's ConfigParserRegistry::instance(), JUCE's singletons) as unique,
+    # and the dynamic loader then binds every loaded copy of the library to the
+    # *first* copy's object. A second NeuralAmpModeler.so — another
+    # installation's bundled copy, which the shared scan cache can name
+    # (the .deb's /opt one beside a dev tree's, or the standalone's beside
+    # the DAW plugin's) — then registered its architectures into the first
+    # copy's registry, whose duplicate check throws from a static
+    # initialiser: an uncaught exception inside dlopen, and the host aborts.
+    # Only a copy built with this flag is safe beside another, so two builds
+    # predating it still collide. GCC only; Clang emits none.
+    foreach(nam_target PlectrifyNam PlectrifyNamDsp PlectrifyNam_VST3)
+        target_compile_options(${nam_target} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-fno-gnu-unique>)
+    endforeach()
+
     foreach(nam_target PlectrifyNam PlectrifyNamDsp)
         target_compile_features(${nam_target} PRIVATE cxx_std_20)
         target_include_directories(${nam_target} PRIVATE Source/namplugin)

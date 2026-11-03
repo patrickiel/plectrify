@@ -159,7 +159,10 @@ bool PluginManager::removeUserFolder (const juce::File& folder)
             listChanged = true;
         }
     }
-    for (const auto& blacklisted : knownPlugins.getBlacklistedFiles()) // copy; the loop mutates the list
+    // getBlacklistedFiles() returns a reference to the list the loop mutates,
+    // so iterate a copy.
+    const auto blacklist = knownPlugins.getBlacklistedFiles();
+    for (const auto& blacklisted : blacklist)
     {
         if (forget (blacklisted, {}))
         {
