@@ -888,6 +888,13 @@ records the substitution it made.
     a CTest) on DPF's `.so` plugins, which memset the whole SDK-sized struct.
     Known, accepted differences that remain: `VstTimeInfo`'s two SMPTE fields
     sit at other offsets in FST, so a plugin reading SMPTE time gets zeros.
+  - `juce-vst2-midi-key-name-storage.patch` — the third struct of that kind:
+    FST declares `MidiKeyName::keyName[]` as a flexible array, so JUCE's
+    `Vst2::MidiKeyName keyName{};` in `getNameForMidiNoteNumber` holds no
+    name at all. GCC and Clang accepted it and let `effGetMidiKeyName` write
+    past it on the stack; MSVC refuses it outright (C2466), which is how the
+    Windows build found it. It now sits at the start of a zeroed buffer with
+    room for the name.
   - `juce-vst2-scale-before-open.patch` — the older format's twin of
     `juce-vst3-scale-before-attach.patch`: JUCE sent a plugin declaring
     `supportsViewDpiScaling` its scale (`effVendorSpecific` `PreS`/`AeCs`)

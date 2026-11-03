@@ -176,6 +176,11 @@ FetchContent_Declare(
                    "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-vst2-scale-before-open.patch"
                    "-DSOURCE_DIR=<SOURCE_DIR>"
                    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
+           COMMAND "${CMAKE_COMMAND}"
+                   "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/juce-vst2-midi-key-name-storage.patch"
+                   "-DSOURCE_DIR=<SOURCE_DIR>"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake"
 )
 FetchContent_MakeAvailable(JUCE)
 

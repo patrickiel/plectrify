@@ -208,6 +208,11 @@ export const JUCE_PATCHES = [
     file: 'modules/juce_audio_processors/format_types/juce_VSTPluginFormat.cpp',
     marker: 'PLECTRIFY_VST2_SCALE_BEFORE_OPEN',
   },
+  {
+    patch: 'cmake/juce-vst2-midi-key-name-storage.patch',
+    file: 'modules/juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h',
+    marker: 'PLECTRIFY_VST2_MIDI_KEY_NAME_STORAGE',
+  },
 ] as const;
 
 /** The commit CMakeLists.txt pins a FetchContent dependency to, read out of

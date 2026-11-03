@@ -1,0 +1,29 @@
+Give a hosted plugin room to write a MIDI key name.
+
+FST (the clean-room header this code compiles against, see CMakeLists.txt)
+declares MidiKeyName's keyName[] as a flexible array, where Steinberg's
+header declares keyName[kVstMaxNameLen]. With FST the struct holds the two
+leading ints and no name at all: MSVC refuses to value-initialise it
+(error C2466, "cannot allocate an array of constant size 0"), and GCC/Clang
+accepted it while effGetMidiKeyName wrote the plugin's answer past the
+struct into the stack. The struct now sits at the start of a zeroed buffer
+with room for the whole name; field offsets are the same under either header.
+diff --git a/modules/juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h b/modules/juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h
+index 71bfe5d..ba1a689 100644
+--- a/modules/juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h
++++ b/modules/juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h
+@@ -1321,7 +1321,13 @@ struct VSTPluginInstanceHeadless : public AudioPluginInstance,
+ 
+     std::optional<String> getNameForMidiNoteNumber (int note, int midiChannel) override
+     {
+-        Vst2::MidiKeyName keyName{};
++        // PLECTRIFY_VST2_MIDI_KEY_NAME_STORAGE: FST declares keyName[] as a
++        // flexible array, so the struct itself holds no name at all: MSVC refuses
++        // to value-initialise it (C2466), and elsewhere the plugin's answer was
++        // written past the struct into the stack. Reserve the name's full length
++        // behind the two leading ints; the offsets are the same under either header.
++        alignas (Vst2::MidiKeyName) char keyNameStorage[sizeof (Vst2::MidiKeyName) + 256] {};
++        auto& keyName = *reinterpret_cast<Vst2::MidiKeyName*> (keyNameStorage);
+ 
+         keyName.thisProgramIndex = getCurrentProgram();
+         keyName.thisKeyNumber = note;
