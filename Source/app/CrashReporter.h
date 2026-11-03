@@ -91,15 +91,26 @@ namespace plectrify
        #if JUCE_WINDOWS
         SetUnhandledExceptionFilter (detail::writeCrashDump);
        #else
-        // No minidump machinery off Windows — macOS writes a .ips crash report
-        // itself, and Linux leaves a core to systemd-coredump or apport. A log
-        // line still marks that we went down abnormally.
-        juce::SystemStats::setApplicationCrashHandler ([] (void*)
+        // No minidump machinery off Windows. macOS writes a .ips crash report
+        // itself, so a log line marking the death is enough there.
+        //
+        // Linux gets no core at all: JUCE's signal handler SIGKILLs the
+        // process the moment this callback returns, so the kernel never dumps
+        // one (and apport ignores binaries it did not install anyway). The
+        // backtrace logged here is therefore the only evidence there will
+        // ever be. Neither backtrace_symbols nor the logger is
+        // async-signal-safe — acceptable for last words, which is all this is.
+        // Frames read "Plectrify(+0x…)": `addr2line -fCe <that binary> 0x…`
+        // names them, against the same build.
+        juce::SystemStats::setApplicationCrashHandler ([] (void* signum)
         {
            #if JUCE_MAC
+            juce::ignoreUnused (signum);
             juce::Logger::writeToLog ("CRASH: fatal signal — see the macOS crash report");
            #else
-            juce::Logger::writeToLog ("CRASH: fatal signal - see coredumpctl or /var/crash");
+            juce::Logger::writeToLog ("CRASH: fatal signal "
+                                      + juce::String ((int) (juce::pointer_sized_int) signum)
+                                      + "\n" + juce::SystemStats::getStackBacktrace());
            #endif
         });
        #endif
