@@ -387,8 +387,7 @@ void testResetRemovesTargetsAndSparesTheRest()
     // Every target, in whichever shape it takes on disk.
     for (const auto* name : { "settings.json", "working-rack.json", "presets.json", "lastSession.rig",
                               "working-history.json", "restore_in_progress",
-                              "working-rack.quarantine.json", "audio_settings.xml", "plugin_folders.json",
-                              "window.json" })
+                              "working-rack.quarantine.json", "audio_settings.xml", "window.json" })
         write (root.getChildFile (name), "x");
 
     write (root.getChildFile ("rigs/index.json"), "[]");
@@ -401,7 +400,7 @@ void testResetRemovesTargetsAndSparesTheRest()
     write (root.getChildFile ("WebKit-Tone3000/cookies.sqlite"), "c");
 
     // What a reset must leave alone.
-    const juce::StringArray kept { "known_plugins.xml", "scan_in_progress.txt", "plectrify.log",
+    const juce::StringArray kept { "known_plugins.xml", "plugin_folders.json", "scan_in_progress.txt", "plectrify.log",
                                    "backup-before-restore.plectrifybackup",
                                    plectrify::reset::snapshotName, "WebView2/Local State",
                                    "WebView2-Plugin/Local State", "crashes/crash.txt" };

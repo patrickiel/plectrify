@@ -215,7 +215,8 @@ if (PLECTRIFY_HOST_LEGACY_PLUGINS)
         FST
         GIT_REPOSITORY https://git.iem.at/zmoelnig/FST.git
         GIT_TAG        30f49e6fe97cb822eaadcc6e1ae9941d004bff54 # FST 0.177.0
-        GIT_SHALLOW    TRUE
+        # Not shallow: a depth-1 clone of a bare commit hash leans on the server
+        # allowing fetch-by-SHA, and the whole repository is a few hundred KB.
         UPDATE_DISCONNECTED TRUE
         # Only the header is wanted. FST's own CMakeLists builds its test
         # plugins and looks for a JUCE package; naming a directory that does

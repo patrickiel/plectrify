@@ -1411,7 +1411,8 @@ OS.
   `PluginManager`, `PluginBinary.h`).
 - `plugin_folders.json` — the folders the user added to the plugin search path
   (Settings → Plugin folders), a JSON array of absolute paths. Machine state
-  like `known_plugins.xml`: left out of backups, removed by a reset.
+  like `known_plugins.xml`: left out of backups, and kept by a reset for the
+  same reason as that cache, whose entries from those folders it accounts for.
 - `tone3000/credentials.json` + `state.json` — the connected TONE3000 account,
   and the browser window's size, position, monitor, page and scroll offset.
   **The one path `resolveAppFile` refuses to hand the web page**: everything else
@@ -1519,7 +1520,9 @@ spares: everything under the content root (installed packages and downloaded
 captures are the user's, the uninstallers' promise), `known_plugins.xml` and the
 scan sentinel (dropping them would empty the drawer until a Rescan, since a
 launch with packages present settles the starter install without its full scan,
-and would re-load a plugin that crashed the last one), both undo archives, the
+and would re-load a plugin that crashed the last one), `plugin_folders.json`
+(the folders those cached entries came from, without which they could no longer
+be removed), both undo archives, the
 page's own WebView2 profiles (one may be held by a DAW right now), the log and
 `crashes/`. The legacy layouts the page still migrates (`presets/`,
 `presets.json`, `lastSession.rig`, `working-history.json`) are targets, or the
@@ -2067,7 +2070,7 @@ each load-bearing:
    `build*/legacy-plugin-include/`, added as a `SYSTEM` include so its
    `#pragma GCC warning`s stay quiet. The release scripts' provenance gate
    checks the FST checkout like JUCE's — HEAD at the pin, untouched: **FST
-   is never patched**, the two layout fixes it needs are patches to JUCE
+   is never patched**, the layout fixes it needs are patches to JUCE
    (`juce-vst2-*.patch`), where the provenance machinery already exists
    (`fstCommitOf` in `scripts/shared.ts`; `pinnedDependencyCommit` reads each
    pin from its own `FetchContent_Declare` block, since the file now has two)
@@ -2092,9 +2095,18 @@ folders to the search path: engine-owned (`PluginManager::addUserFolder`,
 the OS folder picker on the engine's side, Remove hands back a pushed path),
 the added folder is scanned at once through the existing scan queue, and the
 list rides its own `pluginFoldersChanged` stream rather than `appInfo`, which
-the diagnostics paste into public issues. And because JUCE's scanner is
+the diagnostics paste into public issues. **Each format walks only its own
+places** (`PluginManager::pathsForFormat`): its default locations, every user
+folder, and — VST3 alone — the managed and bundled directories. The legacy
+format's search takes every loose `.dll` it meets, so walking the VST3 folders
+too LoadLibrary'd vendor helper DLLs during the scan and reported the 32-bit
+ones as skipped plugins. A folder the user adds is searched by both, since
+naming the format is exactly what they did not do. Each format's file list is
+built once per scan and shared by the scanner and the skipped-plugin pass. And
+because JUCE's scanner is
 silent about a binary it cannot load, `PluginBinary.h` reads the PE/ELF/
-Mach-O header of every file the scan found and produced nothing for, and the
+Mach-O header of every file the scan found and produced nothing for — every
+per-architecture binary in a bundle, silent if any could be the host's — and the
 "Skipped plugins" dialog shows a reason (`bits32`, `wrongArch` →
 `describeSkipReason`) instead of a Retry button for those. **32-bit plugins
 are out of scope** — no bridge; the dialog points Windows users at jBridge —

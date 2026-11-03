@@ -31,12 +31,6 @@ const juce::StringArray& targets()
         // what reopens the setup wizard.
         "audio_settings.xml",
 
-        // The plugin folders the user added to the search path. Like
-        // known_plugins.xml this is machine state — paths on this disk — but
-        // unlike it, forgetting it costs nothing a rescan would not restore,
-        // and a fresh installation searches the standard folders alone.
-        "plugin_folders.json",
-
         // Where the main window was. A fresh installation opens centred.
         "window.json",
 

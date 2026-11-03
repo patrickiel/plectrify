@@ -176,11 +176,23 @@ void testReason()
     check (whyUnloadable (Architecture::universal, Architecture::arm64).isEmpty(), "a universal binary fits every host");
     check (whyUnloadable (Architecture::unknown, Architecture::x64).isEmpty(),
            "nothing confident to say means nothing said");
+
+    using Archs = juce::Array<Architecture>;
+    check (whyUnloadable (Archs { Architecture::bits32, Architecture::x64 }, Architecture::x64).isEmpty(),
+           "a bundle with a 64-bit binary beside its 32-bit one is not called 32-bit");
+    check (whyUnloadable (Archs { Architecture::bits32, Architecture::arm64 }, Architecture::x64) == "wrongArch",
+           "32-bit and arm64 only, on an x64 host, is the wrong architecture");
+    check (whyUnloadable (Archs { Architecture::bits32, Architecture::bits32 }, Architecture::x64) == "bits32",
+           "every binary 32-bit is a 32-bit plugin");
+    check (whyUnloadable (Archs { Architecture::bits32, Architecture::unknown }, Architecture::x64).isEmpty(),
+           "one unreadable binary leaves nothing confident to say");
+    check (whyUnloadable (Archs {}, Architecture::x64).isEmpty(), "no binaries, no verdict");
 }
 
 void testBundleBinary()
 {
-    using plectrify::pluginbinary::pluginBinaryOf;
+    using plectrify::pluginbinary::pluginBinariesOf;
+    using Files = juce::Array<juce::File>;
 
     const auto scratch = juce::File::getSpecialLocation (juce::File::tempDirectory)
                              .getChildFile ("PlectrifyPluginBinaryTests");
@@ -191,7 +203,7 @@ void testBundleBinary()
     macBundle.getChildFile ("Contents/MacOS").createDirectory();
     macBundle.getChildFile ("Contents/Resources/Info.plist").replaceWithText ("<plist/>");
     macBundle.getChildFile ("Contents/MacOS/Amp").replaceWithText ("binary");
-    check (pluginBinaryOf (macBundle) == macBundle.getChildFile ("Contents/MacOS/Amp"),
+    check (pluginBinariesOf (macBundle) == Files { macBundle.getChildFile ("Contents/MacOS/Amp") },
            "a mac bundle's binary is under Contents/MacOS, never Resources");
 
     const auto vst3Bundle = scratch.getChildFile ("Amp.vst3");
@@ -199,18 +211,26 @@ void testBundleBinary()
     vst3Bundle.getChildFile ("Contents/x86-win").createDirectory();
     vst3Bundle.getChildFile ("Contents/Resources/moduleinfo.json").replaceWithText ("{}");
     vst3Bundle.getChildFile ("Contents/x86-win/Amp.vst3").replaceWithText ("binary");
-    check (pluginBinaryOf (vst3Bundle) == vst3Bundle.getChildFile ("Contents/x86-win/Amp.vst3"),
+    check (pluginBinariesOf (vst3Bundle) == Files { vst3Bundle.getChildFile ("Contents/x86-win/Amp.vst3") },
            "a VST3 bundle's binary is in its architecture folder");
+
+    vst3Bundle.getChildFile ("Contents/x86_64-win").createDirectory();
+    vst3Bundle.getChildFile ("Contents/x86_64-win/Amp.vst3").replaceWithText ("binary");
+    const auto both = pluginBinariesOf (vst3Bundle);
+    check (both.size() == 2
+               && both.contains (vst3Bundle.getChildFile ("Contents/x86-win/Amp.vst3"))
+               && both.contains (vst3Bundle.getChildFile ("Contents/x86_64-win/Amp.vst3")),
+           "every architecture folder's binary is found, not just the first listed");
 
     const auto plain = scratch.getChildFile ("Amp.dll");
     plain.replaceWithText ("binary");
-    check (pluginBinaryOf (plain) == plain, "a plain file is its own binary");
+    check (pluginBinariesOf (plain) == Files { plain }, "a plain file is its own binary");
 
-    check (! pluginBinaryOf (scratch.getChildFile ("Missing.vst")).exists(), "nothing for a missing path");
+    check (pluginBinariesOf (scratch.getChildFile ("Missing.vst")).isEmpty(), "nothing for a missing path");
 
     const auto empty = scratch.getChildFile ("Empty.vst3");
     empty.getChildFile ("Contents").createDirectory();
-    check (! pluginBinaryOf (empty).exists(), "nothing for a bundle with no binary");
+    check (pluginBinariesOf (empty).isEmpty(), "nothing for a bundle with no binary");
 
     scratch.deleteRecursively();
 }

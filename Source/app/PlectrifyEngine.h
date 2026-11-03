@@ -513,6 +513,11 @@ private:
         is added) and so drops the queue. */
     void scanPluginFolder (const juce::File& folder);
     juce::StringArray pendingFolderScans;
+
+    /** Starts the next queued scan, if any (full before managed before
+        folders). Called when any scan ends — startScan's and the first-launch
+        bundled scan alike, since a request queued behind either waits on it. */
+    void runQueuedScan();
     std::unique_ptr<juce::FileChooser> folderChooser;
 
     void openEditorFor (juce::AudioProcessorGraph::NodeID nodeID);

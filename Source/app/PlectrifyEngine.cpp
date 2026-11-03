@@ -3106,6 +3106,12 @@ void PlectrifyEngine::scanBundledPluginsIfNeeded()
                 safe->emitPluginsChanged();
                 safe->emitPluginScanChanged ("complete");
                 safe->emitAppInfo();
+
+                // The first-launch scan starts before the page can ask for
+                // anything, so a folder added or a package installed while
+                // it ran was queued behind it — and only this hands the
+                // queue on.
+                safe->runQueuedScan();
             });
         });
 }
@@ -3207,6 +3213,28 @@ void PlectrifyEngine::scanManagedPlugins()
         pendingManagedRescan = true;
 }
 
+void PlectrifyEngine::runQueuedScan()
+{
+    // A full rescan covers the managed directory and every user folder too, so
+    // it answers all three requests and the narrow ones are dropped.
+    if (std::exchange (pendingFullRescan, false))
+    {
+        pendingManagedRescan = false;
+        pendingFolderScans.clear();   // on the search path already
+        scanForPlugins();
+    }
+    else if (std::exchange (pendingManagedRescan, false))
+    {
+        scanManagedPlugins();
+    }
+    else if (! pendingFolderScans.isEmpty())
+    {
+        const juce::File folder (pendingFolderScans[0]);
+        pendingFolderScans.remove (0);
+        scanPluginFolder (folder);
+    }
+}
+
 bool PlectrifyEngine::startScan (const juce::FileSearchPath& paths)
 {
     juce::WeakReference<PlectrifyEngine> safe (this);
@@ -3230,24 +3258,7 @@ bool PlectrifyEngine::startScan (const juce::FileSearchPath& paths)
                     // on, so the list the UI shows can only be trusted after.
                     safe->emitPluginBlacklist();
 
-                    // A full rescan covers the managed directory too, so it
-                    // answers both requests and the narrow one is dropped.
-                    if (std::exchange (safe->pendingFullRescan, false))
-                    {
-                        safe->pendingManagedRescan = false;
-                        safe->pendingFolderScans.clear();   // on the search path already
-                        safe->scanForPlugins();
-                    }
-                    else if (std::exchange (safe->pendingManagedRescan, false))
-                    {
-                        safe->scanManagedPlugins();
-                    }
-                    else if (! safe->pendingFolderScans.isEmpty())
-                    {
-                        const juce::File folder (safe->pendingFolderScans[0]);
-                        safe->pendingFolderScans.remove (0);
-                        safe->scanPluginFolder (folder);
-                    }
+                    safe->runQueuedScan();
                 }
             }
         });

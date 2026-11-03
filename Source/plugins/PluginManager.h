@@ -98,7 +98,7 @@ public:
         name. So the user names the folder and it is searched like the defaults
         from then on. Machine state, like known_plugins.xml: persisted in
         `plugin_folders.json` beside it under the data root, left out of
-        backups, removed by a reset. Message thread only. */
+        backups, kept by a reset (see AppReset.h). Message thread only. */
     juce::StringArray getUserFolders() const;
 
     /** Adds a folder; false (and nothing happens) when it is not a directory
@@ -193,21 +193,40 @@ public:
 private:
     void run() override;
     juce::File getCacheFile() const;
-    void loadUserFolders();
+    void loadUserFolders() const;   // re-reads plugin_folders.json into userFolders
     void saveUserFolders() const;
 
     /** Drops known-list and blacklist entries whose file no longer exists on
         disk (uninstalled plugins). Returns true if anything was removed. */
     bool pruneMissingPlugins();
 
-    /** Scan thread, after every format has run over pathsToScan: walks the
-        same files the scanner did and records the ones that produced nothing
-        and whose binary says why. Replaces the entries under those folders. */
-    void recordUnloadablePlugins();
+    /** Scan thread, after every format has run: takes the very files each
+        format's scanner was given (`scannedFiles`, one list per format in
+        getFormats() order) and records the ones that produced nothing and
+        whose binary says why. Replaces the entries under pathsToScan. */
+    void recordUnloadablePlugins (const std::vector<juce::StringArray>& scannedFiles);
 
-    /** The files `format` would scan under pathsToScan, minus — for any format
-        but VST3 — binaries inside another format's bundle. Scan thread. */
-    juce::StringArray filesToScan (juce::AudioPluginFormat& format) const;
+    /** Where `format` belongs: its own default locations, every user folder,
+        and — for VST3, the only format either can hold — the managed and
+        bundled directories. Message thread (reads userFolders). */
+    juce::FileSearchPath ownLocations (juce::AudioPluginFormat& format) const;
+
+    /** The part of `paths` that `format` should walk: each path inside one of
+        its ownLocations(), plus each of those locations inside a path, with
+        nested entries collapsed so no file is listed twice. Without this the
+        older format walked every VST3 folder and LoadLibrary'd any loose
+        helper .dll it found there. Message thread. */
+    juce::FileSearchPath pathsForFormat (juce::AudioPluginFormat& format,
+                                         const juce::FileSearchPath& paths) const;
+
+    /** Whether `path` lies in a location some format still searches — for a
+        known type, the format named (`formatName`); empty means any. */
+    bool isStillSearched (const juce::String& path, const juce::String& formatName) const;
+
+    /** The files `format` would scan under `paths`, minus — for any format but
+        VST3 — binaries inside another format's bundle. Scan thread. */
+    juce::StringArray filesToScan (juce::AudioPluginFormat& format,
+                                   const juce::FileSearchPath& paths) const;
 
     /** Drops older-format types and blacklist entries inside a bundle, which
         scans before filesToScan's rule recorded. Scan thread. */
@@ -220,7 +239,8 @@ private:
     juce::KnownPluginList knownPlugins;
 
     juce::FileSearchPath pathsToScan;
-    juce::StringArray userFolders;  // absolute paths; message thread only
+    std::vector<juce::FileSearchPath> formatPathsToScan; // per format, getFormats() order; set before the thread starts
+    mutable juce::StringArray userFolders;  // absolute paths, re-read from disk on use; message thread only
     juce::Array<UnloadablePlugin> unloadable;   // guarded by unloadableLock
     mutable juce::CriticalSection unloadableLock;
     std::function<void (bool listChanged)> pluginScannedCallback;

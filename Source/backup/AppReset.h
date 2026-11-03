@@ -25,6 +25,12 @@
       full rescan (starterBundle.ts), so the drawer would show only the bundled
       NAM until someone pressed Rescan — and a plugin that crashed a scan would
       be loaded again to crash the next one.
+    - plugin_folders.json — the folders the user added to the search path,
+      which is what the plugins known from them in that cache are there for.
+      Forgetting the folders but not the cache left those plugins in the
+      drawer with nothing left to remove them by: the folder was no longer
+      listed, pruneMissingPlugins drops only files that are gone, and a
+      Rescan only adds.
     - The two undo archives (backup-before-restore / backup-before-reset), which
       are the only way back from either operation.
     - WebView2/ and WebView2-Plugin/ — the page's browser profiles. Nothing in

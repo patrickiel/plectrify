@@ -223,57 +223,83 @@ inline juce::String whyUnloadable (Architecture built, Architecture host)
     return "wrongArch";
 }
 
-/** The executable inside a plugin file or bundle: the file itself when it is
-    one (.dll, .so, a single-file .vst3), otherwise the first binary under
-    `Contents/` — `Contents/MacOS/<name>` for a mac bundle, `Contents/<arch>/
-    <file>` for a cross-platform VST3 bundle. A bundle holding several
-    per-architecture binaries hands back the first found, which is the right
-    answer for the question asked here: the scan already failed to load it,
-    so whichever binary is inside is not the host's. Non-existent when nothing
+/** Why a bundle holding these per-architecture binaries could not load into a
+    host of `host`: one verdict for the lot. Silent when any of them could be
+    the host's (it matches, is universal, or cannot be read) — then whatever
+    stopped the plugin was not its architecture — "bits32" only when every one
+    is 32-bit, and "wrongArch" otherwise. A bundle shipping x86-win beside
+    x86_64-win is a 64-bit plugin that failed for some other reason, and
+    reporting it from whichever folder happened to list first called it a
+    32-bit one. */
+inline juce::String whyUnloadable (const juce::Array<Architecture>& built, Architecture host)
+{
+    if (built.isEmpty())
+        return {};
+
+    bool all32 = true;
+    for (const auto arch : built)
+    {
+        if (whyUnloadable (arch, host).isEmpty())
+            return {};
+        all32 = all32 && arch == Architecture::bits32;
+    }
+    return all32 ? "bits32" : "wrongArch";
+}
+
+/** The executables inside a plugin file or bundle: the file itself when it is
+    one (.dll, .so, a single-file .vst3); otherwise the binary under
+    `Contents/MacOS/` for a mac bundle, or one per architecture folder
+    (`Contents/<arch>/<file>`) for a cross-platform VST3 bundle — every one of
+    them, since a bundle may carry several and only all of them together say
+    whether the architecture is the reason it did not load. Empty when nothing
     is found. */
-inline juce::File pluginBinaryOf (const juce::File& fileOrBundle)
+inline juce::Array<juce::File> pluginBinariesOf (const juce::File& fileOrBundle)
 {
     if (fileOrBundle.existsAsFile())
-        return fileOrBundle;
+        return { fileOrBundle };
 
-    if (! fileOrBundle.isDirectory())
-        return {};
-
+    juce::Array<juce::File> binaries;
     const auto contents = fileOrBundle.getChildFile ("Contents");
-    if (! contents.isDirectory())
-        return {};
+    if (! fileOrBundle.isDirectory() || ! contents.isDirectory())
+        return binaries;
 
-    const auto macOS = contents.getChildFile ("MacOS");
-    if (macOS.isDirectory())
-        for (const auto& entry : juce::RangedDirectoryIterator (macOS, false, "*", juce::File::findFiles))
+    const auto firstFileIn = [] (const juce::File& dir)
+    {
+        for (const auto& entry : juce::RangedDirectoryIterator (dir, false, "*", juce::File::findFiles))
             if (! entry.isHidden())
                 return entry.getFile();
+        return juce::File();
+    };
+
+    if (const auto macOS = contents.getChildFile ("MacOS"); macOS.isDirectory())
+        if (const auto binary = firstFileIn (macOS); binary != juce::File())
+            return { binary };
 
     for (const auto& dir : juce::RangedDirectoryIterator (contents, false, "*", juce::File::findDirectories))
     {
         if (dir.getFile().getFileName() == "Resources")
             continue;
-        for (const auto& entry : juce::RangedDirectoryIterator (dir.getFile(), false, "*", juce::File::findFiles))
-            if (! entry.isHidden())
-                return entry.getFile();
+        if (const auto binary = firstFileIn (dir.getFile()); binary != juce::File())
+            binaries.add (binary);
     }
 
-    return {};
+    return binaries;
 }
 
 /** The whole question for one plugin file the scan found and could not load:
     the reason token, or empty when nothing confident can be said. */
 inline juce::String whyUnloadable (const juce::File& fileOrBundle)
 {
-    const auto binary = pluginBinaryOf (fileOrBundle);
-    if (! binary.existsAsFile())
-        return {};
+    juce::Array<Architecture> built;
 
-    juce::FileInputStream in (binary);
-    if (in.failedToOpen())
-        return {};
+    for (const auto& binary : pluginBinariesOf (fileOrBundle))
+    {
+        juce::FileInputStream in (binary);
+        // One binary that cannot be read is one that might be the host's.
+        built.add (in.failedToOpen() ? Architecture::unknown : describeBinaryArchitecture (in));
+    }
 
-    return whyUnloadable (describeBinaryArchitecture (in), hostArchitecture());
+    return whyUnloadable (built, hostArchitecture());
 }
 
 } // namespace plectrify::pluginbinary

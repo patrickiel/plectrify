@@ -31,6 +31,7 @@ import type {
   SceneState,
   StatusState,
 } from './types';
+import type { PluginFormat } from './legacyPlugins';
 import {
   LOOPER_SESSION_DIR,
   LOOPER_SESSION_INDEX,
@@ -174,6 +175,9 @@ interface NodeInfo {
   // module's plugin is unloaded (deep standby).
   pluginVersion?: string;
   pluginManufacturer?: string;
+  /** Which format hosts the plugin (`'vst3'` | `'legacy'`); absent reads as
+      `'vst3'`. Part of the identity a patch matches against. */
+  format?: PluginFormat;
 }
 
 interface RackSnapshot {
@@ -2843,6 +2847,7 @@ export class JuceEngine implements EngineBridge {
         name: n.name,
         pluginVersion: n.pluginVersion,
         pluginManufacturer: n.pluginManufacturer,
+        format: n.format,
         displayName: meta.displayName,
         color: meta.color,
         styleVariant: meta.styleVariant,
