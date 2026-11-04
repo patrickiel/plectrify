@@ -48,6 +48,7 @@ import {
 } from './shared.ts';
 import { DEV_SERVER_PORT, DEV_SERVER_URL } from './devServer.ts';
 import {
+  BSDTAR,
   assertWindows,
   clearBuildMarker,
   copyUiBesideExe,
@@ -124,7 +125,7 @@ function stageBundledPlugins(): void {
 
     mkdirSync(destination, { recursive: true });
     console.log(`==> Staging ${plugin.name} ${plugin.version} for the dev build`);
-    run('stage plugin', 'tar.exe', ['-xf', archive, '-C', destination]);
+    run('stage plugin', BSDTAR, ['-xf', archive, '-C', destination]);
   }
 }
 

@@ -34,7 +34,7 @@ import {
   JUCE_PATCHED_FILES, JUCE_PATCHES, ROOT, TEST_TARGETS, bundledPluginsFor, capture, fail,
   fstCommitOf, pinnedDependencyCommit, pnpm, probe, run, sha256File,
 } from './shared.ts';
-import { assertWindows, findCMake, findCTest, powershell } from './windows.ts';
+import { BSDTAR, assertWindows, findCMake, findCTest, powershell } from './windows.ts';
 import { APT_REPOSITORY_FILES } from './aptRepository.ts';
 
 assertWindows('release.windows.ts');
@@ -338,7 +338,7 @@ function stageBundledPlugins(destination: string): void {
 
     // tar.exe (bsdtar) reads zip, and is the same extractor the source archive
     // step uses — no PowerShell in the release path.
-    run('stage plugin', 'tar.exe', ['-xf', archive, '-C', destination]);
+    run('stage plugin', BSDTAR, ['-xf', archive, '-C', destination]);
 
     // The archive is a package payload, so what it contains is a claim rather
     // than a certainty. The app looks for this bundle by name.
@@ -526,7 +526,7 @@ mkdirSync(juceBundlePath, { recursive: true });
 run('Archiving tracked Plectrify source', 'git', [
   '-C', ROOT, 'archive', '--format=zip', `--output=${trackedSourceZip}`, 'HEAD',
 ]);
-run('Unpacking the tracked source', 'tar', ['-x', '-f', trackedSourceZip, '-C', plectrifySourcePath]);
+run('Unpacking the tracked source', BSDTAR, ['-x', '-f', trackedSourceZip, '-C', plectrifySourcePath]);
 cpSync(juceSourcePath, juceBundlePath, {
   recursive: true,
   filter: (src) => !/(^|[\\/])\.git([\\/]|$)/.test(relative(juceSourcePath, src)),
@@ -549,7 +549,7 @@ Plectrify licence: GNU AGPL version 3 only
 `,
 );
 rmSync(sourceArchivePath, { force: true });
-run('Building the corresponding-source archive', 'tar', [
+run('Building the corresponding-source archive', BSDTAR, [
   '-a', '-c', '-f', sourceArchivePath, '-C', sourceWorkPath, basename(sourceBundlePath),
 ]);
 const sourceHash = sha256File(sourceArchivePath);
