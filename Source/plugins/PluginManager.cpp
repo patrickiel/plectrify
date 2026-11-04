@@ -195,7 +195,10 @@ void PluginManager::loadUserFolders() const
 
     // A plain JSON array of absolute paths. Anything else in the file is
     // ignored rather than fatal: this is a convenience list, not a document.
-    if (auto* list = juce::JSON::parse (file).getArray())
+    // The parsed var is held by name: getArray() points into it, and on a
+    // temporary that pointer dangles before the loop reads it.
+    const auto parsed = juce::JSON::parse (file);
+    if (auto* list = parsed.getArray())
         for (const auto& entry : *list)
             if (entry.isString() && juce::File::isAbsolutePath (entry.toString()))
                 userFolders.addIfNotAlreadyThere (entry.toString());
