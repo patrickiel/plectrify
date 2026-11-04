@@ -3142,6 +3142,11 @@ void PlectrifyEngine::emitPluginFolders()
 
 void PlectrifyEngine::handleAddPluginFolder (const juce::var&)
 {
+    // One dialog at a time: replacing the chooser while its dialog is still
+    // up would destroy it under its own pending callback.
+    if (folderChooser != nullptr)
+        return;
+
     // Start where the last added folder's parent is — a user adding two
     // folders usually adds siblings — else at the home directory.
     const auto existing = pluginManager.getUserFolders();
@@ -3158,6 +3163,14 @@ void PlectrifyEngine::handleAddPluginFolder (const juce::var&)
     {
         if (safe == nullptr)
             return;
+
+        // The chooser is calling us, so release it a message later — on every
+        // outcome, or the next Add folder would be refused forever.
+        juce::MessageManager::callAsync ([safe]
+        {
+            if (safe != nullptr)
+                safe->folderChooser.reset();
+        });
 
         // An empty result is Cancel; a file is a picker that could not say no.
         const auto folder = chooser.getResult();

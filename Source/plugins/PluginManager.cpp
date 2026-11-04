@@ -415,7 +415,8 @@ void PluginManager::pruneFilesInsideBundles()
         if (type.pluginFormatName != "VST3" && isInsideAnotherFormatsBundle (type.fileOrIdentifier))
             knownPlugins.removeType (type);
 
-    for (const auto& blacklisted : knownPlugins.getBlacklistedFiles())
+    const auto blacklist = knownPlugins.getBlacklistedFiles(); // copy; the loop mutates the list
+    for (const auto& blacklisted : blacklist)
         if (! blacklisted.endsWithIgnoreCase (".vst3") && isInsideAnotherFormatsBundle (blacklisted))
             knownPlugins.removeFromBlacklist (blacklisted);
 }
