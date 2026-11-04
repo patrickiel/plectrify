@@ -85,7 +85,7 @@
     <span class="w-1 flex-none" aria-hidden="true"></span>
   {/if}
   <Tone3000Logo height={15} />
-  <span class="min-w-0 truncate text-[length:var(--drawer-font-title,.8rem)] text-ink/80">
+  <span class="t3k-label min-w-0 truncate text-[length:var(--drawer-font-title,.8rem)] text-ink/80">
     Amp captures &amp; IRs
   </span>
 </button>

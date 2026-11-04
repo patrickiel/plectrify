@@ -8,6 +8,7 @@
   import type { HTMLButtonAttributes } from 'svelte/elements';
   import type { PluginScanState } from '../../lib/engine/EngineBridge';
   import type { BlacklistedPlugin, Patch, PluginInfo } from '../../lib/engine/types';
+  import { pluginIdentityKey } from '../../lib/engine/patches';
   import type { CatalogueState } from '../../lib/engine/catalogue';
   import {
     isSectionOnBranch,
@@ -25,6 +26,8 @@
     resolveOpenKey,
     type DrawerSection,
     type PatchNode,
+    hasBothFormats,
+    type DrawerFormatFilter,
   } from './drawerTree';
   import { onRevealRequest, type RevealRequest } from './reveal';
   import { DrawerResize } from './drawerResize.svelte';
@@ -115,6 +118,11 @@
         the sidebar, since the panel is only mounted while it is the active
         tool. */
     onShowPackage?: (packageId: string) => void;
+    /** What a plugin in the legacy format is called on this platform — its
+        file extension (`.dll`, `.vst`, `.so`), which is the badge a legacy
+        plugin's tile carries. The format itself is never named; see
+        legacyPlugins.ts. */
+    legacyExtension?: string;
   }
 
   let {
@@ -146,10 +154,19 @@
     onRepairPatch,
     onOpenToneUrl,
     onShowPackage,
+    legacyExtension,
   }: Props = $props();
 
   let filter = $state('');
   const filterActive = $derived(filter.trim() !== '');
+
+  /** The plugins section's format toggle. Offered only while the library holds
+      both formats and this build loads the older one; otherwise it reads as
+      'all' whatever was last chosen, so a rescan that drops the last .so
+      plugin cannot leave the list filtered down to nothing. */
+  let formatChoice = $state<DrawerFormatFilter>('all');
+  const showFormatToggle = $derived(legacyExtension !== undefined && hasBothFormats(plugins));
+  const format = $derived(showFormatToggle ? formatChoice : 'all');
 
   /** The package a pack patch's **Pack** badge points at, or undefined — for a
       patch the user saved, or for a pack whose package this build's catalogue
@@ -200,13 +217,26 @@
 
   /** pluginName -> plugin id, for making a patch tile draggable (and dimming
       the ones whose plugin is not installed). */
-  const pluginIdByName = $derived(new Map(plugins.map((p) => [p.name, p.id])));
+  // Keyed by name *and* format: a `.dll` and a `.vst3` can share a name, and a
+  // patch tile must drag the one its state was saved from.
+  const pluginIdByIdentity = $derived(
+    new Map(plugins.map((p) => [pluginIdentityKey(p.name, p.format), p.id])),
+  );
 
   /** Everything the list draws: the filtered patch tree, the uncategorised row
       hoisted out above it, the plugins section, and the depth-first flat view
       the reveal, the reorder lookup and the stale-key resolution walk. Built in
       one pure pass — see drawerTree.ts. */
-  const tree = $derived(buildDrawerTree({ patches, plugins, packages: catalogue.items, filter }));
+  const tree = $derived(
+    buildDrawerTree({
+      patches,
+      plugins,
+      packages: catalogue.items,
+      filter,
+      format,
+      legacyExtension,
+    }),
+  );
 
   const effectiveOpenKey = $derived(resolveOpenKey(openSection, tree));
 
@@ -412,6 +442,9 @@
     {collapsed}
     shownHeight={resize.shownHeight}
     bind:filter
+    formatToggle={showFormatToggle && legacyExtension
+      ? { value: format, legacyExtension, onSelect: (next) => (formatChoice = next) }
+      : undefined}
     {blacklisted}
     {onManageBlacklist}
     {scanLabel}
@@ -449,7 +482,9 @@
         >
           <PatchTile
             patch={entry.patch}
-            pluginId={pluginIdByName.get(entry.patch.pluginName)}
+            pluginId={pluginIdByIdentity.get(
+              pluginIdentityKey(entry.patch.pluginName, entry.patch.pluginFormat),
+            )}
             revealed={revealedIds.has(entry.patch.id)}
             onDragStart={(payload) => {
               // A plain drag leaves for the rack, but stays armed for the
@@ -625,6 +660,14 @@
                       aria-hidden="true"
                     />
                     {plugin.name}
+                    {#if plugin.format === 'legacy' && legacyExtension}
+                      <!-- The one thing that distinguishes a legacy plugin from
+                           a VST3 of the same name: what its file is called. -->
+                      <span
+                        class="ml-auto flex-none rounded-sm border border-ink/15 px-1 font-mono text-[.6rem] leading-[1.3] text-muted"
+                        >{legacyExtension}</span
+                      >
+                    {/if}
                   </span>
                 {/each}
               </div>
@@ -639,7 +682,7 @@
         {#if filterActive}
           No matches.
         {:else if plugins.length === 0}
-          No VST3 plugins found. Scan for plugins, or install a starter set from the Packages panel.
+          No plugins found. Scan for plugins, or install a starter set from the Packages panel.
         {:else}
           Nothing here yet. Save a patch from a module's patch menu, or install one from the
           Packages panel.

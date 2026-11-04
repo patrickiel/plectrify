@@ -6,6 +6,8 @@ import {
   isUncategorised,
   NO_SECTION,
   resolveOpenKey,
+  hasBothFormats,
+  type DrawerFormatFilter,
   type DrawerTree,
 } from './drawerTree';
 import { patchSectionKey } from '../../lib/engine/drawerGroups';
@@ -52,12 +54,15 @@ const build = (input: {
   plugins?: PluginInfo[];
   packages?: CataloguePackage[];
   filter?: string;
+  format?: DrawerFormatFilter;
 }): DrawerTree =>
   buildDrawerTree({
     patches: input.patches ?? [],
     plugins: input.plugins ?? [],
     packages: input.packages ?? [],
     filter: input.filter ?? '',
+    format: input.format,
+    legacyExtension: '.so',
   });
 
 const titles = (tree: DrawerTree) => tree.treeRoots.map((n) => n.title);
@@ -343,5 +348,56 @@ describe('firstSectionWith', () => {
 
   it('finds nothing for an unknown id', () => {
     expect(firstSectionWith(tree.allSections, new Set(['nope']))).toBeUndefined();
+  });
+});
+
+describe('buildDrawerTree — plugin format', () => {
+  const amp: PluginInfo = { id: 'VST3-Amp', name: 'Amp', manufacturer: 'A', format: 'vst3' };
+  const old: PluginInfo = {
+    id: 'VST-SoulForce',
+    name: 'SoulForce',
+    manufacturer: 'B',
+    format: 'legacy',
+  };
+  const unmarked: PluginInfo = { id: 'VST3-Verb', name: 'Verb', manufacturer: 'A' };
+  const names = (tree: DrawerTree) =>
+    (tree.pluginsSection?.groups ?? []).flatMap(([, ps]) => ps.map((p) => p.name)).sort();
+
+  it('shows every format by default', () => {
+    expect(names(build({ plugins: [amp, old, unmarked] }))).toEqual(['Amp', 'SoulForce', 'Verb']);
+  });
+
+  it('narrows to one format, reading an unmarked plugin as VST3', () => {
+    expect(names(build({ plugins: [amp, old, unmarked], format: 'vst3' }))).toEqual([
+      'Amp',
+      'Verb',
+    ]);
+    expect(names(build({ plugins: [amp, old, unmarked], format: 'legacy' }))).toEqual([
+      'SoulForce',
+    ]);
+  });
+
+  it('leaves patches alone', () => {
+    const tree = build({
+      patches: [patch({ id: 'p1', category: 'Amps' })],
+      plugins: [amp, old],
+      format: 'legacy',
+    });
+    expect(titles(tree)).toEqual(['Amps']);
+  });
+
+  it('lets the text filter match the file type as a whole word', () => {
+    expect(names(build({ plugins: [amp, old, unmarked], filter: '.so' }))).toEqual(['SoulForce']);
+    expect(names(build({ plugins: [amp, old, unmarked], filter: 'vst3' }))).toEqual([
+      'Amp',
+      'Verb',
+    ]);
+    expect(names(build({ plugins: [amp, old, unmarked], filter: 's' }))).toEqual(['SoulForce']);
+  });
+
+  it('knows when both formats are present', () => {
+    expect(hasBothFormats([amp, unmarked])).toBe(false);
+    expect(hasBothFormats([old])).toBe(false);
+    expect(hasBothFormats([amp, old])).toBe(true);
   });
 });

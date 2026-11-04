@@ -41,7 +41,7 @@
 ---
 
 A free guitar rig for Windows, macOS and Linux. Plug in and play through your own
-VST3 amp sims and pedals. No DAW, no session to set up.
+plugin amp sims and pedals. No DAW, no session to set up.
 
 Reorder, bypass and swap modules like pedals on a board. It runs live, at the
 lowest latency your interface can do.
@@ -55,7 +55,7 @@ lowest latency your interface can do.
      readers get the -plate copy (the same near-black chip Tone3000Logo.svelte
      draws) rather than a tweaked logo. -->
 
-- **Your plugins, any order.** Any VST3 amp or effect, from any maker, in any
+- **Your plugins, any order.** Any plugin amp or effect, from any maker, in any
   chain: a free overdrive into a commercial amp sim into whatever reverb you
   love.
 - **Thousands of real amp captures.** Browse the
@@ -99,7 +99,7 @@ Grab the latest installer from the
 > [full instructions](https://plectrify.com/docs/opening-on-macos). Every
 > installer ships with a SHA-256 checksum you can verify.
 
-Bring your own VST3 plugins; plenty of great ones are free.
+Bring your own plugins; plenty of great ones are free.
 [Neural Amp Modeler](https://www.neuralampmodeler.com) is included, so TONE3000
 captures play with nothing else installed. On Windows, install your interface's
 ASIO driver for the lowest latency; macOS uses CoreAudio; on Linux pick JACK
@@ -110,7 +110,7 @@ ASIO driver for the lowest latency; macOS uses CoreAudio; on Linux pick JACK
 1. Open **Audio Settings** and pick your interface as input (the ASIO device
    type on Windows, JACK on Linux) and your speakers or headphones as output. The first
    enabled input channel is your guitar.
-2. Hit **Scan Plugins** once. Plectrify finds and remembers your VST3s.
+2. Hit **Scan Plugins** once. Plectrify finds and remembers your plugins.
 3. Add modules: an amp sim, then whatever effects you like. Drag to reorder,
    click to bypass, open a plugin's own editor from its card.
 4. Map the knobs you care about, save the rig, play.
@@ -126,7 +126,7 @@ app: **Report a bug** opens GitHub's form pre-filled with an environment report
 
 ## For developers
 
-Plectrify is a JUCE 8 (C++17) app hosting VST3s, with the entire UI a Svelte 5
+Plectrify is a JUCE 8 (C++17) plugin host, with the entire UI a Svelte 5
 web app in an embedded web view.
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) build, run and test from source

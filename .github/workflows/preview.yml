@@ -1,0 +1,95 @@
+# Installable test builds of a branch: the Windows installer, the macOS pkg and
+# the Linux .deb, attached to the run as workflow artifacts. Runs on every pull
+# request and on demand for any branch (Actions → Preview builds → Run workflow,
+# or `gh workflow run preview.yml --ref <branch>`).
+#
+# It runs the release scripts in the mode each already has for building without
+# publishing: release.windows.ts without --pre-release, release.macos.ts with
+# --ad-hoc --no-upload, release.linux.ts with --no-upload. They are invoked
+# directly rather than through `pnpm release`, which would add --pre-release on
+# Windows. So nothing is tagged, nothing reaches the GitHub release or the APT
+# repository, and no secret is needed. A CI build would not do instead: it is
+# Debug, which serves its UI and bundled plugins from the runner's source tree.
+#
+# --skip-tests because ci.yml runs the full gate on the same pull request; this
+# workflow only turns the commit into something that can be installed. The
+# installers carry the VERSION file's number like a release does, and the mac
+# pkg is unsigned (ad-hoc signed bundles, not notarized), so Gatekeeper asks
+# for right-click → Open the first time.
+name: Preview builds
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2022
+            script: scripts/release.windows.ts
+            flags: --skip-tests
+            artifact: windows-x64
+            files: |
+              artifacts/*/Plectrify-win-x64-setup.exe
+              artifacts/*/BUILD_INFO.txt
+          - name: macOS
+            os: macos-15
+            script: scripts/release.macos.ts
+            flags: --ad-hoc --no-upload --skip-tests
+            artifact: macos-arm64
+            files: artifacts/*.pkg
+          - name: Linux
+            os: ubuntu-24.04
+            script: scripts/release.linux.ts
+            flags: --no-upload --skip-tests
+            artifact: linux-x64
+            files: artifacts/*.deb
+    steps:
+      # Windows runners check out with core.autocrlf=true, and Prettier (like
+      # every other tool here) expects the LF the repository stores.
+      - name: Keep LF line endings
+        run: git config --global core.autocrlf false
+
+      # The branch's own head, not the merge commit a pull_request checkout
+      # defaults to: the build should be the commit the branch actually holds.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: ./.github/actions/setup
+
+      - name: Name the artifact
+        id: name
+        shell: bash
+        # Through env, never interpolated into the script: a fork's branch name
+        # is attacker-chosen text. Slashes are not allowed in artifact names.
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          branch="${BRANCH//[^A-Za-z0-9._-]/-}"
+          echo "label=plectrify-${{ matrix.artifact }}-${branch}-$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build installer
+        shell: bash
+        run: pnpm exec tsx ${{ matrix.script }} --version "$(tr -d '[:space:]' < VERSION)" ${{ matrix.flags }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.name.outputs.label }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 14

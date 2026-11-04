@@ -31,6 +31,7 @@ import type {
   SceneState,
   StatusState,
 } from './types';
+import type { PluginFormat } from './legacyPlugins';
 import {
   LOOPER_SESSION_DIR,
   LOOPER_SESSION_INDEX,
@@ -62,6 +63,7 @@ import {
   legacyPatchIdsFrom,
   legacyPatchPath,
   mergePatches,
+  patchFitsModule,
   patchIdsFrom,
   patchPath,
   patchTitleOverride,
@@ -173,6 +175,9 @@ interface NodeInfo {
   // module's plugin is unloaded (deep standby).
   pluginVersion?: string;
   pluginManufacturer?: string;
+  /** Which format hosts the plugin (`'vst3'` | `'legacy'`); absent reads as
+      `'vst3'`. Part of the identity a patch matches against. */
+  format?: PluginFormat;
 }
 
 interface RackSnapshot {
@@ -475,6 +480,8 @@ export class JuceEngine implements EngineBridge {
   // Plugin files the scanner skips; empty until the engine's first push lands.
   private blacklistedPlugins: BlacklistedPlugin[] = [];
   private blacklistListeners = new Set<(entries: BlacklistedPlugin[]) => void>();
+  private pluginFolders: string[] = [];
+  private pluginFolderListeners = new Set<(folders: string[]) => void>();
 
   private catalogue: CatalogueState = EMPTY_CATALOGUE_STATE;
   private catalogueListeners = new Set<(state: CatalogueState) => void>();
@@ -580,11 +587,19 @@ export class JuceEngine implements EngineBridge {
       };
       this.emitPluginScan();
     });
+    b?.addEventListener('pluginFoldersChanged', (data) => {
+      this.pluginFolders = Array.isArray(data)
+        ? (data as unknown[]).filter((f): f is string => typeof f === 'string')
+        : [];
+      for (const listener of this.pluginFolderListeners) listener(this.pluginFolders);
+    });
     b?.addEventListener('pluginBlacklistChanged', (data) => {
       this.blacklistedPlugins = Array.isArray(data)
         ? (data as Partial<BlacklistedPlugin>[]).filter(
             (e): e is BlacklistedPlugin =>
-              typeof e?.path === 'string' && typeof e?.name === 'string',
+              typeof e?.path === 'string' &&
+              typeof e?.name === 'string' &&
+              (e.reason === undefined || typeof e.reason === 'string'),
           )
         : [];
       this.emitBlacklistedPlugins();
@@ -757,6 +772,7 @@ export class JuceEngine implements EngineBridge {
     b?.emitEvent('requestRack', {});
     b?.emitEvent('requestPlugins', {});
     b?.emitEvent('requestPluginBlacklist', {});
+    b?.emitEvent('requestPluginFolders', {});
     b?.emitEvent('requestStatus', {});
     b?.emitEvent('requestAppInfo', {});
     b?.emitEvent('requestMidiDevices', {});
@@ -1581,9 +1597,10 @@ export class JuceEngine implements EngineBridge {
 
     const mod = this.rack.find((m) => m.id === moduleId);
     if (!mod) return;
-    if (mod.name !== doc.pluginName) {
-      // A blob is only meaningful to the plugin that wrote it; feeding one to
-      // a different plugin is at best ignored and at worst a crash.
+    if (!patchFitsModule(doc, mod)) {
+      // A blob is only meaningful to the plugin that wrote it — the same name
+      // in the other format included; feeding one to a different plugin is at
+      // best ignored and at worst a crash.
       console.error(
         `Patch ${patch.name} carries ${doc.pluginName} state, not ${mod.name}; loading the mapping only`,
       );
@@ -2317,6 +2334,26 @@ export class JuceEngine implements EngineBridge {
     backend()?.emitEvent('retryBlacklistedPlugins', { paths: paths ?? [] });
   }
 
+  subscribePluginFolders(listener: (folders: string[]) => void): () => void {
+    this.pluginFolderListeners.add(listener);
+    listener(this.pluginFolders);
+    return () => this.pluginFolderListeners.delete(listener);
+  }
+
+  refreshPluginFolders(): void {
+    backend()?.emitEvent('requestPluginFolders', {});
+  }
+
+  addPluginFolder(): void {
+    backend()?.emitEvent('addPluginFolder', {});
+  }
+
+  removePluginFolder(path: string): void {
+    // Same shape as the blacklist retry: no optimistic removal, the engine
+    // pushes the list it holds — unchanged if a running scan refused.
+    backend()?.emitEvent('removePluginFolder', { path });
+  }
+
   private emitBlacklistedPlugins(): void {
     for (const listener of this.blacklistListeners) listener(this.blacklistedPlugins);
   }
@@ -2810,6 +2847,7 @@ export class JuceEngine implements EngineBridge {
         name: n.name,
         pluginVersion: n.pluginVersion,
         pluginManufacturer: n.pluginManufacturer,
+        format: n.format,
         displayName: meta.displayName,
         color: meta.color,
         styleVariant: meta.styleVariant,

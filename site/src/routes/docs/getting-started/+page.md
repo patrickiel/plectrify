@@ -53,12 +53,16 @@ properly.
 
 ## 3. Scan for plugins
 
-Open **Plugins** and run a scan. Plectrify looks in the standard VST3 folders for your OS and
+Open **Plugins** and run a scan. Plectrify looks in the standard plugin folders for your OS and
 caches what it finds, so this is a one-off: you only need to run it again after installing
-something new.
+something new. Plugins that live somewhere else — an installer that chose its own folder, a
+collection you keep on another drive — are found once you add that folder under **Settings →
+Plugin folders**; the folder is scanned as soon as it is added.
 
 The scan runs in the background and survives a plugin that crashes on load: the offender is
-blacklisted and skipped next time, and you are told which one it was. VST3 only, deliberately.
+blacklisted and skipped next time, and you are told which one it was. Plectrify loads VST3
+plugins (`.vst3`) and older plugins shipped as single `.dll` files (`.vst` bundles on macOS,
+`.so` on Linux). AU and CLAP plugins are not loaded.
 
 ## 4. Add your first module
 

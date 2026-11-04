@@ -411,7 +411,7 @@ export interface EngineBridge {
   /** Open the plugin's own native editor window (native engine only). */
   openEditor(id: string): void;
 
-  /** Scan the system for VST3 plugins (native engine only). */
+  /** Scan the system for plugins (native engine only). */
   scanPlugins(): void;
   /** Subscribe to plugin-scan progress so it can be presented inside the web UI. */
   subscribePluginScan(listener: (state: PluginScanState) => void): () => void;
@@ -427,6 +427,23 @@ export interface EngineBridge {
       rescan, so the plugins are retried straight away. Refused (silently, with
       a corrective push of the unchanged list) while a scan is running. */
   retryBlacklistedPlugins(paths?: string[]): void;
+
+  /** Subscribe to the folders the user added to the plugin search path, as
+      absolute paths in the order they were added. Replays the last known list.
+      Its own stream rather than a field of `appInfo`, because these are paths
+      under the user's home and `appInfo` is what the diagnostics paste into a
+      public issue. Returns an unsubscribe function. */
+  subscribePluginFolders(listener: (folders: string[]) => void): () => void;
+  /** Ask the engine to re-push the folder list — same dropped-while-occluded
+      reasoning as refreshAppInfo. */
+  refreshPluginFolders(): void;
+  /** Add a folder. No payload: the engine opens the OS folder picker and the
+      user names it, so the page never passes a path in. The picked folder is
+      appended, pushed on `subscribePluginFolders`, and scanned at once. */
+  addPluginFolder(): void;
+  /** Stop searching `path` and forget the plugins found under it. Refused
+      (with a corrective push of the unchanged list) while a scan is running. */
+  removePluginFolder(path: string): void;
 
   /** Subscribe to the plugin catalogue joined with what is installed.
       Replays the last known state. Returns an unsubscribe function. */

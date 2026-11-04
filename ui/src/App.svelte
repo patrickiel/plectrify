@@ -7,6 +7,7 @@
   import { MockEngine } from './lib/engine/MockEngine';
   import { JuceEngine, juceAvailable } from './lib/engine/JuceEngine';
   import { DEFAULT_APP_SETTINGS } from './lib/engine/appSettings';
+  import { legacyPluginExtension } from './lib/engine/legacyPlugins';
   import { applyTheme, bootTheme } from './lib/theme';
   import type { EngineBridge, PluginScanState } from './lib/engine/EngineBridge';
   import {
@@ -108,6 +109,7 @@
   const caps = $derived({ ...STANDALONE_CAPABILITIES, ...appInfo.capabilities });
   let pluginScan = $state<PluginScanState>({ status: 'idle', pluginCount: 0 });
   let blacklistedPlugins = $state<BlacklistedPlugin[]>([]);
+  let pluginFolders = $state<string[]>([]);
   // The catalogue is owned here for the rack's module drawer, which files
   // patches under their package's category. The Packages panel keeps its own
   // subscription — subscribeCatalogue replays the last known state, so two
@@ -259,6 +261,7 @@
       engine.subscribeStatus((state) => (status = state)),
       engine.subscribeAppSettings((settings) => (appSettings = settings)),
       engine.subscribeBlacklistedPlugins((entries) => (blacklistedPlugins = entries)),
+      engine.subscribePluginFolders((folders) => (pluginFolders = folders)),
       engine.subscribeAppInfo((info) => (appInfo = info)),
       engine.subscribePluginScan((state) => (pluginScan = state)),
       engine.subscribeCatalogue((state) => (catalogue = state)),
@@ -386,6 +389,7 @@
     {appSettings}
     onSetAppSettings={(settings) => engine.setAppSettings(settings)}
     {appInfo}
+    {pluginFolders}
     capabilities={caps}
     {getReport}
     bind:looperMidiLearning
@@ -449,6 +453,10 @@
       {toneDirty}
       {pluginScan}
       {blacklistedPlugins}
+      legacyExtension={appInfo.buildInfo?.legacyPlugins === true
+        ? legacyPluginExtension(appInfo.platform)
+        : undefined}
+      platform={appInfo.platform}
       onBrowseTone3000={browseTone3000}
       {missingCaptures}
       onRepairPatch={(patchId) => void engine.tone3000Repair(patchId)}

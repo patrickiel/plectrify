@@ -47,6 +47,11 @@
     module: RackModule;
     /** Global edit mode, toggled from the top bar. */
     editing: boolean;
+    /** The legacy format's file extension on this platform (`.dll`, `.vst`,
+        `.so`): the small badge a module hosting one carries beside its title,
+        so a `.dll` "Foo" and a `.vst3` "Foo" can be told apart on the rack.
+        The format is never named — see legacyPlugins.ts. */
+    legacyExtension?: string;
     onBypass: (b: boolean) => void;
     /** The engine is still applying a bypass toggle; the power button spins
         and stays revealed until the new state comes back. */
@@ -131,6 +136,7 @@
   let {
     module,
     editing,
+    legacyExtension,
     onBypass,
     bypassPending = false,
     moduleDragging = false,
@@ -777,6 +783,18 @@
               {@attach (el: HTMLElement) => measureTitle(el, shownTitle)}>{shownTitle}</span
             >
           </span>
+        {/if}
+        {#if module.format === 'legacy' && legacyExtension}
+          <!-- The legacy format's one honest name, its extension; the same
+               badge the drawer tile wears, so a module can be traced back to
+               the plugin it was built from. -->
+          <span
+            class="module-format-chip"
+            {@attach tooltip(`${module.name} is a ${legacyExtension} plugin`, {
+              placement: 'top',
+              positionFrom: '.module-panel',
+            })}>{legacyExtension}</span
+          >
         {/if}
         <!-- The header's control cluster: the power switch, and nothing else.
              It was a pair — the switch and the options kebab — and two floating
@@ -1614,6 +1632,17 @@
      does not: a growable flex item reports its whole max-content width when
      the card is sized to its contents, so a 55-character capture name stretched
      the card as if no basis were set. */
+  .module-format-chip {
+    flex: none;
+    padding: 0 0.25rem;
+    border: 1px solid color-mix(in srgb, var(--color-ink) 15%, transparent);
+    border-radius: 0.2rem;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    line-height: 1.3;
+  }
+
   .module-title {
     position: relative;
     flex-grow: 1;

@@ -34,8 +34,19 @@ working rack autosaves so it restores on the next launch.
 
 - **Native app**: JUCE 8.0.14 (fetched via CMake `FetchContent`, pinned commit),
   C++17. Visual Studio 2022/18 generator on Windows; Ninja (or Makefiles) +
-  Xcode CLT on macOS, arm64 only, deployment floor 13.3. VST3 hosting only
-  (`JUCE_PLUGINHOST_VST3=1`; VST2/LADSPA are disabled in `CMakeLists.txt`).
+  Xcode CLT on macOS, arm64 only, deployment floor 13.3. Hosts VST3
+  (`JUCE_PLUGINHOST_VST3=1`) and, behind the CMake option
+  `PLECTRIFY_HOST_LEGACY_PLUGINS` (default ON), the VST2-era single-file
+  format (`JUCE_PLUGINHOST_VST=1`: `.dll` on Windows, `.vst` bundles on macOS,
+  `.so` on Linux). JUCE's hosting code for that format needs a header
+  Steinberg no longer distributes, so the build fetches **FST** (Free Studio
+  Technology, IEM Graz, GPLv3+, a clean-room header; pinned commit) into
+  `build*/_deps` at configure time and forwards JUCE's two `pluginterfaces/
+  vst2.x/` includes to it from a generated directory — no Steinberg-named
+  file ever enters the repo. Three rules travel with it, see *Legacy
+  plugins* below. The header compiles unchanged, but two of its struct sizes
+  differ from the SDK's that JUCE's buffers assume — hence the two
+  `juce-vst2-*.patch` files. LADSPA/LV2/AU hosting stay off.
   ASIO is on for Windows builds only (`JUCE_ASIO=1` behind `if(WIN32)`) using
   the ASIO 2.3 headers bundled with JUCE — no external SDK, no configure-time
   detection; macOS talks CoreAudio natively and has no ASIO at all. Linux:
@@ -861,6 +872,37 @@ records the substitution it made.
     land there is a distribution dropping webkit2gtk-4.1 for webkitgtk-6.0,
     which JUCE 8.0.14 does not know. Never fix this class of bug by adding a
     `-dev` package to the .deb's `Depends:`.
+  - `juce-vst2-speaker-arrangement-size.patch` and
+    `juce-vst2-pin-properties-padding.patch` — the pair that makes JUCE's
+    hosting of the older plugin format work against the FST header (see
+    *Legacy plugins*). FST compiles in place of Steinberg's header, but two
+    of its structs have a different `sizeof`: `VstSpeakerArrangement` ends in
+    a flexible array (8 bytes, where the SDK's `speakers[8]` makes 904) and
+    `VstPinProperties` omits the SDK's 48 reserved bytes (80, not 128). JUCE
+    sizes its speaker-arrangement allocation from `sizeof` and puts pin
+    properties on the stack, so the first real plugin loaded overran both —
+    a malloc abort a few calls after `effGetSpeakerArrangement`. The first
+    patch sizes the allocation from `offsetof (speakers)`, the second reads
+    pin properties through a padded buffer; both compute the same thing under
+    the original header. Found with `PlectrifyLegacyPluginProbe` (manual, not
+    a CTest) on DPF's `.so` plugins, which memset the whole SDK-sized struct.
+    Known, accepted differences that remain: `VstTimeInfo`'s two SMPTE fields
+    sit at other offsets in FST, so a plugin reading SMPTE time gets zeros.
+  - `juce-vst2-midi-key-name-storage.patch` — the third struct of that kind:
+    FST declares `MidiKeyName::keyName[]` as a flexible array, so JUCE's
+    `Vst2::MidiKeyName keyName{};` in `getNameForMidiNoteNumber` holds no
+    name at all. GCC and Clang accepted it and let `effGetMidiKeyName` write
+    past it on the stack; MSVC refuses it outright (C2466), which is how the
+    Windows build found it. It now sits at the start of a zeroed buffer with
+    room for the name.
+  - `juce-vst2-scale-before-open.patch` — the older format's twin of
+    `juce-vst3-scale-before-attach.patch`: JUCE sent a plugin declaring
+    `supportsViewDpiScaling` its scale (`effVendorSpecific` `PreS`/`AeCs`)
+    as 1.0 right before `effEditOpen` and the real factor a message loop
+    later, so DPF plugins drew at half size on a 200% display. The format has
+    no other scale channel, so a plugin that does not declare it (LSP's
+    VST2 build, most Windows freeware of that era) still opens at 1:1 and
+    offers its own zoom, if any.
 
   After changing the JUCE tag, regenerate them all against the new sources and
   delete `build*/_deps/juce-*` so FetchContent re-populates. Editing a
@@ -1364,7 +1406,13 @@ OS.
   what defines a first run for the audio stack** — see
   `chooseFirstRunAudioDevice` — just as `settings.json`'s absence does for the
   page (`setupCompleted`, `starterInstallAttempted`).
-- `known_plugins.xml` — VST3 scan cache incl. the crash blacklist (`PluginManager`).
+- `known_plugins.xml` — plugin scan cache incl. the crash blacklist and the
+  `UNLOADABLE` entries (files found but unloadable here, with the reason —
+  `PluginManager`, `PluginBinary.h`).
+- `plugin_folders.json` — the folders the user added to the plugin search path
+  (Settings → Plugin folders), a JSON array of absolute paths. Machine state
+  like `known_plugins.xml`: left out of backups, and kept by a reset for the
+  same reason as that cache, whose entries from those folders it accounts for.
 - `tone3000/credentials.json` + `state.json` — the connected TONE3000 account,
   and the browser window's size, position, monitor, page and scroll offset.
   **The one path `resolveAppFile` refuses to hand the web page**: everything else
@@ -1472,7 +1520,9 @@ spares: everything under the content root (installed packages and downloaded
 captures are the user's, the uninstallers' promise), `known_plugins.xml` and the
 scan sentinel (dropping them would empty the drawer until a Rescan, since a
 launch with packages present settles the starter install without its full scan,
-and would re-load a plugin that crashed the last one), both undo archives, the
+and would re-load a plugin that crashed the last one), `plugin_folders.json`
+(the folders those cached entries came from, without which they could no longer
+be removed), both undo archives, the
 page's own WebView2 profiles (one may be held by a DAW right now), the log and
 `crashes/`. The legacy layouts the page still migrates (`presets/`,
 `presets.json`, `lastSession.rig`, `working-history.json`) are targets, or the
@@ -1992,6 +2042,76 @@ credential Plectrify has no use for and must never carry** — every request is 
 as the signed-in user, with their token, against their own rate limit.
 
 
+### Legacy plugins
+
+Besides VST3, the app hosts the VST2-era single-file format — `.dll` on
+Windows, `.vst` bundles on macOS, `.so` on Linux — because the freeware amp
+sims and pedals people ask for (LePou, VTar Amps, NaLex…) never got VST3
+builds. JUCE 8.0.14 already carries the hosting code (`VSTPluginFormat`); it
+was off only because it needs Steinberg's withdrawn SDK header, and **FST**
+(IEM Graz, GPLv3+, a clean-room reimplementation that Debian ships in main)
+provides drop-in `aeffect.h`/`aeffectx.h` shims, so JUCE compiles unchanged.
+The feature is deliberately **implemented and not promoted**: no landing-page
+copy, no feature post, no release-notes line beyond the fact. Three rules,
+each load-bearing:
+
+1. **Never name the format.** User-facing text says "plugins" when generic and
+   the **file extension** (`.dll` / `.vst` / `.so`, by `appInfo.platform` via
+   `legacyPluginExtension`) when specific; "VST3" only where it is about VST3
+   itself. Never "VST2", "VST" or "VST compatible" for the legacy format — the
+   word is Steinberg's trademark and the one clear-cut claim they could make.
+   The diagnostics row reads `VST3 · .dll`; the drawer tile and module card
+   carry an extension chip; the Plugin folders hint names both extensions.
+   Code comments may say "VST2-era" (they are not user-facing); test files
+   assert the UI strings contain no `vst`.
+2. **No Steinberg-named file in the repo.** FST is fetched into
+   `build*/_deps/fst-src` at configure time (pinned commit in
+   `CMakeLists.txt`); the two forwarding headers are generated into
+   `build*/legacy-plugin-include/`, added as a `SYSTEM` include so its
+   `#pragma GCC warning`s stay quiet. The release scripts' provenance gate
+   checks the FST checkout like JUCE's — HEAD at the pin, untouched: **FST
+   is never patched**, the layout fixes it needs are patches to JUCE
+   (`juce-vst2-*.patch`), where the provenance machinery already exists
+   (`fstCommitOf` in `scripts/shared.ts`; `pinnedDependencyCommit` reads each
+   pin from its own `FetchContent_Declare` block, since the file now has two)
+   — ships the tree as `fst/` in the corresponding-source archive and records
+   `fstCommit` in the release manifests and BUILD_INFO files. Its GPLv3 notice
+   is in `THIRD_PARTY_NOTICES.md` and the SOURCE_OFFER texts.
+3. **One withdrawal switch.** `-DPLECTRIFY_HOST_LEGACY_PLUGINS=OFF` leaves FST
+   unfetched, the format unregistered, `appInfo.buildInfo.legacyPlugins`
+   false (so the chips never appear and the hint names `.vst3` alone) and
+   everything else unchanged. Builds without it must stay green.
+
+What follows from hosting a second format: a plugin's identity is **name +
+format** (`PluginFormat = 'vst3' | 'legacy'`, absent → `'vst3'`, on
+`PluginInfo`, `RackModule` and `Patch.pluginFormat`), because vendors ship
+both formats under one name and a VST3 state chunk loaded into a same-named
+`.dll` is a broken module — `pluginIdentityKey` / `patchFitsModule` /
+`patchFitsPlugin` in `patches.ts` are the only comparison, used by the card's
+patch menu, the drawer tile, the drop target and `applyPatchTone`. Freeware
+lives wherever its installer put it, so **Settings → Plugin folders** adds
+folders to the search path: engine-owned (`PluginManager::addUserFolder`,
+`plugin_folders.json`), the page names no path in either direction (Add opens
+the OS folder picker on the engine's side, Remove hands back a pushed path),
+the added folder is scanned at once through the existing scan queue, and the
+list rides its own `pluginFoldersChanged` stream rather than `appInfo`, which
+the diagnostics paste into public issues. **Each format walks only its own
+places** (`PluginManager::pathsForFormat`): its default locations, every user
+folder, and — VST3 alone — the managed and bundled directories. The legacy
+format's search takes every loose `.dll` it meets, so walking the VST3 folders
+too LoadLibrary'd vendor helper DLLs during the scan and reported the 32-bit
+ones as skipped plugins. A folder the user adds is searched by both, since
+naming the format is exactly what they did not do. Each format's file list is
+built once per scan and shared by the scanner and the skipped-plugin pass. And
+because JUCE's scanner is
+silent about a binary it cannot load, `PluginBinary.h` reads the PE/ELF/
+Mach-O header of every file the scan found and produced nothing for — every
+per-architecture binary in a bundle, silent if any could be the host's — and the
+"Skipped plugins" dialog shows a reason (`bits32`, `wrongArch` →
+`describeSkipReason`) instead of a Retry button for those. **32-bit plugins
+are out of scope** — no bridge; the dialog points Windows users at jBridge —
+as are AU and CLAP hosting.
+
 ## Code style
 
 - **C++**: JUCE conventions — `juce::` prefixes, `#include <JuceHeader.h>`,
@@ -2022,7 +2142,9 @@ as the signed-in user, with their token, against their own rate limit.
   (the TONE3000 slice's pure rules — state rewriting, PKCE, download paths,
   which model gets picked, where the browser window reopens) and
   `Plectrify.RackProcessor` (headless graph topology: slot order, connection
-  rebuilding, split-position arithmetic, using dummy in-memory plugins).
+  rebuilding, split-position arithmetic, using dummy in-memory plugins) and
+  `Plectrify.PluginBinary` (the PE/ELF/Mach-O header sniffing behind the
+  "Skipped plugins" reasons, on synthetic headers).
   Build the targets (`PlectrifyTests`, `PlectrifyRackTests`) then run
   `ctest --test-dir build -C Debug --output-on-failure` (ctest sits beside the
   VS-bundled cmake). `pnpm app --dist` and both release scripts run these
@@ -2041,7 +2163,7 @@ as the signed-in user, with their token, against their own rate limit.
 
 - Never commit `third_party/` (fetched dependency payloads), `build*/`,
   `ui/dist/`, or any `node_modules/` — all are gitignored.
-- The app loads and executes third-party VST3 binaries in-process; plugin
+- The app loads and executes third-party plugin binaries in-process; plugin
   scanning is user-triggered and cached, not automatic. The macOS build keeps
   that possible under the hardened runtime via the
   `com.apple.security.cs.disable-library-validation` entitlement

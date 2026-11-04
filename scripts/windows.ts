@@ -67,6 +67,12 @@ export function findCTest(cmakePath: string): string {
   fail('ctest was not found alongside CMake or on PATH.');
 }
 
+/** The bsdtar Windows ships, by absolute path — never `tar` off PATH. Under
+    Git Bash (CI's `shell: bash`, or a developer's terminal) PATH finds Git's
+    GNU tar first, which reads `D:\…` as a remote `host:path` ("Cannot connect
+    to D: resolve failed") and cannot read or write zip at all. */
+export const BSDTAR = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+
 export function exePath(config: string): string {
   return join(ROOT, 'build', 'Plectrify_artefacts', config, 'Plectrify.exe');
 }

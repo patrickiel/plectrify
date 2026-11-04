@@ -16,6 +16,7 @@
     text on the clipboard cannot drift apart. */
 
 import { laneName } from '../../lib/engine/routing';
+import { legacyPluginExtension } from '../../lib/engine/legacyPlugins';
 import { formatRamMb } from '../status/formatStats';
 import type { PluginScanState } from '../../lib/engine/EngineBridge';
 import type {
@@ -198,9 +199,12 @@ function appSection(input: DiagnosticsInput): DiagSection {
         // "no ASIO" is a Windows fact — its absence there explains a missing
         // device type. On macOS and Linux ASIO does not exist, so stating it
         // would be noise in every report.
+        // The legacy format is named by its extension, never as a format —
+        // the trademark rule in legacyPlugins.ts.
         value: build
           ? facts(
               build.vst3 ? 'VST3' : 'no VST3',
+              build.legacyPlugins === true && legacyPluginExtension(info.platform),
               (info.platform ?? 'windows') === 'windows' &&
                 (build.asio ? 'ASIO built in' : 'no ASIO'),
             )

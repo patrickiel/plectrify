@@ -5,6 +5,8 @@
   import { MAX_DRAWER_HEIGHT, MIN_DRAWER_HEIGHT } from '../../lib/engine/appSettings';
   import Button from '../../lib/components/Button.svelte';
   import TextField from '../../lib/components/TextField.svelte';
+  import SegmentedControl from '../../lib/components/SegmentedControl.svelte';
+  import type { DrawerFormatFilter } from './drawerTree';
   import { tooltip } from '../../lib/components/tooltip.svelte';
   import BrowseTone3000Tile from '../tone3000/BrowseTone3000Tile.svelte';
 
@@ -36,6 +38,14 @@
     /** Only for the separator's aria-valuenow. */
     shownHeight: number;
     filter: string;
+    /** The plugins section's format toggle, or undefined when there is only
+        one format to show. The older format is labelled by its extension and
+        never by name (legacyPlugins.ts). */
+    formatToggle?: {
+      value: DrawerFormatFilter;
+      legacyExtension: string;
+      onSelect: (value: DrawerFormatFilter) => void;
+    };
     blacklisted: BlacklistedPlugin[];
     onManageBlacklist: () => void;
     /** The scan button's own words and its aria-label — the narrow header
@@ -57,6 +67,7 @@
     collapsed,
     shownHeight,
     filter = $bindable(),
+    formatToggle,
     blacklisted,
     onManageBlacklist,
     scanLabel,
@@ -127,6 +138,26 @@
           {blacklisted.length}
           {blacklisted.length === 1 ? 'plugin' : 'plugins'} skipped
         </button>
+      {/if}
+      {#if formatToggle}
+        <!-- Narrows the Plugins section only; patches are found by what they
+             sound like, not by their plugin's file type. -->
+        <SegmentedControl
+          class="format-toggle h-auto self-stretch"
+          label="Show plugins of type"
+          value={formatToggle.value}
+          onSelect={formatToggle.onSelect}
+          tipPlacement="bottom"
+          options={[
+            { value: 'all', label: 'All', tip: 'Show every plugin' },
+            { value: 'vst3', label: 'VST3', tip: 'Show only .vst3 plugins' },
+            {
+              value: 'legacy',
+              label: formatToggle.legacyExtension,
+              tip: `Show only ${formatToggle.legacyExtension} plugins`,
+            },
+          ]}
+        />
       {/if}
       <div class="filter-field flex-none">
         <TextField
@@ -238,6 +269,30 @@
      a wide drawer does not hand it half the row. */
   .filter-field {
     width: clamp(5rem, 24cqi, 14rem);
+  }
+
+  /* The segmented control is a fixed toolbar height; here it takes the row's
+     height instead — set by the Rescan button, which follows the header's
+     control scale above — and the header's type size, so the three controls
+     line up top and bottom. */
+  .drawer-head :global(.format-toggle button) {
+    font-size: var(--ctl-text-sm);
+  }
+
+  /* On a narrow header the TONE3000 tile gives up its caption and keeps the
+     wordmark, which is the half that says what it opens — so the format
+     toggle beside the filter keeps its place at every width. */
+  @container (max-width: 40rem) {
+    /* Collapsed rather than removed: the caption's line box is what sets the
+       tile's height (the wordmark is shorter), so it stays in flow at zero
+       width and only the gap before it is taken back. */
+    .drawer-head :global(.t3k-label) {
+      max-width: 0;
+      margin-left: -0.5rem;
+    }
+    .drawer-head :global(.t3k-tile) {
+      padding-right: 0.6rem;
+    }
   }
 
   /* The extra height this field wants over the stock `sm` one, set here rather

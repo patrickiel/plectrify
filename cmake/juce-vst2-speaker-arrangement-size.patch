@@ -1,0 +1,37 @@
+Size a hosted plugin's speaker arrangement from the speakers array's offset.
+
+JUCE's VstSpeakerConfigurationHolder allocates
+`(max(8, n) - 8) * sizeof (VstSpeakerProperties) + sizeof (VstSpeakerArrangement)`,
+which is only right when the header declares `speakers[8]` as Steinberg's
+original does, so that sizeof already covers eight. Plectrify compiles this
+code against FST (a clean-room header, see CMakeLists.txt), which declares
+`speakers[]` as a flexible array: sizeof is the two leading ints, the old
+formula allocated 8 bytes for any arrangement of up to eight channels, and
+the loop filling it wrote 112 bytes per speaker into the heap behind them.
+The first real plugin loaded aborted in malloc a few calls later.
+
+`offsetof (speakers) + max(8, n) * sizeof (VstSpeakerProperties)` is the same
+number under either header.
+diff --git a/modules/juce_audio_processors_headless/format_types/juce_VSTCommon.h b/modules/juce_audio_processors_headless/format_types/juce_VSTCommon.h
+index 84f409e5d..cbfe684e1 100644
+--- a/modules/juce_audio_processors_headless/format_types/juce_VSTCommon.h
++++ b/modules/juce_audio_processors_headless/format_types/juce_VSTCommon.h
+@@ -227,8 +227,16 @@ struct SpeakerMappings  : private AudioChannelSet // (inheritance only to give e
+ 
+         Vst2::VstSpeakerArrangement* allocate (int numChannels)
+         {
+-            auto arrangementSize = (size_t) (jmax (8, numChannels) - 8) * sizeof (Vst2::VstSpeakerProperties)
+-                                    + sizeof (Vst2::VstSpeakerArrangement);
++            // PLECTRIFY_VST2_SPEAKER_ARRANGEMENT_SIZE: sized from the offset of the
++            // speakers array, not from sizeof (VstSpeakerArrangement). The original
++            // SDK header declares speakers[8], so sizeof already covers eight and
++            // the old formula added the rest; a header declaring a flexible array
++            // (FST does) has a sizeof of two ints, so that formula allocated 8
++            // bytes for any arrangement of up to eight channels, and the loop
++            // filling it then wrote 112 bytes per speaker into the heap behind
++            // them. This expression is the same number under either header.
++            auto arrangementSize = offsetof (Vst2::VstSpeakerArrangement, speakers)
++                                    + (size_t) jmax (8, numChannels) * sizeof (Vst2::VstSpeakerProperties);
+ 
+             storage.malloc (1, arrangementSize);
+             return storage.get();

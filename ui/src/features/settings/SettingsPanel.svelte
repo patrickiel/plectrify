@@ -4,11 +4,13 @@
     ArrowCounterClockwiseIcon,
     CaretLeftIcon,
     EraserIcon,
+    FolderPlusIcon,
     MinusIcon,
     PianoKeysIcon,
     PlugIcon,
     PlusIcon,
     SlidersHorizontalIcon,
+    XIcon,
   } from 'phosphor-svelte';
   import { onDestroy, onMount } from 'svelte';
   import { slide } from 'svelte/transition';
@@ -64,6 +66,14 @@
         archive made on the other one. Absent on an engine older than the
         field, which simply means the note is not offered. */
     platform?: 'windows' | 'macos' | 'linux';
+    /** The folders the user added to the plugin search path, absolute, in
+        the order added. The engine owns the list; this only shows it. */
+    pluginFolders: string[];
+    /** The file extension of the older plugin format this build also loads
+        (`.dll`, `.vst`, `.so`), for the Plugin folders hint; absent when the
+        build loads VST3 alone. Always an extension, never a format name —
+        see legacyPlugins.ts. */
+    legacyExtension?: string;
     /** Which view the panel shows: the settings list, or the MIDI learn
         table it links to. Owned by ToolSidebar so it can reset to 'main'
         whenever the panel closes. */
@@ -84,6 +94,8 @@
     onSetAppSettings,
     capabilities,
     platform,
+    pluginFolders,
+    legacyExtension,
     view,
     onShowMidi,
     onOpenSetup,
@@ -146,7 +158,24 @@
   // honest picture: nothing is blocked until the OS file dialog opens.
   let backup = $state<BackupState>({ ...IDLE_BACKUP });
   let confirmRestore = $state(false);
+  /** The folder whose Remove row is showing its confirm, or null. One at a
+      time: opening another closes the first, like the delete rows elsewhere. */
+  let confirmRemoveFolder = $state<string | null>(null);
+  /** The last path segment, for the confirm line and the row's title — the
+      whole path is on the row above it already. */
+  const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+  const folderHint = $derived(
+    legacyExtension
+      ? `Loads .vst3 and ${legacyExtension} plugins from these folders.`
+      : 'Loads .vst3 plugins from these folders.',
+  );
   let confirmReset = $state(false);
+  // The folder list is pushed once at boot, and a push is dropped while the
+  // window is hidden, so the card re-asks every time it is shown — the same
+  // request/re-push contract the Info panel follows for appInfo. Without it a
+  // folder the engine is searching could be missing from the card for the
+  // whole session.
+  onMount(() => engine.refreshPluginFolders());
   onMount(() =>
     engine.subscribeBackup((state) => {
       backup = state;
@@ -249,6 +278,57 @@
         <PianoKeysIcon size={15} aria-hidden="true" />
         MIDI settings…
       </RowButton>
+    </Card>
+    <!-- Plugin folders. The engine already searches the standard folders of
+         this OS; this is for everything an installer put elsewhere. The page
+         names no path in either direction: Add opens the OS folder picker on
+         the engine's side, and Remove hands back a path the engine pushed.
+         Not capability-gated — a DAW-hosted Plectrify loads plugins too, and
+         the folder list is shared through the data root like everything else. -->
+    <Card>
+      <p
+        class="px-[.6rem] py-[.35rem] text-[.625rem] font-semibold tracking-[.14em] text-muted uppercase"
+      >
+        Plugin folders
+      </p>
+      {#each pluginFolders as folder (folder)}
+        {#if confirmRemoveFolder === folder}
+          <InlineConfirmRow
+            message={`Stop searching "${folderName(folder)}"? Its plugins leave the drawer.`}
+            confirmLabel="Remove"
+            onConfirm={() => {
+              confirmRemoveFolder = null;
+              engine.removePluginFolder(folder);
+            }}
+            onCancel={() => (confirmRemoveFolder = null)}
+          />
+        {:else}
+          <div class="flex items-center gap-1 py-0.5 pr-1 pl-[.6rem]" title={folder}>
+            <span class="min-w-0 flex-1 truncate font-mono text-[.72rem] text-ink/80">
+              {folder}
+            </span>
+            <ToolbarButton
+              size="sm"
+              iconOnly
+              label={`Remove folder ${folderName(folder)}`}
+              onclick={() => (confirmRemoveFolder = folder)}
+            >
+              <XIcon size={13} weight="bold" />
+            </ToolbarButton>
+          </div>
+        {/if}
+      {/each}
+      <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={() => engine.addPluginFolder()}>
+        <FolderPlusIcon size={15} aria-hidden="true" />
+        Add folder…
+      </RowButton>
+      <p
+        class="px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
+      >
+        {pluginFolders.length === 0
+          ? 'Plectrify looks in the standard plugin folders for your OS. Add any other folder your plugins live in.'
+          : folderHint}
+      </p>
     </Card>
     <!-- Still the fused −/readout/+ group, so the readout stays the click
          that returns to 100%. One shape for both scales: the rack's zoom and

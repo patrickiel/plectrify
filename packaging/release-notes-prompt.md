@@ -1,6 +1,6 @@
 You are writing the GitHub release notes for Plectrify {{VERSION}}, a standalone
-Windows guitar-rig VST3 host: users chain VST3 plugins (amp sims, effects) and
-play guitar through them live.
+guitar-rig plugin host for Windows, macOS and Linux: users chain plugins (amp
+sims, effects) and play guitar through them live.
 
 Rewrite the commit subjects below into release notes for end users —
 guitarists, not developers.

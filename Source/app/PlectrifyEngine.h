@@ -496,6 +496,30 @@ private:
         as well, so running it alone loses nothing. */
     bool pendingFullRescan = false;
 
+    /** The user's own plugin folders (PluginManager::getUserFolders). The page
+        asks (`requestPluginFolders`) and is pushed the list on every change
+        (`pluginFoldersChanged`); the folder picker is an OS dialog the engine
+        opens itself, so the page names no path going in — the same promise
+        the backup dialogs keep. Paths come back out, but on their own stream,
+        never on appInfo: that block is pasted into public issues. */
+    void handleAddPluginFolder (const juce::var& payload);
+    void handleRemovePluginFolder (const juce::var& payload);
+    void emitPluginFolders();
+
+    /** Scans one folder the user just added, so the drawer fills while they
+        are still looking at the row — a narrow scan in the scanManagedPlugins
+        sense, queued the same way when a scan is in flight. A pending full
+        rescan covers it (the folder is on the search path from the moment it
+        is added) and so drops the queue. */
+    void scanPluginFolder (const juce::File& folder);
+    juce::StringArray pendingFolderScans;
+
+    /** Starts the next queued scan, if any (full before managed before
+        folders). Called when any scan ends — startScan's and the first-launch
+        bundled scan alike, since a request queued behind either waits on it. */
+    void runQueuedScan();
+    std::unique_ptr<juce::FileChooser> folderChooser;
+
     void openEditorFor (juce::AudioProcessorGraph::NodeID nodeID);
 
     /** Names this engine's write-through temporaries apart from every other

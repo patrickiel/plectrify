@@ -160,7 +160,7 @@
         <h2 class="text-sm font-semibold text-ink">Plectrify</h2>
         <p class="font-mono text-[11px] text-accent">{versionLine}</p>
       </div>
-      <p class="text-xs leading-5 text-muted">A minimal standalone guitar-rig VST3 host.</p>
+      <p class="text-xs leading-5 text-muted">A minimal standalone guitar-rig plugin host.</p>
     </div>
     <div class="flex items-center justify-between gap-3 px-[.6rem] pb-2">
       <p class="text-xs leading-5 text-muted" role="status" aria-live="polite">
