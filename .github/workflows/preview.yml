@@ -66,7 +66,7 @@ jobs:
 
       # The branch's own head, not the merge commit a pull_request checkout
       # defaults to: the build should be the commit the branch actually holds.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -87,7 +87,7 @@ jobs:
         shell: bash
         run: pnpm exec tsx ${{ matrix.script }} --version "$(tr -d '[:space:]' < VERSION)" ${{ matrix.flags }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.name.outputs.label }}
           path: ${{ matrix.files }}
