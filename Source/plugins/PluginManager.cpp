@@ -159,7 +159,10 @@ bool PluginManager::removeUserFolder (const juce::File& folder)
             listChanged = true;
         }
     }
-    for (const auto& blacklisted : knownPlugins.getBlacklistedFiles()) // copy; the loop mutates the list
+    // getBlacklistedFiles() returns a reference to the list the loop mutates,
+    // so iterate a copy.
+    const auto blacklist = knownPlugins.getBlacklistedFiles();
+    for (const auto& blacklisted : blacklist)
     {
         if (forget (blacklisted, {}))
         {
@@ -412,7 +415,8 @@ void PluginManager::pruneFilesInsideBundles()
         if (type.pluginFormatName != "VST3" && isInsideAnotherFormatsBundle (type.fileOrIdentifier))
             knownPlugins.removeType (type);
 
-    for (const auto& blacklisted : knownPlugins.getBlacklistedFiles())
+    const auto blacklist = knownPlugins.getBlacklistedFiles(); // copy; the loop mutates the list
+    for (const auto& blacklisted : blacklist)
         if (! blacklisted.endsWithIgnoreCase (".vst3") && isInsideAnotherFormatsBundle (blacklisted))
             knownPlugins.removeFromBlacklist (blacklisted);
 }
