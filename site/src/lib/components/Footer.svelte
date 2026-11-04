@@ -95,5 +95,9 @@
       <p>© {new Date().getFullYear()} {PRODUCT}. AGPL-3.0.</p>
       <p>No account, no telemetry, no DRM.</p>
     </div>
+    <p class="text-control-off mt-3 font-mono text-[0.64rem] tracking-[0.06em]">
+      VST and ASIO are registered trademarks of Steinberg Media Technologies GmbH. {PRODUCT} is not affiliated
+      with or endorsed by Steinberg.
+    </p>
   </div>
 </footer>

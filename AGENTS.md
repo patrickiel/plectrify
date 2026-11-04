@@ -4,9 +4,9 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-Plectrify is a **guitar-rig VST3 host** for Windows, macOS (Apple
+Plectrify is a **guitar-rig plugin host** for Windows, macOS (Apple
 Silicon) and Linux (x86-64): a JUCE (C++17) engine that runs a user-ordered chain of VST3
-plugins (amp sims, effects) live from a guitar input. It ships in two
+and older plugins (amp sims, effects; see *Legacy plugins*) live from a guitar input. It ships in two
 shapes from one engine: the standalone application, and a VST3 plugin that
 runs the same rig inside a DAW (`Source/plugin/`; core support — release
 packaging for the plugin is still to come). The entire UI is a Svelte web
@@ -40,7 +40,7 @@ working rack autosaves so it restores on the next launch.
   format (`JUCE_PLUGINHOST_VST=1`: `.dll` on Windows, `.vst` bundles on macOS,
   `.so` on Linux). JUCE's hosting code for that format needs a header
   Steinberg no longer distributes, so the build fetches **FST** (Free Studio
-  Technology, IEM Graz, GPLv3+, a clean-room header; pinned commit) into
+  Technology, IEM Graz, GPLv3+, a reverse-engineered header; pinned commit) into
   `build*/_deps` at configure time and forwards JUCE's two `pluginterfaces/
   vst2.x/` includes to it from a generated directory — no Steinberg-named
   file ever enters the repo. Three rules travel with it, see *Legacy
@@ -82,7 +82,7 @@ Source/               # C++ — vertical slices, each folder is on the include p
   audio/              # RackProcessor (AudioProcessorGraph wrapper), InputRouterProcessor
   plugin/             # the VST3 build: PluginProcessor (AudioProcessor + HostServices),
                       #   PluginEditor (the shared web view in a DAW's window)
-  plugins/            # PluginManager (VST3 scan / cache / async instantiation)
+  plugins/            # PluginManager (plugin scan / cache / async instantiation)
   namplugin/          # Linux only: our JUCE build of Neural Amp Modeler (see Linux below)
   rackui/             # PluginEditorWindow (hosts a plugin's own editor)
   tone3000/             # TONE3000 account, its own browser window, downloads, NAM state codec
@@ -1239,7 +1239,7 @@ page hides the surface behind `HostCapabilities`).
   put whatever that memory last held on the speakers. Metering itself is gated
   on an atomic the wizard arms and drops (and `JuceEngine`'s boot disarms, since
   a reloaded page cannot un-arm what the previous one left set).
-- `PluginManager` (`Source/plugins/`) — VST3-only `AudioPluginFormatManager` +
+- `PluginManager` (`Source/plugins/`) — `AudioPluginFormatManager` (VST3, plus the older format) +
   `KnownPluginList` cached to disk; instantiation is async (message thread);
   scanning runs on a background thread with a crash blacklist
   (dead-man's-pedal file). `KnownPluginList` is internally locked, so the
@@ -2049,11 +2049,13 @@ Windows, `.vst` bundles on macOS, `.so` on Linux — because the freeware amp
 sims and pedals people ask for (LePou, VTar Amps, NaLex…) never got VST3
 builds. JUCE 8.0.14 already carries the hosting code (`VSTPluginFormat`); it
 was off only because it needs Steinberg's withdrawn SDK header, and **FST**
-(IEM Graz, GPLv3+, a clean-room reimplementation that Debian ships in main)
-provides drop-in `aeffect.h`/`aeffectx.h` shims, so JUCE compiles unchanged.
-The feature is deliberately **implemented and not promoted**: no landing-page
-copy, no feature post, no release-notes line beyond the fact. Three rules,
-each load-bearing:
+(IEM Graz, GPLv3+, by its own account a reverse-engineered header, written
+without the SDK, that Debian ships in main) provides drop-in
+`aeffect.h`/`aeffectx.h` shims, so JUCE compiles unchanged. Public copy stays
+**simple and general**: "your plugins" or "VST3 and older", with the file
+extensions where a doc has to be specific, and no feature post or headline of
+its own. Every public surface that says "VST3" or "ASIO" carries the Steinberg
+trademark line (site footer, README). Three rules, each load-bearing:
 
 1. **Never name the format.** User-facing text says "plugins" when generic and
    the **file extension** (`.dll` / `.vst` / `.so`, by `appInfo.platform` via

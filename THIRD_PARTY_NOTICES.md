@@ -50,17 +50,18 @@ Plectrify also hosts plugins in the older binary format that predates VST3
 (`.dll` files on Windows, `.vst` bundles on macOS, `.so` files on Linux). The
 interface header it is compiled against is **FST**, by IOhannes m zmölnig at
 the Institute of Electronic Music and Acoustics (IEM), Graz —
-<https://git.iem.at/zmoelnig/FST> — a clean-room description of that interface
-written without reference to, and without accepting the licence of, Steinberg's
-withdrawn SDK. FST is licensed under the **GNU General Public License, version 3
+<https://git.iem.at/zmoelnig/FST> — by its authors' own account a reverse-engineered
+description of that interface, written without reference to, and without
+accepting the licence of, Steinberg's withdrawn SDK. FST is licensed under the **GNU General Public License, version 3
 or later**, which is compatible with Plectrify's AGPL-3.0-only. It is a
 header-only library fetched at build time (pinned to the commit named in
 `CMakeLists.txt`) and compiled into the application; the pinned tree ships in
 the corresponding-source archive beside JUCE's.
 
-FST and Plectrify are not affiliated with or endorsed by Steinberg. The format
-is not referred to as "VST" anywhere in Plectrify; VST is a registered trademark
-of Steinberg Media Technologies GmbH.
+FST and Plectrify are not affiliated with or endorsed by Steinberg. Plectrify's
+app, documentation and website do not call that format "VST" or describe it as
+VST compatible; VST is a registered trademark of Steinberg Media Technologies
+GmbH.
 
 ## Steinberg ASIO SDK
 

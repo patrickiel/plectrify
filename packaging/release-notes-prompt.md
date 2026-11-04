@@ -32,6 +32,9 @@ Rules:
 - Merge commits that belong to one feature into a single bullet.
 - Plain, concrete language; present tense ("Adds…", "Fixes…"); no marketing
   tone, no exclamation marks, no emoji.
+- Never write "VST2", "VST" or "VST compatible" for plugins older than VST3,
+  even if a commit does: they are "older plugins", or by file extension (`.dll`,
+  `.vst`, `.so`). "VST3" is fine for VST3 itself.
 - Scale to the release: a small release may be just Highlights and a couple of
   bullets; never pad.
 - Output the markdown only — no preamble, no closing remarks, and no code

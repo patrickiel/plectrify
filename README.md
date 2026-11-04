@@ -140,3 +140,6 @@ Free software under the
 [GNU Affero General Public License, version 3](LICENSE). Every release ships a
 checksummed source archive of the exact Plectrify and patched JUCE code it was
 built from.
+
+VST and ASIO are registered trademarks of Steinberg Media Technologies GmbH.
+Plectrify is not affiliated with or endorsed by Steinberg.

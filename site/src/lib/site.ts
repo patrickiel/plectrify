@@ -35,9 +35,9 @@ export const IDENTITY = 'Chain your plugins and play.';
  * "amp sim"), because they are what someone looking for this actually types.
  */
 export const DESCRIPTION =
-  'A free guitar rig for Windows, macOS and Linux. Plug in and play through your own VST3 amp sims ' +
-  'and pedals, chained like a real pedalboard, or load thousands of real amp captures from ' +
-  'TONE3000. Tuner, metronome, looper and setlists for practice and for playing live.';
+  'A free guitar rig for Windows, macOS and Linux. Plug in and play through your own amp sim and ' +
+  'pedal plugins, VST3 and older, chained like a real pedalboard, or load thousands of real amp ' +
+  'captures from TONE3000. Tuner, metronome, looper and setlists for practice and for playing live.';
 
 export const REPO = 'https://github.com/patrickiel/plectrify';
 

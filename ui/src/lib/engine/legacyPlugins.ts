@@ -1,7 +1,7 @@
 /** The two plugin formats the engine hosts, and the one rule about naming the
     second: it is never called "VST2" or "VST" anywhere a user reads. "VST" is
     Steinberg's registered trademark and this format is hosted through a
-    clean-room header (FST — see THIRD_PARTY_NOTICES.md), so the page says
+    reverse-engineered header (FST — see THIRD_PARTY_NOTICES.md), so the page says
     "plugins" when it means plugins in general and names the *file extension*
     when it has to be specific. Only VST3 is ever called by its name. */
 
