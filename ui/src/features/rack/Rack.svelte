@@ -2154,6 +2154,7 @@
               {catalogue}
               {pluginScan}
               blacklisted={blacklistedPlugins}
+              hiddenPlugins={appSettings.hiddenPlugins}
               {legacyExtension}
               height={appSettings.drawerHeight}
               onSetHeight={(px) => onSetAppSettings({ drawerHeight: px })}

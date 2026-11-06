@@ -36,6 +36,7 @@ See [audio setup and latency](/docs/audio-setup) for how to choose a buffer prop
 
 ## A plugin does not show up after scanning
 
+- Check you did not hide it: **Settings → Hidden plugins** lists what is left out of the drawer.
 - Plectrify loads VST3 plugins (`.vst3`) and older plugins shipped as `.dll` files (`.vst`
   bundles on macOS, `.so` on Linux). AU and CLAP plugins are not loaded.
 - Check the plugin actually installed to a standard plugin folder for your OS — or add the folder

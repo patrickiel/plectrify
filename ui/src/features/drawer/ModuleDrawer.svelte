@@ -7,8 +7,13 @@
   import { prefersReducedMotion } from 'svelte/motion';
   import type { HTMLButtonAttributes } from 'svelte/elements';
   import type { PluginScanState } from '../../lib/engine/EngineBridge';
-  import type { BlacklistedPlugin, Patch, PluginInfo } from '../../lib/engine/types';
+  import type { BlacklistedPlugin, HiddenPlugin, Patch, PluginInfo } from '../../lib/engine/types';
   import { pluginIdentityKey } from '../../lib/engine/patches';
+  import {
+    HIDE_PLUGIN_DRAG_TYPE,
+    hidePluginDragData,
+    visiblePlugins,
+  } from '../../lib/engine/hiddenPlugins';
   import type { CatalogueState } from '../../lib/engine/catalogue';
   import {
     isSectionOnBranch,
@@ -54,6 +59,10 @@
     catalogue: CatalogueState;
     pluginScan: PluginScanState;
     blacklisted: BlacklistedPlugin[];
+    /** Plugins the user left out of the Plugins section (persisted app
+        setting). Nothing else here is narrowed by it: `plugins` stays the whole
+        library, so a patch tile for a hidden plugin still drags. */
+    hiddenPlugins: HiddenPlugin[];
     /** Drawer height in CSS pixels (persisted app setting, pre chrome
         scale); committed back through onSetHeight when the top edge is
         dragged. */
@@ -131,6 +140,7 @@
     catalogue,
     pluginScan,
     blacklisted,
+    hiddenPlugins,
     height,
     onSetHeight,
     collapsed,
@@ -160,12 +170,15 @@
   let filter = $state('');
   const filterActive = $derived(filter.trim() !== '');
 
+  /** The bare plugins this drawer offers: the library minus what was hidden. */
+  const shownPlugins = $derived(visiblePlugins(plugins, hiddenPlugins));
+
   /** The plugins section's format toggle. Offered only while the library holds
       both formats and this build loads the older one; otherwise it reads as
       'all' whatever was last chosen, so a rescan that drops the last .so
       plugin cannot leave the list filtered down to nothing. */
   let formatChoice = $state<DrawerFormatFilter>('all');
-  const showFormatToggle = $derived(legacyExtension !== undefined && hasBothFormats(plugins));
+  const showFormatToggle = $derived(legacyExtension !== undefined && hasBothFormats(shownPlugins));
   const format = $derived(showFormatToggle ? formatChoice : 'all');
 
   /** The package a pack patch's **Pack** badge points at, or undefined — for a
@@ -230,7 +243,7 @@
   const tree = $derived(
     buildDrawerTree({
       patches,
-      plugins,
+      plugins: shownPlugins,
       packages: catalogue.items,
       filter,
       format,
@@ -326,7 +339,7 @@
   function revealIds(request: Exclude<RevealRequest, { kind: 'browse' }>): string[] {
     if (request.kind === 'patch')
       return patches.some((p) => p.id === request.id) ? [request.id] : [];
-    const { patchIds, pluginIds } = packageDrawerItems(request.id, patches, plugins);
+    const { patchIds, pluginIds } = packageDrawerItems(request.id, patches, shownPlugins);
     return [...patchIds, ...pluginIds];
   }
 
@@ -419,6 +432,10 @@
     const payload = { pluginId: plugin.id };
     e.dataTransfer.setData('application/x-plectrify-new-module', JSON.stringify(payload));
     e.dataTransfer.setData('text/plain', plugin.name);
+    // Offered to Settings' Hidden plugins card as well as to the rack. A bare
+    // plugin is the only thing that can be hidden, and this type is how the card
+    // tells one from a patch tile, whose drag is otherwise the same.
+    e.dataTransfer.setData(HIDE_PLUGIN_DRAG_TYPE, hidePluginDragData(plugin));
     onDragStart(payload);
   }
 </script>
@@ -683,6 +700,8 @@
           No matches.
         {:else if plugins.length === 0}
           No plugins found. Scan for plugins, or install a starter set from the Packages panel.
+        {:else if shownPlugins.length === 0}
+          Every plugin is hidden. Bring them back under Settings → Hidden plugins.
         {:else}
           Nothing here yet. Save a patch from a module's patch menu, or install one from the
           Packages panel.

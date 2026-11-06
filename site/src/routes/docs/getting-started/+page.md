@@ -64,6 +64,10 @@ blacklisted and skipped next time, and you are told which one it was. Plectrify 
 plugins (`.vst3`) and older plugins shipped as single `.dll` files (`.vst` bundles on macOS,
 `.so` on Linux). AU and CLAP plugins are not loaded.
 
+Everything the scan finds is offered in the drawer, drum machines included. To leave one out,
+open **Settings** and drag it from the drawer onto **Hidden plugins**. That list is also how to
+bring it back; a rescan does not, and a rig or patch that uses a hidden plugin keeps working.
+
 ## 4. Add your first module
 
 A **module** is one hosted plugin sitting in one slot of the rack. Add one from the picker and
