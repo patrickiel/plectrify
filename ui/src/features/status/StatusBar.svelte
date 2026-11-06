@@ -265,7 +265,7 @@
   </div>
 
   <section
-    class="relative flex h-full w-full items-center before:absolute before:top-1/2 before:left-0 before:h-5 before:w-px before:-translate-y-1/2 before:bg-[color-mix(in_srgb,var(--color-ink)_calc(16%*var(--ink-k)),transparent)] before:content-[''] after:absolute after:top-1/2 after:right-0 after:h-5 after:w-px after:-translate-y-1/2 after:bg-[color-mix(in_srgb,var(--color-ink)_calc(16%*var(--ink-k)),transparent)] after:content-['']"
+    class="relative flex h-full w-full items-center"
     aria-label="Guitar tuner"
     onpointerenter={enterZone('tuner')}
     onfocusin={(e) => {
