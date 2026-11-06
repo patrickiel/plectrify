@@ -2131,6 +2131,12 @@ void PlectrifyEngine::captureFactoryState (const juce::String& pluginId,
                 return;
             }
 
+            // A new TONE3000 patch starts with NAM's own gate off: the rig's
+            // noise gate already sits ahead of the chain.
+            for (auto* parameter : instance->getParameters())
+                if (parameter->getName (64) == "NoiseGateActive")
+                    parameter->setValue (0.0f);
+
             juce::MemoryBlock block;
             instance->getStateInformation (block);
 

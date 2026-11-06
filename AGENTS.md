@@ -1962,7 +1962,12 @@ a tone is: capture the module's live state, rewrite two strings, apply it back
 (`NamStateCodec`). Starting from the live state is why swapping tones keeps the
 player's own gain, EQ and noise gate. With no module on screen the plugin is
 instantiated off the graph for its factory state, which is why no template blob
-has to be shipped and kept in step with NAM's version.
+has to be shipped and kept in step with NAM's version. That factory path is the
+one place a tone starts fresh, so it also sets NAM's `NoiseGateActive` off on
+that instance: the rig's gate already sits ahead of the chain. Not a changed
+plugin default, because Windows and macOS ship upstream's binary and a plain NAM
+module keeps upstream's gate-on. A swap on an existing module keeps that module's
+gate, and a patch already on disk keeps what it saved.
 
 `NamStateCodec` is the most delicate thing in the slice, and three details are
 load-bearing: the state is wrapped in JUCE's binary-XML envelope *and* in

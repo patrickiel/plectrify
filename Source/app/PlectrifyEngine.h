@@ -259,10 +259,11 @@ private:
     juce::String captureStateOf (const juce::String& moduleId,
                                  juce::String* pluginName = nullptr,
                                  juce::String* pluginVersion = nullptr) const;
-    /** Instantiate a plugin off the graph purely to read its factory state and
-        parameter list. The TONE3000 panel needs this when a tone is turned into
-        a patch with no module to start from; it is the alternative to shipping
-        a template blob that would rot against the plugin's version. */
+    /** Instantiate a plugin off the graph purely to read its factory state, with
+        NAM's own noise gate switched off, and parameter list. The TONE3000 panel
+        needs this when a tone is turned into a patch with no module to start
+        from; it is the alternative to shipping a template blob that would rot
+        against the plugin's version. */
     void captureFactoryState (const juce::String& pluginId,
                               std::function<void (juce::String, juce::var)> onDone);
     /** The scanned Neural Amp Modeler's plugin id, or empty if no scan has

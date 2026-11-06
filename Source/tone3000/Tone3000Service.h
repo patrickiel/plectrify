@@ -47,7 +47,7 @@ public:
         std::function<juce::String (const juce::String& moduleId)> captureModuleState;
 
         /** Instantiate `pluginId` off the graph and answer with its factory
-            state and its parameter list, or an empty state on failure. Async,
+            state (NAM's own gate off) and its parameter list, or an empty state on failure. Async,
             because plugin instantiation is. Used when a patch is being created
             from the drawer with no module to start from — which is why no
             template blob has to be shipped and kept in step with NAM's version. */

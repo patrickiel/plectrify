@@ -214,6 +214,33 @@ int main (int argc, char* argv[])
            "the plugin accepted the longer path");
     longer.deleteFile();
 
+    // A new TONE3000 patch's gate (PlectrifyEngine::captureFactoryState): set on
+    // an instance that never processed audio, it has to reach the saved state.
+    const auto findGate = [] (juce::AudioPluginInstance& instance) -> juce::AudioProcessorParameter*
+    {
+        for (auto* parameter : instance.getParameters())
+            if (parameter->getName (64) == "NoiseGateActive")
+                return parameter;
+
+        return nullptr;
+    };
+
+    juce::String freshError;
+    auto fresh = formats.createPluginInstance (*found[0], 48000.0, 512, freshError);
+    auto* freshGate = fresh != nullptr ? findGate (*fresh) : nullptr;
+    auto* gate = findGate (*plugin);
+
+    check (freshGate != nullptr && gate != nullptr, "the plugin exports NoiseGateActive");
+
+    if (freshGate != nullptr && gate != nullptr)
+    {
+        check (gate->getValue() > 0.5f, "the gate is on by default");
+        freshGate->setValue (0.0f);
+        applyState (*plugin, captureState (*fresh));
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+        check (gate->getValue() < 0.5f, "a state saved with the gate off applies as off");
+    }
+
     plugin->releaseResources();
     plugin.reset();
 
