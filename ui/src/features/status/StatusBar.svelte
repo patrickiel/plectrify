@@ -63,7 +63,8 @@
   // gain marker, reading a meter — closing only when the pointer leaves the
   // bar or enters another zone, whose panel takes over. A panel that vanished
   // the moment the pointer slipped off a 40px pill was one that had to be
-  // re-aimed at every time.
+  // re-aimed at every time. Panels are children of the bar's zones, so being on
+  // one counts as being on the bar; StatusSlideout bridges the gap between them.
   type Slideout = 'tuner' | 'mute' | 'gate';
   let barHovered = $state(false);
   let hoveredSlideout = $state<Slideout | null>(null);
@@ -199,7 +200,7 @@
 {/if}
 
 <footer
-  class="relative z-70 grid h-10 w-full flex-none [zoom:var(--ui-scale,1)] grid-cols-[1fr_minmax(11rem,21rem)_1fr] items-center bg-(--bar-surface) backdrop-blur-2xl [--bar-surface:var(--color-chrome)] [--footer-font-size:.75rem] before:absolute before:top-[-1px] before:right-(--tool-rail-w) before:left-0 before:h-px before:bg-[color-mix(in_srgb,var(--color-ink)_calc(10%*var(--ink-k)),transparent)] before:content-[''] max-[1100px]:grid-cols-[1fr_minmax(10rem,15rem)_1fr] max-[860px]:grid-cols-[1fr_minmax(9rem,12rem)_1fr] max-[620px]:grid-cols-[1fr_minmax(7rem,9rem)_1fr]"
+  class="relative z-70 grid h-10 w-full flex-none [zoom:var(--ui-scale,1)] grid-cols-[1fr_minmax(11rem,21rem)_1fr] items-center bg-chrome backdrop-blur-2xl [--footer-font-size:.75rem] before:absolute before:top-[-1px] before:right-(--tool-rail-w) before:left-0 before:h-px before:bg-[color-mix(in_srgb,var(--color-ink)_calc(10%*var(--ink-k)),transparent)] before:content-[''] max-[1100px]:grid-cols-[1fr_minmax(10rem,15rem)_1fr] max-[860px]:grid-cols-[1fr_minmax(9rem,12rem)_1fr] max-[620px]:grid-cols-[1fr_minmax(7rem,9rem)_1fr]"
   aria-label="Input, tuner, and output status"
   onpointerenter={() => (barHovered = true)}
   onpointerleave={() => {

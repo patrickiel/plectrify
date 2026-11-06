@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ArrowCounterClockwiseIcon, PianoKeysIcon } from 'phosphor-svelte';
-  import { fly, slide } from 'svelte/transition';
+  import { slide } from 'svelte/transition';
   import { describeTrigger } from '../../lib/engine/midi';
   import {
     NOISE_GATE_ATTACK_MS,
@@ -19,10 +19,11 @@
   import SegmentedControl from '../../lib/components/SegmentedControl.svelte';
   import { cn } from '../../lib/components/classNames';
   import { createReveal } from '../../lib/components/reveal.svelte';
+  import StatusSlideout from './StatusSlideout.svelte';
 
   /**
-   * The GATE pill's slideout, built like the mute's: a drawer pulled out of
-   * the bar, docked to its top edge, open while the pointer is in the zone.
+   * The GATE pill's slideout, built like the mute's: a panel floating above the
+   * bar, pointing at the pill, open while the pointer is in the zone.
    *
    * The threshold is the control that matters, so it is drawn over the live
    * input level: the fill is what the IN meter shows, on the threshold's own
@@ -61,26 +62,6 @@
 
   const expert = $derived(viewMode === 'expert');
 
-  /** Centred on the GATE pill like the mute's panel is on its pill — but the
-      pill sits near the window's left edge, so a centred 28rem panel can run
-      off it. Measure once laid out and shift it just far enough back in. */
-  function keepOnScreen(node: HTMLElement) {
-    const fit = () => {
-      node.style.setProperty('--shift', '0px');
-      const rect = node.getBoundingClientRect();
-      const margin = 8;
-      const shift =
-        rect.left < margin
-          ? margin - rect.left
-          : rect.right > window.innerWidth - margin
-            ? window.innerWidth - margin - rect.right
-            : 0;
-      node.style.setProperty('--shift', `${shift}px`);
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }
   // Motion for what Expert reveals — see reveal.svelte.ts.
   const reveal = createReveal();
 
@@ -111,11 +92,7 @@
     'w-[3.6rem] flex-none text-right text-[color:color-mix(in_srgb,var(--color-ink)_60%,transparent)] tabular-nums';
 </script>
 
-<div
-  class="absolute bottom-full left-1/2 z-60 flex w-[28rem] max-w-[calc(100vw-1rem)] translate-x-[calc(-50%+var(--shift,0px))] flex-col gap-[.1rem] rounded-[.4rem_.4rem_0_0] border border-b-0 border-[color:color-mix(in_srgb,var(--color-ink)_calc(18%_*_var(--ink-k)),transparent)] bg-[color:var(--bar-surface)] px-[.4rem] py-[.35rem] font-mono text-[length:var(--footer-font-size)] font-[650] text-[color:color-mix(in_srgb,var(--color-ink)_80%,transparent)] shadow-[0_-4px_14px_color-mix(in_srgb,var(--color-void)_20%,transparent)] backdrop-blur-2xl"
-  transition:fly={{ y: 8, duration: 140 }}
-  {@attach keepOnScreen}
->
+<StatusSlideout class="w-[28rem]">
   <div class="flex items-center justify-between gap-3 py-[.1rem] pr-[.1rem] pl-[.35rem]">
     <span>Noise gate</span>
     <!-- Simple/Expert rides in the header, where the sidebar tools keep it: a
@@ -341,4 +318,4 @@
       </div>
     </div>
   {/if}
-</div>
+</StatusSlideout>
