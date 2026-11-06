@@ -62,7 +62,7 @@
        where the theme sits — a theme is set once for a room, but which readout
        you want is something you flip while looking at the tuner. -->
   <div class="flex items-center justify-between gap-3 py-[.1rem] pr-[.1rem] pl-[.35rem]">
-    <span class="text-[color:color-mix(in_srgb,var(--color-ink)_80%,transparent)]">Display</span>
+    <span class="text-[color:color-mix(in_srgb,var(--color-ink)_80%,transparent)]">Tuner</span>
     <SegmentedControl
       label="Tuner display"
       value={display}
