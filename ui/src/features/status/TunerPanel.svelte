@@ -1,6 +1,5 @@
 <script lang="ts">
   import { PianoKeysIcon } from 'phosphor-svelte';
-  import { fly } from 'svelte/transition';
   import { NEEDLE_PRECISIONS, STROBE_PRECISIONS } from '../../lib/engine/appSettings';
   import { describeTrigger } from '../../lib/engine/midi';
   import type {
@@ -13,6 +12,7 @@
   import { learnBadgeClass } from '../../lib/components/learnSkin';
   import { tooltip } from '../../lib/components/tooltip.svelte';
   import SegmentedControl from '../../lib/components/SegmentedControl.svelte';
+  import StatusSlideout from './StatusSlideout.svelte';
 
   interface Props {
     display: TunerDisplayMode;
@@ -52,24 +52,17 @@
   }: Props = $props();
 </script>
 
-<!-- The tuner's slideout: a drawer pulled out of the bar, not a card hovering
-     over it. It borrows the bar's own surface and docks flush to its top edge —
-     flush also means there is no gap to cross on the way in, so the pointer never
-     leaves the zone and the panel needs no bridge to survive the trip.
-
-     Settings only. The readout itself lives in the bar, where it is visible
-     without a hover — so this drawer holds nothing that has to be watched. -->
-<div
-  class="absolute right-0 bottom-full left-0 z-60 mx-auto flex w-max flex-col gap-[.1rem] rounded-[.4rem_.4rem_0_0] border border-b-0 border-[color:color-mix(in_srgb,var(--color-ink)_calc(18%_*_var(--ink-k)),transparent)] bg-[color:var(--bar-surface)] px-[.4rem] py-[.35rem] font-mono text-[length:var(--footer-font-size)] font-[650] text-[color:color-mix(in_srgb,var(--color-ink)_80%,transparent)] shadow-[0_-4px_14px_color-mix(in_srgb,var(--color-void)_20%,transparent)] backdrop-blur-2xl"
-  transition:fly={{ y: 8, duration: 140 }}
->
+<!-- The tuner's slideout. Settings only: the readout itself lives in the bar,
+     where it is visible without a hover, so this panel holds nothing that has to
+     be watched. -->
+<StatusSlideout class="w-max">
   <!-- A segmented control rather than a checkbox: the readouts are named
        alternatives, and a checkbox would leave that mutual exclusivity implicit.
        It lives here, beside the display it changes, rather than in the setup menu
        where the theme sits — a theme is set once for a room, but which readout
        you want is something you flip while looking at the tuner. -->
   <div class="flex items-center justify-between gap-3 py-[.1rem] pr-[.1rem] pl-[.35rem]">
-    <span class="text-[color:color-mix(in_srgb,var(--color-ink)_80%,transparent)]">Display</span>
+    <span class="text-[color:color-mix(in_srgb,var(--color-ink)_80%,transparent)]">Tuner</span>
     <SegmentedControl
       label="Tuner display"
       value={display}
@@ -173,4 +166,4 @@
       </button>
     </div>
   </div>
-</div>
+</StatusSlideout>

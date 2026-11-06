@@ -1,15 +1,14 @@
 <script lang="ts">
   import { PianoKeysIcon } from 'phosphor-svelte';
-  import { fly } from 'svelte/transition';
   import { describeTrigger } from '../../lib/engine/midi';
   import type { MidiTrigger } from '../../lib/engine/types';
   import Button from '../../lib/components/Button.svelte';
   import SegmentedControl from '../../lib/components/SegmentedControl.svelte';
+  import StatusSlideout from './StatusSlideout.svelte';
 
   /**
-   * The mute pill's slideout, built like the tuner's: a drawer pulled out of the
-   * bar rather than a card hovering over it, docked flush to its top edge so the
-   * pointer never leaves the zone on the way in.
+   * The mute pill's slideout, built like the tuner's: a panel floating above the
+   * bar, pointing at the pill.
    *
    * It holds the mute's MIDI binding and the feedback guard's on/off, with the
    * sentence explaining what that buys — the pill itself had only a tooltip,
@@ -42,10 +41,7 @@
   }: Props = $props();
 </script>
 
-<div
-  class="absolute bottom-full left-1/2 z-60 flex w-max max-w-[19rem] -translate-x-1/2 flex-col gap-[.1rem] rounded-[.4rem_.4rem_0_0] border border-b-0 border-[color:color-mix(in_srgb,var(--color-ink)_calc(18%_*_var(--ink-k)),transparent)] bg-[color:var(--bar-surface)] px-[.4rem] py-[.35rem] font-mono text-[length:var(--footer-font-size)] font-[650] text-[color:color-mix(in_srgb,var(--color-ink)_80%,transparent)] shadow-[0_-4px_14px_color-mix(in_srgb,var(--color-void)_20%,transparent)] backdrop-blur-2xl"
-  transition:fly={{ y: 8, duration: 140 }}
->
+<StatusSlideout class="w-max max-w-[19rem]">
   <!-- The mute's footswitch, learned here rather than in the MIDI dialog. The
        tools' own switch is the model, down to the wording: the button says what
        to do next rather than what it is, so an unlabelled key icon is not left
@@ -122,4 +118,4 @@
       Feedback detected — the output is muted right now.
     </p>
   {/if}
-</div>
+</StatusSlideout>
