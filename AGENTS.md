@@ -1349,8 +1349,9 @@ between two lanes; no lane can be emptied or born by one. The TS mirror is
 (`AppSettings.hiddenPlugins`, `ui/src/lib/engine/hiddenPlugins.ts`). The gesture
 is dragging a drawer plugin chip onto the Hidden plugins card in Settings, so the
 drawer carries no control for it and it is on offer only while Settings is open.
-The chip's drag has a type of its own, which is how the card lights up for a bare
-plugin and not for a patch tile, and the card commits on `dragend` rather than at
+The chip's drag has a type of its own, which is how the card mounts its
+`DropOverlay` (the same one a rack card uses for replace and swap, so a drop looks
+the same everywhere) for a bare plugin and not for a patch tile, and the card commits on `dragend` rather than at
 the drop: hiding removes the chip, and a drag source removed mid-gesture may never
 report the end Rack is waiting for. It is a
 filter on the page rather than a scan exclusion, because the scan's result is

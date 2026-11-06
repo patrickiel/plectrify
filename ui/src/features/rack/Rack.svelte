@@ -25,6 +25,7 @@
   } from './routeGeometry';
   import Button from '../../lib/components/Button.svelte';
   import ConfirmDialog from '../../lib/components/ConfirmDialog.svelte';
+  import DropOverlay from '../../lib/components/DropOverlay.svelte';
   import IconButton from '../../lib/components/IconButton.svelte';
   import TaskDialog from '../../lib/components/TaskDialog.svelte';
   import type {
@@ -1564,11 +1565,9 @@
               >
                 {@render moduleCard(m)}
                 {#if rackDrag !== null}
-                  <div
-                    class="replace-zone"
-                    class:replace-zone-over={over}
-                    class:replace-zone-blocked={!allowed}
-                    role="presentation"
+                  <DropOverlay
+                    {over}
+                    blocked={!allowed}
                     ondragenter={() => {
                       if (allowed) cardTargetId = m.id;
                     }}
@@ -1586,16 +1585,14 @@
                       dropOnModule(m);
                     }}
                   >
-                    <span class="replace-badge" aria-hidden="true">
-                      {#if swapping}
-                        <ArrowsLeftRightIcon size={13} weight="bold" />
-                        Swap
-                      {:else}
-                        <SwapIcon size={13} weight="bold" />
-                        Replace
-                      {/if}
-                    </span>
-                  </div>
+                    {#if swapping}
+                      <ArrowsLeftRightIcon size={13} weight="bold" />
+                      Swap
+                    {:else}
+                      <SwapIcon size={13} weight="bold" />
+                      Replace
+                    {/if}
+                  </DropOverlay>
                 {/if}
               </div>
             {/snippet}
@@ -1740,7 +1737,7 @@
                      something arriving, the move arrows for a module changing
                      seats. No pill and no word — a gap is 2.25rem of glass and
                      a label beside it would be bigger than the target it names.
-                     Cards are the other way round (see .replace-badge): there
+                     Cards are the other way round (see DropOverlay): there
                      the ring is a whole module wide, and what needs saying is
                      which of two things the drop does to the module already
                      sitting in it. -->
@@ -2608,52 +2605,14 @@
   }
 
   /* Dropping onto a card rather than into a gap — a tile (the module becomes
-     what was dropped) or another module (the two trade places). The zone
-     covers the whole card and is mounted only while a drag is in flight, so
-     exactly one element sees the drag — the card's own knobs, menus and docks
-     can neither swallow the drop nor fire a dragleave as the pointer crosses
-     them.
+     what was dropped) or another module (the two trade places) — is drawn by
+     DropOverlay, including what a drop this module cannot take does. What stays
+     here is the module beneath: only a *replace* greys it, since that module is
+     on its way out, where a swapped one is only changing seats.
 
-     It speaks the gaps' language (dashed accent at rest, solid and lit where
-     the drop would land) plus the one thing a gap never has to say: something
-     already here is answering for it. Hence the veil — without it a ring
-     around a card reads as "add inside", which is not a thing the rack can
-     do. Only a *replace* also greys the card beneath (see
-     `.module-slot-replacing`): that module is on its way out, where a swapped
-     one is only changing seats. */
-  .replace-zone {
-    position: absolute;
-    inset: 0;
-    /* Above the card's own hover lift (z-index 50 on .module-editing:hover),
-       which a drag started elsewhere can leave latched. */
-    z-index: 60;
-    border-radius: 1rem; /* the card's own rounded-2xl */
-    border: 1px dashed color-mix(in srgb, var(--color-accent) 45%, transparent);
-    background: color-mix(in srgb, var(--color-accent) 6%, transparent);
-    transition:
-      border-color 0.15s ease,
-      background 0.15s ease,
-      box-shadow 0.15s ease;
-  }
-  .replace-zone.replace-zone-over {
-    border-style: solid;
-    border-color: var(--color-accent);
-    background: color-mix(in srgb, var(--color-void) 62%, transparent);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent),
-      0 0 18px color-mix(in srgb, var(--color-accent) 28%, transparent);
-  }
-  /* A drop this module cannot take (the TONE3000 tile over anything but a NAM
-     module; a move drag over its own card). Left mounted and made transparent
-     to the drag rather than removed, so the pointer falls through to a card
-     with no drop handler and the browser draws its own "no" — the same answer,
-     without a ring that would have promised otherwise. Falling through matters
-     doubly for a move drag: the gaps beneath the module's own card stay
-     reachable, exactly as they were before a card was a drop target at all. */
-  .replace-zone.replace-zone-blocked {
-    opacity: 0;
-    pointer-events: none;
-  }
+     A blocked overlay falling through matters doubly for a move drag: the gaps
+     beneath the module's own card stay reachable, exactly as they were before a
+     card was a drop target at all. */
   /* The card recedes under the veil: this is the module on its way out. */
   .module-slot-replacing :global(.module-panel) {
     filter: grayscale(0.6) brightness(0.75);
@@ -2661,50 +2620,6 @@
   .module-slot :global(.module-panel) {
     transition: filter 0.15s ease;
   }
-  /* What the drop would do, in a word — Replace or Swap, since a card is the
-     one target where the same gesture has two possible meanings and the module
-     underneath has to be told which. A gap needs no such pill: its mark already
-     says everything (see .drop-zone-plus), and a label beside 2.25rem of glass
-     would be bigger than the target it names.
-
-     Straddling the card's top edge rather than centred in it: the drag image is
-     drawn on the pointer, which is somewhere in the middle of the card the
-     whole time it is hovered, and a short card has no middle to spare. The drag
-     image says what is arriving; this says which module is making way. */
-  .replace-badge {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    translate: -50% -50%;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    /* Never the event target: a child under the pointer fires the zone's own
-       dragleave, which would flicker the ring off the moment it appeared. */
-    pointer-events: none;
-    padding: 0.22rem 0.55rem;
-    border-radius: 999px;
-    border: 1px solid var(--color-accent);
-    background: color-mix(in srgb, var(--color-accent) 20%, var(--color-menu));
-    color: var(--color-accent);
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    /* Only the hovered target names the gesture; every other one is a ring and
-       nothing more, or the rack fills with the same word repeated. */
-    opacity: 0;
-    scale: 0.9;
-    transition:
-      opacity 0.15s ease,
-      scale 0.15s ease;
-  }
-  .replace-zone-over .replace-badge {
-    opacity: 1;
-    scale: 1;
-  }
-
   /* The empty rack is an insert gap the width of the chain, and it is drawn as
      one: the dashed accent outline, the accent wash and the solid-on-hover
      firming are .module-drop-zone's, at panel scale. Opaque, so it masks the

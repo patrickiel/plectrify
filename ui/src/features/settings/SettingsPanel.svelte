@@ -4,6 +4,7 @@
     ArrowCounterClockwiseIcon,
     CaretLeftIcon,
     EraserIcon,
+    EyeSlashIcon,
     FolderPlusIcon,
     MinusIcon,
     PianoKeysIcon,
@@ -53,6 +54,7 @@
   } from '../../lib/engine/backup';
   import { createReveal } from '../../lib/components/reveal.svelte';
   import Card from '../../lib/components/Card.svelte';
+  import DropOverlay from '../../lib/components/DropOverlay.svelte';
   import CardRow from '../../lib/components/CardRow.svelte';
   import InlineConfirmRow from '../../lib/components/InlineConfirmRow.svelte';
   import MenuCheckbox from '../../lib/components/MenuCheckbox.svelte';
@@ -188,7 +190,8 @@
   /** That drag is over the card right now: releasing here hides the plugin. */
   let hideDragOver = $state(false);
   let hiddenCardEl = $state<HTMLElement>();
-  /** Dropped on the card and waiting for the gesture to finish. See onDragEnd. */
+  /** Dropped on the card and waiting for the gesture to finish. See
+      onWindowDragEnd. */
   let pendingHide: HiddenPlugin | null = null;
 
   const carriesPlugin = (e: DragEvent) =>
@@ -213,22 +216,9 @@
     pendingHide = null;
   }
 
-  function onHideDragOver(e: DragEvent) {
-    if (!carriesPlugin(e) || !e.dataTransfer) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    hideDragOver = true;
-  }
-
-  function onHideDragLeave(e: DragEvent) {
-    const into = e.relatedTarget;
-    if (!(into instanceof Node && (e.currentTarget as Node).contains(into))) hideDragOver = false;
-  }
-
   function onHideDrop(e: DragEvent) {
-    if (!carriesPlugin(e) || !e.dataTransfer) return;
     e.preventDefault();
-    pendingHide = parseHidePluginDrag(e.dataTransfer.getData(HIDE_PLUGIN_DRAG_TYPE));
+    pendingHide = parseHidePluginDrag(e.dataTransfer?.getData(HIDE_PLUGIN_DRAG_TYPE) ?? '');
   }
   // The folder list is pushed once at boot, and a push is dropped while the
   // window is hidden, so the card re-asks every time it is shown — the same
@@ -398,60 +388,58 @@
          was done, so no confirm. Entries print from what is stored rather than from
          the plugin list, so one whose plugin has since been uninstalled can still
          be taken off. Not capability-gated, for the same reason as the folders. -->
-    <div
-      bind:this={hiddenCardEl}
-      role="group"
-      aria-label="Hidden plugins"
-      ondragover={onHideDragOver}
-      ondragleave={onHideDragLeave}
-      ondrop={onHideDrop}
-    >
-      <Card
-        class={[
-          'outline-offset-[-1px] transition-colors duration-120',
-          hideDragActive && 'outline-2 outline-accent/60 outline-dashed',
-          hideDragOver &&
-            'bg-[color-mix(in_srgb,var(--color-accent)_16%,transparent)] outline-accent',
-        ]}
-      >
+    <div class="relative" bind:this={hiddenCardEl}>
+      <Card>
         <p
           class="px-[.6rem] py-[.35rem] text-[.625rem] font-semibold tracking-[.14em] text-muted uppercase"
         >
           Hidden plugins
         </p>
-        {#each appSettings.hiddenPlugins as plugin (pluginIdentityKey(plugin.name, plugin.format))}
-          <div class="flex items-center gap-1 py-0.5 pr-1 pl-[.6rem]" title={plugin.name}>
-            <span class="min-w-0 flex-1 truncate text-[.8rem] text-ink/80">{plugin.name}</span>
-            {#if plugin.format === 'legacy' && legacyExtension}
-              <span
-                class="flex-none rounded-sm border border-ink/15 px-1 font-mono text-[.6rem] leading-[1.3] text-muted"
-                >{legacyExtension}</span
+        <!-- Only the rows give way, so the title and the hint stay in sight however
+             much a scan found that nobody wants in a guitar chain. -->
+        <div class="max-h-36 overflow-y-auto">
+          {#each appSettings.hiddenPlugins as plugin (pluginIdentityKey(plugin.name, plugin.format))}
+            <div class="flex items-center gap-1 py-0.5 pr-1 pl-[.6rem]" title={plugin.name}>
+              <span class="min-w-0 flex-1 truncate text-[.8rem] text-ink/80">{plugin.name}</span>
+              {#if plugin.format === 'legacy' && legacyExtension}
+                <span
+                  class="flex-none rounded-sm border border-ink/15 px-1 font-mono text-[.6rem] leading-[1.3] text-muted"
+                  >{legacyExtension}</span
+                >
+              {/if}
+              <ToolbarButton
+                size="sm"
+                iconOnly
+                label={`Show ${plugin.name} in the drawer again`}
+                onclick={() =>
+                  onSetAppSettings({
+                    hiddenPlugins: showPlugin(appSettings.hiddenPlugins, plugin),
+                  })}
               >
-            {/if}
-            <ToolbarButton
-              size="sm"
-              iconOnly
-              label={`Show ${plugin.name} in the drawer again`}
-              onclick={() =>
-                onSetAppSettings({ hiddenPlugins: showPlugin(appSettings.hiddenPlugins, plugin) })}
-            >
-              <XIcon size={13} weight="bold" />
-            </ToolbarButton>
-          </div>
-        {/each}
+                <XIcon size={13} weight="bold" />
+              </ToolbarButton>
+            </div>
+          {/each}
+        </div>
         <p
-          class={[
-            'px-[.6rem] pb-[.4rem] text-[.7rem] leading-[1.35]',
-            hideDragActive
-              ? 'font-medium text-accent'
-              : 'text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]',
-          ]}
+          class="px-[.6rem] pt-1 pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
         >
-          {hideDragActive
-            ? 'Drop here to hide it from the drawer.'
-            : 'Drag a plugin here from the drawer to hide it. Rigs and patches using it keep working.'}
+          Drag a plugin here from the drawer to hide it. Rigs and patches using it keep working.
         </p>
       </Card>
+      {#if hideDragActive}
+        <DropOverlay
+          over={hideDragOver}
+          style="--drop-overlay-radius: var(--radius-control-lg)"
+          ondragenter={() => (hideDragOver = true)}
+          ondragleave={() => (hideDragOver = false)}
+          ondragover={(e) => e.preventDefault()}
+          ondrop={onHideDrop}
+        >
+          <EyeSlashIcon size={13} weight="bold" />
+          Hide
+        </DropOverlay>
+      {/if}
     </div>
     <!-- Still the fused −/readout/+ group, so the readout stays the click
          that returns to 100%. One shape for both scales: the rack's zoom and
