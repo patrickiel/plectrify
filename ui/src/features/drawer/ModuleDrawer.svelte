@@ -663,9 +663,7 @@
                     draggable="true"
                     ondragstart={(e) => startPluginDrag(e, plugin)}
                     ondragend={onDragEnd}
-                    {@attach tooltip(
-                      'Drag onto a gap to add a module, or onto a module to replace it',
-                    )}
+                    {@attach tooltip('Drag to add or replace')}
                   >
                     <!-- The same grip every draggable thing in the drawer
                            carries (see BrowseTone3000Tile, PatchTile): one
