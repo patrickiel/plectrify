@@ -13,6 +13,7 @@ import { TONE3000_ARCHITECTURES } from './types';
 import { isMidiTrigger } from './midi';
 import { normalizePositions } from './knobLayout';
 import { namDefaultKnobs } from './tone3000';
+import { normalizeHiddenPlugins } from './hiddenPlugins';
 import {
   normalizeActiveSetlistId,
   normalizeActiveSongId,
@@ -74,6 +75,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   drawerCollapsed: false,
   drawerOpenSection: '',
   drawerPatchOrder: {},
+  hiddenPlugins: [],
   catalogueHintDismissed: false,
   starterInstallAttempted: false,
   setupCompleted: false,
@@ -300,6 +302,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
     drawerOpenSection:
       typeof candidate?.drawerOpenSection === 'string' ? candidate.drawerOpenSection : '',
     drawerPatchOrder: patchOrderMap(candidate?.drawerPatchOrder),
+    hiddenPlugins: normalizeHiddenPlugins(candidate?.hiddenPlugins),
     catalogueHintDismissed: bool(
       candidate?.catalogueHintDismissed,
       DEFAULT_APP_SETTINGS.catalogueHintDismissed,

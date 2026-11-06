@@ -4,6 +4,7 @@
     ArrowCounterClockwiseIcon,
     CaretLeftIcon,
     EraserIcon,
+    EyeSlashIcon,
     FolderPlusIcon,
     MinusIcon,
     PianoKeysIcon,
@@ -25,6 +26,14 @@
   import { TONE3000_ARCHITECTURES } from '../../lib/engine/types';
   import { ARCHITECTURE_LABELS } from '../../lib/engine/tone3000';
   import {
+    HIDE_PLUGIN_DRAG_TYPE,
+    hidePlugin,
+    parseHidePluginDrag,
+    showPlugin,
+  } from '../../lib/engine/hiddenPlugins';
+  import { pluginIdentityKey } from '../../lib/engine/patches';
+  import type { HiddenPlugin } from '../../lib/engine/types';
+  import {
     MAX_RACK_ZOOM,
     MAX_UI_SCALE,
     MIN_RACK_ZOOM,
@@ -45,6 +54,7 @@
   } from '../../lib/engine/backup';
   import { createReveal } from '../../lib/components/reveal.svelte';
   import Card from '../../lib/components/Card.svelte';
+  import DropOverlay from '../../lib/components/DropOverlay.svelte';
   import CardRow from '../../lib/components/CardRow.svelte';
   import InlineConfirmRow from '../../lib/components/InlineConfirmRow.svelte';
   import MenuCheckbox from '../../lib/components/MenuCheckbox.svelte';
@@ -170,6 +180,46 @@
       : 'Loads .vst3 plugins from these folders.',
   );
   let confirmReset = $state(false);
+
+  // The Hidden plugins card is the drop target for a drawer plugin chip. It
+  // watches the window rather than being told by the drawer, because the drag's
+  // own type already says everything it needs, and it means the card asks
+  // nothing of anybody while Settings is closed.
+  /** A plugin chip is being dragged somewhere: the card says it can take it. */
+  let hideDragActive = $state(false);
+  /** That drag is over the card right now: releasing here hides the plugin. */
+  let hideDragOver = $state(false);
+  let hiddenCardEl = $state<HTMLElement>();
+  /** Dropped on the card and waiting for the gesture to finish. See
+      onWindowDragEnd. */
+  let pendingHide: HiddenPlugin | null = null;
+
+  const carriesPlugin = (e: DragEvent) =>
+    e.dataTransfer?.types.includes(HIDE_PLUGIN_DRAG_TYPE) ?? false;
+
+  function onWindowDragStart(e: DragEvent) {
+    hideDragActive = carriesPlugin(e);
+    // The panel scrolls, and a highlight nobody can see highlights nothing.
+    if (hideDragActive) hiddenCardEl?.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** The hide lands here rather than at the drop. It takes the chip out of the
+      drawer, and a drag source removed mid-gesture may never get its own
+      dragend, which is the only thing that tells Rack the drag is over: the
+      drawer would stay sunk. This listener is on the window, so the chip's own
+      handler has already run. */
+  function onWindowDragEnd() {
+    hideDragActive = false;
+    hideDragOver = false;
+    if (pendingHide)
+      onSetAppSettings({ hiddenPlugins: hidePlugin(appSettings.hiddenPlugins, pendingHide) });
+    pendingHide = null;
+  }
+
+  function onHideDrop(e: DragEvent) {
+    e.preventDefault();
+    pendingHide = parseHidePluginDrag(e.dataTransfer?.getData(HIDE_PLUGIN_DRAG_TYPE) ?? '');
+  }
   // The folder list is pushed once at boot, and a push is dropped while the
   // window is hidden, so the card re-asks every time it is shown — the same
   // request/re-push contract the Info panel follows for appInfo. Without it a
@@ -228,6 +278,8 @@
   const setBindings = (settings: { midiBindings: Record<string, MidiTrigger> }) =>
     onSetAppSettings(settings);
 </script>
+
+<svelte:window ondragstart={onWindowDragStart} ondragend={onWindowDragEnd} />
 
 {#if view === 'midi'}
   <!-- Full height, so the MIDI view's binding lists can flex into whatever the
@@ -330,6 +382,65 @@
           : folderHint}
       </p>
     </Card>
+    <!-- Hidden plugins: the list a drawer plugin chip is dragged onto, and the one
+         way back. So hiding is only on offer while Settings is open, and costs the
+         drawer no control of its own. Bringing one back is undone as cheaply as it
+         was done, so no confirm. Entries print from what is stored rather than from
+         the plugin list, so one whose plugin has since been uninstalled can still
+         be taken off. Not capability-gated, for the same reason as the folders. -->
+    <div class="relative" bind:this={hiddenCardEl}>
+      <Card>
+        <p
+          class="px-[.6rem] py-[.35rem] text-[.625rem] font-semibold tracking-[.14em] text-muted uppercase"
+        >
+          Hidden plugins
+        </p>
+        <!-- Only the rows give way, so the title and the hint stay in sight however
+             much a scan found that nobody wants in a guitar chain. -->
+        <div class="max-h-36 overflow-y-auto">
+          {#each appSettings.hiddenPlugins as plugin (pluginIdentityKey(plugin.name, plugin.format))}
+            <div class="flex items-center gap-1 py-0.5 pr-1 pl-[.6rem]" title={plugin.name}>
+              <span class="min-w-0 flex-1 truncate text-[.8rem] text-ink/80">{plugin.name}</span>
+              {#if plugin.format === 'legacy' && legacyExtension}
+                <span
+                  class="flex-none rounded-sm border border-ink/15 px-1 font-mono text-[.6rem] leading-[1.3] text-muted"
+                  >{legacyExtension}</span
+                >
+              {/if}
+              <ToolbarButton
+                size="sm"
+                iconOnly
+                label={`Show ${plugin.name} in the drawer again`}
+                onclick={() =>
+                  onSetAppSettings({
+                    hiddenPlugins: showPlugin(appSettings.hiddenPlugins, plugin),
+                  })}
+              >
+                <XIcon size={13} weight="bold" />
+              </ToolbarButton>
+            </div>
+          {/each}
+        </div>
+        <p
+          class="px-[.6rem] pt-1 pb-[.4rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
+        >
+          Drag a plugin here from the drawer to hide it. Rigs and patches using it keep working.
+        </p>
+      </Card>
+      {#if hideDragActive}
+        <DropOverlay
+          over={hideDragOver}
+          style="--drop-overlay-radius: var(--radius-control-lg)"
+          ondragenter={() => (hideDragOver = true)}
+          ondragleave={() => (hideDragOver = false)}
+          ondragover={(e) => e.preventDefault()}
+          ondrop={onHideDrop}
+        >
+          <EyeSlashIcon size={13} weight="bold" />
+          Hide
+        </DropOverlay>
+      {/if}
+    </div>
     <!-- Still the fused −/readout/+ group, so the readout stays the click
          that returns to 100%. One shape for both scales: the rack's zoom and
          the chrome's (toolbar + sidebar + status bar as one setting). The

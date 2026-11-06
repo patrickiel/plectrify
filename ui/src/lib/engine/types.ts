@@ -326,6 +326,13 @@ export interface PluginInfo {
   packageId?: string;
 }
 
+/** A plugin the user hid from the module drawer, by its identity (name + format)
+    so it stays hidden wherever its file moves; see hiddenPlugins.ts. */
+export interface HiddenPlugin {
+  name: string;
+  format: PluginFormat;
+}
+
 /** A saved snapshot of the entire signal chain: which plugins, in what order,
     each slot's knob mappings, bypass state, and full plugin state (tone). The
     UI only ever sees the id + name — the chain contents live engine-side (in
@@ -474,6 +481,10 @@ export interface AppSettings {
       name sort, so a new patch appears without touching the stored order, and
       ids naming patches since deleted are simply skipped. */
   drawerPatchOrder: Record<string, string[]>;
+  /** Plugins left out of the module drawer, edited under Settings → Hidden
+      plugins. Only the drawer reads it: they are still scanned, and a rig or a
+      patch using one keeps working. See hiddenPlugins.ts. */
+  hiddenPlugins: HiddenPlugin[];
   /** True once the user has dismissed the empty-rack starter-plugins hint.
       The Packages panel stays available in the rail either way — dismissing
       only stops the suggestion, it does not remove the feature. */

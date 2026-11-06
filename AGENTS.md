@@ -1345,6 +1345,24 @@ between two lanes; no lane can be emptied or born by one. The TS mirror is
 `swapModulesInRack` in `rackMove.ts` — keep the two in step, as with
 `moveModuleInRack`/`moveSlot`.
 
+**Hiding a plugin** takes it out of the drawer and nothing else
+(`AppSettings.hiddenPlugins`, `ui/src/lib/engine/hiddenPlugins.ts`). The gesture
+is dragging a drawer plugin chip onto the Hidden plugins card in Settings, so the
+drawer carries no control for it and it is on offer only while Settings is open.
+The chip's drag has a type of its own, which is how the card mounts its
+`DropOverlay` (the same one a rack card uses for replace and swap, so a drop looks
+the same everywhere) for a bare plugin and not for a patch tile, and the card commits on `dragend` rather than at
+the drop: hiding removes the chip, and a drag source removed mid-gesture may never
+report the end Rack is waiting for. It is a
+filter on the page rather than a scan exclusion, because the scan's result is
+what the engine resolves a rig's plugins against (`findKnownPlugin`): a plugin
+skipped there would stop loading in every rig that uses it, while the point is
+only that a drum machine stops being offered. For the same reason `ModuleDrawer`
+filters its own copy and keeps the whole list for matching a patch tile to its
+plugin, so a hidden plugin's patches still drag onto the rack. Entries are the
+plugin's identity (name + format), not `PluginInfo.id`, which hashes the file's
+path and would bring a plugin back the day it moved.
+
 ### Persistence (all under the per-user data root)
 
 The per-user root is `%APPDATA%/Plectrify/` on Windows,
