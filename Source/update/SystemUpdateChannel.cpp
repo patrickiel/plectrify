@@ -34,7 +34,14 @@ namespace
 
     /** Runs `command` to completion under `timeoutMs` and reports its exit
         code; `output` collects stdout when `captureOutput`. Returns false on a
-        process that could not start or outlived the deadline (and is killed).
+        process that could not start or outlived the deadline (and is killed),
+        and on the pool job it runs in being told to stop — then the process
+        is left running: the one that matters is pkexec, whose prompt would
+        be orphaned by a kill, and the shell's destructor is what asks.
+
+        The wait is sliced for that, and the job must honour it: a job the
+        pool cannot stop is killed by force (pthread_cancel) at shutdown, and
+        the forced unwind through the pool's catch-all aborts the process.
 
         Waited on first and read afterwards, not read while it runs: JUCE's
         pipe read blocks, which would make the deadline unenforceable. The
@@ -47,10 +54,19 @@ namespace
         if (! process.start (command, captureOutput ? juce::ChildProcess::wantStdOut : 0))
             return false;
 
-        if (! process.waitForProcessToFinish (timeoutMs))
+        const auto* job = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+        const auto deadline = juce::Time::getMillisecondCounter() + (juce::uint32) timeoutMs;
+
+        while (! process.waitForProcessToFinish (100))
         {
-            process.kill();
-            return false;
+            if (job != nullptr && job->shouldExit())
+                return false;
+
+            if (juce::Time::getMillisecondCounter() >= deadline)
+            {
+                process.kill();
+                return false;
+            }
         }
 
         if (captureOutput)
@@ -69,8 +85,10 @@ SystemUpdateChannel::SystemUpdateChannel (std::function<void (const State&)> onS
 SystemUpdateChannel::~SystemUpdateChannel()
 {
     // A job captures `this`; a refresh may be sitting on a password prompt,
-    // and killing pkexec from here would only orphan the prompt, so the wait
-    // is bounded and the job's callbacks are WeakReference-guarded.
+    // and killing pkexec from here would only orphan the prompt, so the job
+    // is told to stop (runToCompletion's wait honours it within a slice and
+    // leaves the process be), the wait is bounded, and the job's callbacks
+    // are WeakReference-guarded.
     pool.removeAllJobs (true, 5'000);
 }
 
@@ -152,6 +170,11 @@ void SystemUpdateChannel::refresh()
         juce::uint32 exitCode = 0;
         if (runToCompletion (updatechannel::refreshCommand(), refreshTimeoutMs, false, output, exitCode))
             outcome = updatechannel::refreshOutcome (exitCode);
+
+        // Told to stop (the shell is going): pkexec is left to its prompt,
+        // and nobody is left to answer to.
+        if (juce::ThreadPoolJob::getCurrentThreadPoolJob()->shouldExit())
+            return;
 
         juce::Logger::writeToLog ("Update channel: refresh " + outcome
                                   + (outcome == "done" ? juce::String() : " (exit " + juce::String ((int) exitCode) + ")"));

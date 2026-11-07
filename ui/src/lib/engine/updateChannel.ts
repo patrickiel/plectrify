@@ -101,7 +101,8 @@ export function describeSystemUpdater(updater: SystemUpdater | ''): string {
  *  - `ready`: APT's index already has the release; open the updater.
  *  - `pending`: the index has not noticed it yet; say so and offer a refresh.
  *  - `refreshing`: the refresh is running (its password prompt may be up).
- *  - `refreshFailed`: pkexec or apt-get failed; the terminal is the way to see why.
+ *  - `refreshFailed`: pkexec or apt-get failed, or the fetch did (no network, or
+ *    a source whose key no longer verifies); the terminal is the way to see why.
  *  - `sourceMissing`: the sources entry is gone — reinstall from the download.
  *  - `sourceStale`: refreshed, and the source still cannot see the release —
  *    an older installer's entry, or a changed repository; reinstall likewise. */
@@ -154,7 +155,7 @@ export function describeUpdateChannel(
       return { text: 'Refreshing the package list…' };
     case 'refreshFailed':
       return {
-        text: "Couldn't refresh the package list. Run this in a terminal to see why:",
+        text: "Couldn't refresh the package list — check your connection and try again, or run this in a terminal to see why (if it keeps failing, reinstall from the download):",
         command: 'sudo apt update',
       };
     case 'sourceMissing':

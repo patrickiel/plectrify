@@ -112,6 +112,8 @@ namespace
         expect (command.contains ("-oDir::Etc::SourceParts=-"), "with sources.list.d disabled");
         expect (command.contains ("-oAPT::Get::List-Cleanup=0"),
                 "and the clean-up off, or every other repository's index is deleted");
+        expect (command.contains ("-oAPT::Update::Error-Mode=any"),
+                "and a failed fetch is an error, or an offline machine reads as a stale source");
         expect (! command.contains ("install") && ! command.contains ("upgrade"),
                 "it never installs anything");
         expectEquals (aptSourcesPath, "/etc/apt/sources.list.d/plectrify.sources",

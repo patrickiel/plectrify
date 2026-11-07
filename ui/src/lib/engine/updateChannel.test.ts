@@ -112,13 +112,23 @@ describe('wording', () => {
   });
 
   it('never names the file format or sends a Linux user to a .deb for a working source', () => {
-    for (const verdict of ['unknown', 'ready', 'pending', 'refreshing', 'refreshFailed'] as const) {
+    for (const verdict of ['unknown', 'ready', 'pending', 'refreshing'] as const) {
       const { text, command } = describeUpdateChannel(verdict, '0.1.9', 'plasma-discover');
       expect(`${text} ${command ?? ''}`).not.toMatch(/download|\.deb/i);
     }
     expect(describeUpdateChannel('ready', '0.1.9', 'plasma-discover').text).toContain('Discover');
     expect(describeUpdateChannel('pending', '0.1.9', '').command).toBe('sudo apt update');
     expect(describeUpdateChannel('ready', '0.1.9', '').command).toBe('sudo apt upgrade');
+  });
+
+  it('asks a failed refresh to try again first, with the download as the last resort', () => {
+    // A failed fetch is also what a rotated key looks like, so the download is
+    // named — but after the retry and the terminal, never instead of them.
+    const { text, command } = describeUpdateChannel('refreshFailed', '0.1.9', '');
+    expect(text).toMatch(/try again/i);
+    expect(command).toBe('sudo apt update');
+    expect(text.search(/try again/i)).toBeLessThan(text.search(/download/i));
+    expect(text).not.toMatch(/\.deb/i);
   });
 
   it('sends a broken source to the download, naming the release', () => {

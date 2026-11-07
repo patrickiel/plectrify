@@ -1701,15 +1701,25 @@ runs**: `pkexec apt-get update` scoped to Plectrify's own sources file
 (`-oDir::Etc::SourceList=… -oDir::Etc::SourceParts=-`), with
 `-oAPT::Get::List-Cleanup=0`, which is load-bearing — with the source list
 overridden, apt's default clean-up deletes every *other* repository's index as
-no longer configured. It changes nothing on disk but that one index, pkexec
-puts up the desktop's own password prompt (a dismissed one is exit 126,
-"not now", back to the offer), and a refresh that *succeeds* and still finds
-nothing newer is the diagnosis the issue asked for: the index is fresh, so
-this machine's source — an older installer's, or one a rotated key has
-orphaned — is what cannot see the release, and the notice says to reinstall
-from the download. The updater is started through `DetachedProcess.h`, the
-reset relaunch's fork-close-exec, rather than `startAsProcess`: a window left
-open after Plectrify quits must not keep the audio device's descriptors.
+no longer configured — and `-oAPT::Update::Error-Mode=any`, which is too:
+by default `apt-get update` exits 0 when the fetch fails (offline, a dead
+host, a signature it cannot verify) and only warns, so without it an offline
+laptop would read as a successful refresh that found nothing and be told to
+reinstall. It changes nothing on disk but that one index, pkexec puts up the
+desktop's own password prompt (a dismissed one is exit 126, "not now", back
+to the offer; a failed fetch is 100, "try again"), and a refresh that
+*succeeds* and still finds nothing newer is the diagnosis the issue asked
+for: the index is fresh, so this machine's source — an older installer's
+entry — is what cannot see the release, and the notice says to reinstall from
+the download. (A rotated key is a failed fetch instead, so that case reads
+"try again" with the terminal command, which is where the signature error
+shows.) The updater is started through `DetachedProcess.h`, the reset
+relaunch's fork-close-exec, rather than `startAsProcess`: a window left open
+after Plectrify quits must not keep the audio device's descriptors. The
+channel's waits honour the pool job being told to stop, so quitting with a
+password prompt up leaves pkexec where it is instead of ending in a forced
+thread kill — which aborts the process when it unwinds through JUCE's
+catch-all.
 Linux standalone only — the plugin declines it, since a password prompt from
 inside a DAW is not one, and `STANDALONE_CAPABILITIES.systemUpdates` defaults
 to false on the page like `selfUpdate`, for the same reason. The mock answers
