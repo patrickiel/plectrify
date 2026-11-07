@@ -57,6 +57,18 @@ struct HostCapabilities
    #else
     bool selfUpdate = false;
    #endif
+
+    // The Linux counterpart: nothing is downloaded there, since the .deb
+    // registers Plectrify's APT repository and the system installs the update.
+    // What the host offers instead is what APT's index knows, a refresh of
+    // that one source through pkexec, and a hand-off to the desktop's updater
+    // (Source/update/SystemUpdateChannel.h). Linux standalone only: the plugin
+    // has no business running pkexec from inside a DAW.
+   #if JUCE_LINUX
+    bool systemUpdates = true;  ///< the update notice's Refresh / Open updater buttons
+   #else
+    bool systemUpdates = false;
+   #endif
 };
 
 class HostServices
@@ -161,6 +173,13 @@ public:
     virtual void handleInstallUpdate (const juce::var&) {}
     virtual void handleCancelUpdateInstall() {}
     virtual void handleRequestUpdateInstallState() {}
+    // The Linux notice's helpers (HostCapabilities::systemUpdates): what APT's
+    // index knows (asked on boot and whenever the notice wants it fresh), a
+    // refresh of Plectrify's source under pkexec, and the desktop's updater.
+    // All three answer on the updateChannel stream.
+    virtual void handleRequestUpdateChannel() {}
+    virtual void handleRefreshUpdateChannel() {}
+    virtual void handleOpenSystemUpdater() {}
     virtual void handleSetWindowTheme (const juce::var&) {}
     // The inverse gate of the two above: served by the plugin, no-op in the
     // standalone (whose window the OS resizes). AUv2 gives a host no way to

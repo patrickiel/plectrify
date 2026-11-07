@@ -1056,14 +1056,21 @@ export interface HostCapabilities {
       installer path and Linux updates through APT — so elsewhere the update
       notice keeps its browser "Download" button. */
   selfUpdate: boolean;
+  /** The Linux counterpart: nothing is downloaded there, since the .deb
+      registers Plectrify's APT repository and the system installs the update.
+      The engine instead reports what APT's index knows, refreshes that one
+      source under pkexec's password prompt, and opens the desktop's updater
+      (`ui/src/lib/engine/updateChannel.ts`). Linux standalone only — the
+      plugin keeps the wording and offers no button. */
+  systemUpdates: boolean;
 }
 
 /** What absence of the capabilities field means: the standalone, which has it
     all — every engine older than the field was one.
 
-    `selfUpdate` is the one exception and defaults to false: an engine older
-    than that field has no `installUpdate` handler, so offering the button on
-    its say-so would be a button that does nothing. */
+    `selfUpdate` and `systemUpdates` are the exceptions and default to false:
+    an engine older than those fields has no handler for their events, so
+    offering a button on its say-so would be a button that does nothing. */
 export const STANDALONE_CAPABILITIES: HostCapabilities = {
   audioDevices: true,
   midiDevices: true,
@@ -1074,6 +1081,7 @@ export const STANDALONE_CAPABILITIES: HostCapabilities = {
   feedbackGuard: true,
   backup: true,
   selfUpdate: false,
+  systemUpdates: false,
 };
 
 /** Facts about the running host only the engine knows — the About dialog and the

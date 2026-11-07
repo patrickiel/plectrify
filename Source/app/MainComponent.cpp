@@ -3,6 +3,7 @@
 #include "AppReset.h"
 #include "AudioSetupRules.h"
 #include "DataRootLease.h"
+#include "DetachedProcess.h"
 #include "PipeWireJack.h"
 #include "EngineHelpers.h"
 #include "EngineWebView.h"
@@ -15,14 +16,6 @@
 #endif
 
 #include <map>
-
-#if ! JUCE_WINDOWS
- #include <cerrno>
- #include <fcntl.h>
- #include <string>
- #include <sys/resource.h>
- #include <unistd.h>
-#endif
 
 namespace
 {
@@ -128,6 +121,8 @@ MainComponent::MainComponent()
     plectrify::UpdateInstaller::cleanUpLeftovers();
     updater = std::make_unique<plectrify::UpdateInstaller> (
         [this] (const plectrify::UpdateInstaller::State& state) { emitUpdateInstallState (state); });
+    updateChannel = std::make_unique<plectrify::SystemUpdateChannel> (
+        [this] (const plectrify::SystemUpdateChannel::State& state) { emitUpdateChannel (state); });
 
     if (savedState != nullptr)
     {
@@ -456,97 +451,6 @@ void MainComponent::handleRestoreBackup (const juce::var&)
     });
 }
 
-namespace
-{
-    /** Starts `exe` with one argument as a process that outlives this one, and
-        says honestly whether it started.
-
-        Not juce::File::startAsProcess on the POSIX systems, for two reasons.
-        On macOS it opens a bundle through NSWorkspace with no completion
-        handler and returns true unconditionally, so a launch LaunchServices
-        refused (a translocated or quarantined bundle, a dismissed Gatekeeper
-        prompt) would quit this app into nothing with the reset still armed and
-        the page's "relaunch" error never shown. On Linux it forks a shell
-        without closing anything, so the new instance inherits every descriptor
-        the old one — and every plugin it hosted — had open without CLOEXEC,
-        and keeps them for its own lifetime: a device the old instance held
-        stays held, and a target of the reset it is about to perform may be a
-        file it now holds open itself.
-
-        So: fork, close every descriptor past the standard three, start a
-        session of its own (a terminal's hang-up must not take it down with the
-        old instance), and exec the executable — ours, so this is also a direct
-        launch of the binary on macOS rather than a LaunchServices request. A
-        pipe with CLOEXEC set is the classic honest signal: the exec closes it
-        and the parent reads end-of-file; a failed exec writes errno through it
-        first. Everything between fork and exec is async-signal-safe. */
-   #if JUCE_WINDOWS
-    bool startDetached (const juce::File& exe, const juce::String& argument)
-    {
-        // ShellExecute, which reports failure.
-        return exe.startAsProcess (argument);
-    }
-   #else
-    bool startDetached (const juce::File& exe, const juce::String& argument)
-    {
-        int signal[2];
-        if (::pipe (signal) != 0)
-            return false;
-
-        ::fcntl (signal[0], F_SETFD, FD_CLOEXEC);
-        ::fcntl (signal[1], F_SETFD, FD_CLOEXEC);
-
-        // Converted before the fork: nothing in the child may allocate.
-        const std::string path = exe.getFullPathName().toStdString();
-        const std::string arg  = argument.toStdString();
-
-        const pid_t pid = ::fork();
-
-        if (pid < 0)
-        {
-            ::close (signal[0]);
-            ::close (signal[1]);
-            return false;
-        }
-
-        if (pid == 0)
-        {
-            ::setsid();
-
-            struct rlimit limit {};
-            const auto highest = (::getrlimit (RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY)
-                                     ? (int) juce::jmin<rlim_t> (limit.rlim_cur, (rlim_t) (1 << 20))
-                                     : 65536;
-            for (int fd = 3; fd < highest; ++fd)
-                if (fd != signal[1])
-                    ::close (fd);
-
-            char* const argv[] = { const_cast<char*> (path.c_str()), const_cast<char*> (arg.c_str()), nullptr };
-            ::execv (path.c_str(), argv);
-
-            const int error = errno;
-            const auto written = ::write (signal[1], &error, sizeof (error));
-            juce::ignoreUnused (written);
-            ::_exit (127);
-        }
-
-        ::close (signal[1]);
-
-        int error = 0;
-        ssize_t got;
-        do
-        {
-            got = ::read (signal[0], &error, sizeof (error));
-        } while (got < 0 && errno == EINTR);
-
-        ::close (signal[0]);
-
-        // End-of-file is the exec having happened; anything read is its errno.
-        return got == 0;
-    }
-   #endif
-}
-
 void MainComponent::handleResetApp (const juce::var&)
 {
     emitBackupState ("reset", "working", {});
@@ -589,9 +493,9 @@ void MainComponent::handleResetApp (const juce::var&)
 
     // Started before this instance quits, and told to wait for it (Main.cpp).
     // The executable itself everywhere — on macOS the binary inside the
-    // bundle, not the bundle through LaunchServices; see startDetached.
+    // bundle, not the bundle through LaunchServices; see DetachedProcess.h.
     const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
-    if (! startDetached (exe, plectrify::reset::relaunchFlag))
+    if (! plectrify::startDetached (exe, { plectrify::reset::relaunchFlag }))
     {
         // Nothing would come back up to finish the job, and quitting would
         // leave the user with a closed app and a reset waiting on whenever
@@ -664,6 +568,37 @@ void MainComponent::handleCancelUpdateInstall()
 void MainComponent::handleRequestUpdateInstallState()
 {
     emitUpdateInstallState (updater->lastState());
+}
+
+void MainComponent::emitUpdateChannel (const plectrify::SystemUpdateChannel::State& state)
+{
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("probed", state.probed);
+    payload->setProperty ("updater", state.updater);
+    payload->setProperty ("candidate", state.candidate);
+    payload->setProperty ("sourceInstalled", state.sourceInstalled);
+    payload->setProperty ("canRefresh", state.canRefresh);
+    payload->setProperty ("refresh", state.refresh);
+    engine->emit ("updateChannel", juce::var (payload));
+}
+
+void MainComponent::handleRequestUpdateChannel()
+{
+    // A probe is cheap (one apt-cache read), so a request is always answered
+    // fresh rather than from the last state: the page asks after the user
+    // has been told to refresh by hand, among other times. While a refresh
+    // runs the probe is dropped and that run's own answer will arrive.
+    updateChannel->probe();
+}
+
+void MainComponent::handleRefreshUpdateChannel()
+{
+    updateChannel->refresh();
+}
+
+void MainComponent::handleOpenSystemUpdater()
+{
+    updateChannel->openUpdater();
 }
 
 void MainComponent::handleRequestBackupState()

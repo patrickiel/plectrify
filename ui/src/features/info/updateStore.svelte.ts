@@ -10,6 +10,7 @@
  */
 import { untrack } from 'svelte';
 import type { EngineBridge } from '../../lib/engine/EngineBridge';
+import { IDLE_UPDATE_CHANNEL, type UpdateChannelState } from '../../lib/engine/updateChannel';
 import { IDLE_UPDATE_INSTALL, type UpdateInstallState } from '../../lib/engine/updateInstall';
 import { fetchLatestReleaseTag } from './updateCheck';
 
@@ -62,5 +63,23 @@ export function updateInstall(): UpdateInstallState {
 export function bindUpdateInstall(engine: EngineBridge): () => void {
   return engine.subscribeUpdateInstall((state) => {
     install = state;
+  });
+}
+
+// --- The Linux channel (HostCapabilities.systemUpdates) ---------------------
+// What APT's index knows, mirrored here for the same reason: the notice and
+// the About dialog both read it, and the notice owns the subscription.
+
+let channel = $state<UpdateChannelState>({ ...IDLE_UPDATE_CHANNEL });
+
+/** The engine's last word on the APT channel; idle until a probe answers. */
+export function updateChannel(): UpdateChannelState {
+  return channel;
+}
+
+/** Subscribes the store to the engine's stream. Returns the unsubscribe. */
+export function bindUpdateChannel(engine: EngineBridge): () => void {
+  return engine.subscribeUpdateChannel((state) => {
+    channel = state;
   });
 }

@@ -204,7 +204,8 @@ users exactly as for the download buttons, and refuses a release without those
 files. The signing key is the `APT_SIGNING_KEY` secret of the `apt-signing`
 environment; `scripts/aptRepository.ts` and RELEASING.md carry the reasoning
 and the rotation rule. The update notice tells Linux users to use Software
-Updater instead of offering a download; on Windows it installs the update
+Updater instead of offering a download — and can refresh Plectrify's source
+and open the updater itself (see *Updating*); on Windows it installs the update
 itself (see *Updating* under Architecture), and on macOS it opens the release
 page.
 
@@ -1617,9 +1618,9 @@ recognise the account after Plectrify has forgotten it.
 The page checks GitHub's API once per launch for the newest release
 (`ui/src/features/info/updateCheck.ts`, `updateStore.svelte.ts`) and the
 start-up notice (`UpdateNotice.svelte`) says so. What the notice *does* about
-it is per platform. On Linux it points at Software Updater, since the .deb
-installs an APT source (above). On macOS it opens the release page in the
-browser. **On Windows the standalone installs the update itself**
+it is per platform. On macOS it opens the release page in the browser. On
+Linux the system installs it, since the .deb registers an APT source (above),
+so the notice's job is to get the system to — see *Linux* below. **On Windows the standalone installs the update itself**
 (`HostCapabilities::selfUpdate`, `Source/update/`): the Install button sends
 `installUpdate`, and `UpdateInstaller` fetches `release-manifest.json` from
 `/releases/latest/download/` — the same prefix as the download buttons, so
@@ -1678,6 +1679,42 @@ the field has no handler for the event. A Debug build honours
 one's own, which is how the whole run is exercised against a build that has
 not shipped — `packaging/windows/UPDATE-TESTING.md` is the recipe, variants
 included.
+
+**On Linux nothing is downloaded, and the notice says where APT stands
+instead** (`HostCapabilities::systemUpdates`, `Source/update/
+SystemUpdateChannel.h`, `ui/src/lib/engine/updateChannel.ts`). The notice
+learns of a release from GitHub the moment it is promoted; APT learns of it on
+its next index refresh, which the desktop runs on its own schedule — daily by
+default — so a player who opened Software Updater straight away found nothing
+to install and concluded the notice was wrong. The engine therefore answers
+three questions on the `updateChannel` stream (asked on boot and again when
+the notice shows): which version APT's index would install (`apt-cache policy
+plectrify`, run under `LC_ALL=C` because the parse keys on the English
+`Candidate:` label), whether the sources entry the .deb wrote is still on
+disk, and which desktop updater exists (Software Updater, GNOME Software or
+Discover, Discover first on a KDE session; `UpdateChannelRules.h`, with the
+`Plectrify.UpdateChannel` CTest). The page draws one verdict from that
+(`judgeUpdateChannel`): the index already has it → *Open Software Updater*;
+it is behind → say so and offer *Refresh*; the sources file is gone → reinstall
+from the download. **Refresh is the one package-manager command the app
+runs**: `pkexec apt-get update` scoped to Plectrify's own sources file
+(`-oDir::Etc::SourceList=… -oDir::Etc::SourceParts=-`), with
+`-oAPT::Get::List-Cleanup=0`, which is load-bearing — with the source list
+overridden, apt's default clean-up deletes every *other* repository's index as
+no longer configured. It changes nothing on disk but that one index, pkexec
+puts up the desktop's own password prompt (a dismissed one is exit 126,
+"not now", back to the offer), and a refresh that *succeeds* and still finds
+nothing newer is the diagnosis the issue asked for: the index is fresh, so
+this machine's source — an older installer's, or one a rotated key has
+orphaned — is what cannot see the release, and the notice says to reinstall
+from the download. The updater is started through `DetachedProcess.h`, the
+reset relaunch's fork-close-exec, rather than `startAsProcess`: a window left
+open after Plectrify quits must not keep the audio device's descriptors.
+Linux standalone only — the plugin declines it, since a password prompt from
+inside a DAW is not one, and `STANDALONE_CAPABILITIES.systemUpdates` defaults
+to false on the page like `selfUpdate`, for the same reason. The mock answers
+under `?platform=linux` (`&aptSource=stale|missing` for the two reinstall
+wordings).
 
 ### Installed patches
 

@@ -358,6 +358,8 @@ target_sources(Plectrify PRIVATE
     Source/app/WindowLookAndFeel.cpp
     Source/backup/AppReset.cpp
     Source/backup/BackupArchive.cpp
+    Source/update/SystemUpdateChannel.cpp
+    Source/update/UpdateChannelRules.cpp
     Source/update/UpdateInstaller.cpp
     Source/update/UpdateManifest.cpp)
 
@@ -1207,4 +1209,24 @@ if (BUILD_TESTING)
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
     add_test(NAME Plectrify.UpdateManifest COMMAND PlectrifyUpdateManifestTests)
+
+    # The Linux notice's rules: what apt-cache's output says the index knows,
+    # which desktop updater to open, the one apt-get command the app may run
+    # under pkexec, and what its exit code means. Pure functions — the
+    # processes live in SystemUpdateChannel, which is not under test here.
+    juce_add_console_app(PlectrifyUpdateChannelTests PRODUCT_NAME "Plectrify Update Channel Tests")
+    juce_generate_juce_header(PlectrifyUpdateChannelTests)
+    target_sources(PlectrifyUpdateChannelTests PRIVATE
+        Source/update/UpdateChannelRules.cpp
+        Tests/update/UpdateChannelRulesTests.cpp)
+    target_include_directories(PlectrifyUpdateChannelTests PRIVATE Source/update)
+    target_compile_definitions(PlectrifyUpdateChannelTests PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0)
+    target_link_libraries(PlectrifyUpdateChannelTests PRIVATE
+        juce::juce_core
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    add_test(NAME Plectrify.UpdateChannel COMMAND PlectrifyUpdateChannelTests)
 endif()

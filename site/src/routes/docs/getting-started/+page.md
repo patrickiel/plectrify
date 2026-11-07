@@ -26,7 +26,9 @@ Grab the build for your machine from the [download section](/#download).
   your app menu, or run `plectrify`), and **Plectrify as a VST3 plug-in** in `/usr/lib/vst3`,
   where every Linux DAW looks. From version 0.1.7 the package also adds Plectrify's update
   source, so later versions arrive through **Software Updater** (or `sudo apt upgrade`) like
-  the rest of your system — there is no need to download them again. Opening a newer `.deb`
+  the rest of your system — there is no need to download them again. Plectrify's own update
+  notice can refresh that source (it asks for your password) and open Software Updater for you,
+  since the system may not have noticed a new release yet. Opening a newer `.deb`
   from your browser does not work for upgrading: Ubuntu's App Center shows any installed
   version as "Installed". If you are on 0.1.6 or older, install the newest `.deb` once with
   `sudo apt install ./Plectrify-linux-x64.deb` and updates take care of themselves from then on.

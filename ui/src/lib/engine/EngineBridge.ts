@@ -18,6 +18,7 @@ import type {
   StatusState,
 } from './types';
 import type { BackupState } from './backup';
+import type { UpdateChannelState } from './updateChannel';
 import type { UpdateInstallState } from './updateInstall';
 import type { InstallFinished, InstallProgress, CatalogueState } from './catalogue';
 import type { Tone3000InstallEvent, Tone3000State } from './tone3000';
@@ -599,6 +600,27 @@ export interface EngineBridge {
       reloaded mid-download picks it up where it stands. Returns an
       unsubscribe function. */
   subscribeUpdateInstall(listener: (state: UpdateInstallState) => void): () => void;
+
+  /** Ask the engine what APT's index knows about Plectrify — which version it
+      would install, whether the installer's sources entry is still there,
+      which desktop updater exists — answered on subscribeUpdateChannel.
+
+      Linux standalone only (HostCapabilities.systemUpdates); elsewhere the
+      event is dropped and the stream stays idle. Asked on boot and again
+      whenever the notice shows, since it is one local read. */
+  requestUpdateChannel(): void;
+  /** Refresh Plectrify's APT source — that one source, nothing else — through
+      pkexec, which puts up the desktop's own password prompt, then answer
+      with what the index knows now. Fire-and-forget like installUpdate: the
+      prompt can sit for minutes. Ignored while one is running. */
+  refreshUpdateChannel(): void;
+  /** Open the desktop's updates application (Software Updater, GNOME
+      Software or Discover, whichever the probe found), detached from the app
+      so it outlives it. */
+  openSystemUpdater(): void;
+  /** Subscribe to the channel's state. Replays the last known state. Returns
+      an unsubscribe function. */
+  subscribeUpdateChannel(listener: (state: UpdateChannelState) => void): () => void;
 
   /** Update application preferences. These are persisted independently of
       rigs and the working session. */
