@@ -7,6 +7,7 @@
   import {
     describeSystemUpdater,
     describeUpdateChannel,
+    updateChannelActions,
     judgeUpdateChannel,
   } from '../../lib/engine/updateChannel';
   import {
@@ -90,20 +91,16 @@
   const systemUpdates = $derived(capabilities.systemUpdates && linux);
   const channel = $derived(updateChannel());
   const verdict = $derived(judgeUpdateChannel(latest, channel));
-  const channelLine = $derived(describeUpdateChannel(verdict, latest, channel.updater));
   const updaterName = $derived(describeSystemUpdater(channel.updater));
-  // A refresh that is done is the answer; one that failed or was declined
-  // leaves the offer to try again. The sources file gone or stale is
-  // beyond what a refresh can fix, so the download is what is offered.
-  const offerRefresh = $derived(
-    systemUpdates && channel.canRefresh && (verdict === 'pending' || verdict === 'refreshFailed'),
+  // Which buttons the verdict earns is one rule shared with the About row
+  // (updateChannelActions); the wording follows the same buttons.
+  const actions = $derived(updateChannelActions(verdict, channel));
+  const offerRefresh = $derived(systemUpdates && actions.refresh);
+  const offerUpdater = $derived(systemUpdates && actions.updater);
+  const offerDownload = $derived(actions.download);
+  const channelLine = $derived(
+    describeUpdateChannel(verdict, latest, channel.updater, offerRefresh),
   );
-  const offerUpdater = $derived(
-    systemUpdates &&
-      channel.updater !== '' &&
-      (verdict === 'ready' || verdict === 'pending' || verdict === 'refreshFailed'),
-  );
-  const offerDownload = $derived(verdict === 'sourceMissing' || verdict === 'sourceStale');
 
   // Re-ask the moment the notice shows: the boot probe predates the release
   // check, and the user may have run `apt update` by hand since.
@@ -197,20 +194,20 @@
             {#if offerRefresh}
               <Button
                 size="sm"
-                tone="accent"
+                tone={offerDownload ? 'neutral' : 'accent'}
                 class="gap-1.5"
                 onclick={() => engine.refreshUpdateChannel()}
               >
                 <ArrowsClockwiseIcon size={12} />
-                {verdict === 'refreshFailed' ? 'Try again' : 'Refresh'}
+                {verdict === 'refreshFailed'
+                  ? 'Try again'
+                  : verdict === 'sourceStale'
+                    ? 'Refresh again'
+                    : 'Refresh'}
               </Button>
             {/if}
             {#if offerUpdater}
-              <Button
-                size="sm"
-                tone={offerRefresh ? 'neutral' : 'accent'}
-                onclick={() => engine.openSystemUpdater()}
-              >
+              <Button size="sm" tone="accent" onclick={() => engine.openSystemUpdater()}>
                 Open {updaterName}
               </Button>
             {/if}

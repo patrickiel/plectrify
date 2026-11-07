@@ -1711,9 +1711,14 @@ to the offer; a failed fetch is 100, "try again"), and a refresh that
 *succeeds* and still finds nothing newer is the diagnosis the issue asked
 for: the index is fresh, so this machine's source — an older installer's
 entry — is what cannot see the release, and the notice says to reinstall from
-the download. (A rotated key is a failed fetch instead, so that case reads
-"try again" with the terminal command, which is where the signature error
-shows.) The updater is started through `DetachedProcess.h`, the reset
+the download, keeping a *Refresh again* beside it because a minute after
+promotion the repository may still have been publishing. (A rotated key is a
+failed fetch instead, so that case reads "try again" with the terminal
+command, which is where the signature error shows.) Which buttons a verdict
+earns is one tested rule, `updateChannelActions`, read by the notice and the
+About row alike: the updater only once the index has the release — opening
+it before that shows nothing to install, which is the confusion the whole
+channel exists to end. The updater is started through `DetachedProcess.h`, the reset
 relaunch's fork-close-exec, rather than `startAsProcess`: a window left open
 after Plectrify quits must not keep the audio device's descriptors. The
 channel's waits honour the pool job being told to stop, so quitting with a

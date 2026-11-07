@@ -21,6 +21,7 @@ namespace plectrify
 
 namespace
 {
+   #if JUCE_LINUX
     // apt-cache reads a local cache; this is a hung machine, not a slow one.
     constexpr int policyTimeoutMs = 15'000;
     // The password prompt can sit for as long as the user leaves it, and
@@ -32,7 +33,10 @@ namespace
     // a failure the user then turned into a success nobody learnt of.
     constexpr int refreshTimeoutMs = 0;
 
-    /** `name` resolved against PATH, or a non-existent File. */
+    /** `name` resolved against PATH, or a non-existent File. Only absolute
+        entries are searched: a relative one (`.`, `bin`) names a different
+        place from every working directory, which is nothing to run pkexec
+        from — and juce::File asserts on one. */
     juce::File findOnPath (const juce::String& name)
     {
         juce::StringArray directories;
@@ -40,7 +44,7 @@ namespace
 
         for (const auto& directory : directories)
         {
-            if (directory.isEmpty())
+            if (! directory.startsWithChar ('/'))
                 continue;
 
             const auto candidate = juce::File (directory).getChildFile (name);
@@ -51,7 +55,6 @@ namespace
         return {};
     }
 
-   #if JUCE_LINUX
     /** Runs `command` to completion and reports its exit code; `output`
         collects stdout when `captureOutput`. Returns false on a process that
         could not start, that died from a signal, or that outlived `timeoutMs`
@@ -89,8 +92,14 @@ namespace
         argv.push_back (nullptr);
 
         int pipeFds[2] { -1, -1 };
-        if (captureOutput && ::pipe2 (pipeFds, O_CLOEXEC | O_NONBLOCK) != 0)
+        if (captureOutput && ::pipe2 (pipeFds, O_CLOEXEC) != 0)
             return false;
+
+        // Non-blocking on the read end alone — a flag set at pipe2 rides the
+        // open file description onto the child's stdout, where a print
+        // larger than the pipe would then fail with EAGAIN between drains.
+        if (captureOutput)
+            ::fcntl (pipeFds[0], F_SETFL, ::fcntl (pipeFds[0], F_GETFL) | O_NONBLOCK);
 
         posix_spawn_file_actions_t actions;
         posix_spawn_file_actions_init (&actions);

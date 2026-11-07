@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   describeSystemUpdater,
   describeUpdateChannel,
+  updateChannelActions,
   IDLE_UPDATE_CHANNEL,
   judgeUpdateChannel,
   reduceUpdateChannelState,
@@ -134,5 +135,45 @@ describe('wording', () => {
   it('sends a broken source to the download, naming the release', () => {
     expect(describeUpdateChannel('sourceStale', '0.1.9', '').text).toMatch(/0\.1\.9.*download/i);
     expect(describeUpdateChannel('sourceMissing', '0.1.9', '').text).toMatch(/download/i);
+  });
+});
+
+describe('updateChannelActions', () => {
+  const actions = (verdict: Parameters<typeof updateChannelActions>[0], state = {}) =>
+    updateChannelActions(
+      verdict,
+      probed({ updater: 'update-manager', canRefresh: true, ...state }),
+    );
+
+  it('offers the updater only once the index has the release', () => {
+    expect(actions('ready')).toEqual({ refresh: false, updater: true, download: false });
+    // Before that an updater opens on nothing to install — the confusion the
+    // channel exists to end — so the refresh stands in its place.
+    expect(actions('pending')).toEqual({ refresh: true, updater: false, download: false });
+    expect(actions('refreshFailed')).toEqual({ refresh: true, updater: false, download: false });
+    expect(actions('refreshing')).toEqual({ refresh: false, updater: false, download: false });
+    expect(actions('unknown')).toEqual({ refresh: false, updater: false, download: false });
+  });
+
+  it('keeps a refresh on offer beside the download for a stale source', () => {
+    // A refresh a minute after promotion may have met a repository still
+    // publishing; the next one is cheaper than a reinstall.
+    expect(actions('sourceStale')).toEqual({ refresh: true, updater: false, download: true });
+    expect(actions('sourceMissing')).toEqual({ refresh: false, updater: false, download: true });
+  });
+
+  it('offers nothing it cannot do', () => {
+    expect(actions('pending', { canRefresh: false }).refresh).toBe(false);
+    expect(actions('ready', { updater: '' }).updater).toBe(false);
+  });
+});
+
+describe('describeUpdateChannel without a refresh button', () => {
+  it('does not point at a Refresh the machine has no pkexec for', () => {
+    expect(describeUpdateChannel('pending', '0.1.9', '', true).text).toMatch(/Refresh/);
+    expect(describeUpdateChannel('pending', '0.1.9', '', false).text).not.toMatch(/Refresh/);
+    expect(describeUpdateChannel('pending', '0.1.9', '', false).command).toBe('sudo apt update');
+    expect(describeUpdateChannel('sourceStale', '0.1.9', '', true).text).toMatch(/Refresh again/);
+    expect(describeUpdateChannel('sourceStale', '0.1.9', '', false).text).not.toMatch(/Refresh/);
   });
 });

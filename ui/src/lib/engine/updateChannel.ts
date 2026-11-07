@@ -129,18 +129,51 @@ export function judgeUpdateChannel(
   if (parseVersion(state.candidate) !== null && !isNewerVersion(latest, state.candidate))
     return 'ready';
   // A refresh that succeeded is the proof: the index is fresh and still blind
-  // to the release, so the source itself is what is out of date.
+  // to the release, so the source itself is what is out of date — or the
+  // repository is still being published, which is why the actions below keep
+  // offering a refresh on this verdict rather than only the download.
   if (state.refresh === 'done') return 'sourceStale';
   if (state.refresh === 'failed') return 'refreshFailed';
   return 'pending';
 }
 
+/** Which buttons a verdict earns. One rule for the notice and the About
+ *  row, so the two cannot drift on the question issue #38 is about: the
+ *  updater is offered only once APT's index has the release, because opening
+ *  it before that shows nothing to install, which is the whole confusion. A
+ *  refresh is offered while the index is behind, after one failed, and after
+ *  one succeeded without finding the release — the repository may still have
+ *  been publishing a minute after promotion, and the next refresh is cheaper
+ *  than a reinstall. The download is the answer once the source itself is
+ *  gone or stale, beside that second refresh in the stale case. */
+export interface UpdateChannelActions {
+  refresh: boolean;
+  updater: boolean;
+  download: boolean;
+}
+
+export function updateChannelActions(
+  verdict: UpdateChannelVerdict,
+  state: UpdateChannelState,
+): UpdateChannelActions {
+  return {
+    refresh:
+      state.canRefresh &&
+      (verdict === 'pending' || verdict === 'refreshFailed' || verdict === 'sourceStale'),
+    updater: state.updater !== '' && verdict === 'ready',
+    download: verdict === 'sourceMissing' || verdict === 'sourceStale',
+  };
+}
+
 /** The notice's line under the version, per verdict. `command` is the shell
-    equivalent, rendered as code beside the text where one applies. */
+    equivalent, rendered as code beside the text where one applies.
+    `canRefresh` is whether a Refresh button stands beside the line: the
+    wording must not point at one a machine without pkexec never gets. */
 export function describeUpdateChannel(
   verdict: UpdateChannelVerdict,
   latest: string,
   updater: SystemUpdater | '',
+  canRefresh = true,
 ): { text: string; command?: string } {
   const name = describeSystemUpdater(updater);
   switch (verdict) {
@@ -148,7 +181,9 @@ export function describeUpdateChannel(
       return { text: `Your system has it: open ${name}, or run`, command: 'sudo apt upgrade' };
     case 'pending':
       return {
-        text: `${name} may not list it yet — it will on its next check. Refresh to bring that forward, or run`,
+        text: canRefresh
+          ? `${name} may not list it yet — it will on its next check. Refresh to bring that forward, or run`
+          : `${name} may not list it yet — it will on its next check. To bring that forward, run`,
         command: 'sudo apt update',
       };
     case 'refreshing':
@@ -164,7 +199,9 @@ export function describeUpdateChannel(
       };
     case 'sourceStale':
       return {
-        text: `Your APT source can't see ${latest} — it may be from an older installer. Reinstall from the download to put this computer back on the update channel.`,
+        text: canRefresh
+          ? `Your APT source can't see ${latest} — it may be from an older installer, or the release is still being published. Refresh again in a minute, or reinstall from the download to put this computer back on the update channel.`
+          : `Your APT source can't see ${latest} — it may be from an older installer. Reinstall from the download to put this computer back on the update channel.`,
       };
     default:
       return {

@@ -581,6 +581,7 @@
               systemUpdates={capabilities.systemUpdates}
               onOpenSystemUpdater={() => engine.openSystemUpdater()}
               onRefreshUpdateChannel={() => engine.refreshUpdateChannel()}
+              onRequestUpdateChannel={() => engine.requestUpdateChannel()}
             />
           {/if}
         </div>

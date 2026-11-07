@@ -112,13 +112,28 @@ inline bool startDetached (const juce::File& exe, const juce::StringArray& argum
 
         ::setsid();
 
-        struct rlimit limit {};
-        const auto highest = (::getrlimit (RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY)
-                                 ? (int) juce::jmin<rlim_t> (limit.rlim_cur, (rlim_t) (1 << 20))
-                                 : 65536;
-        for (int fd = 3; fd < highest; ++fd)
-            if (fd != signal[1])
-                ::close (fd);
+        // close_range where the C library and kernel have it: the parent is
+        // blocked on the pipe until the exec, and under systemd or Flatpak
+        // the descriptor limit is about a million, which the loop below
+        // turns into a visible pause per click. The loop stays for an older
+        // kernel (ENOSYS) and for macOS.
+        bool closed = false;
+       #if defined (__linux__) && defined (__GLIBC__) && __GLIBC_PREREQ (2, 34)
+        const auto keep = (unsigned int) signal[1];
+        closed = (keep <= 3 || ::close_range (3, keep - 1, 0) == 0)
+                 && ::close_range (keep + 1, ~0u, 0) == 0;
+       #endif
+
+        if (! closed)
+        {
+            struct rlimit limit {};
+            const auto highest = (::getrlimit (RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY)
+                                     ? (int) juce::jmin<rlim_t> (limit.rlim_cur, (rlim_t) (1 << 20))
+                                     : 65536;
+            for (int fd = 3; fd < highest; ++fd)
+                if (fd != signal[1])
+                    ::close (fd);
+        }
 
         ::execv (path.c_str(), argv.data());
 

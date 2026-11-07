@@ -1440,6 +1440,13 @@ export class MockEngine implements EngineBridge {
   }
 
   requestUpdateChannel(): void {
+    // Mid-refresh the engine re-pushes the last state rather than probing —
+    // that run ends with a probe of its own — so a page reloaded then gets
+    // `refreshing` back, never `idle`.
+    if (this.updateChannel.refresh === 'refreshing') {
+      this.setUpdateChannelState({});
+      return;
+    }
     const source = new URLSearchParams(location.search).get('aptSource');
     this.setUpdateChannelState({
       probed: true,
@@ -1447,7 +1454,6 @@ export class MockEngine implements EngineBridge {
       candidate: this.updateChannel.candidate || '0.0.1',
       sourceInstalled: source !== 'missing',
       canRefresh: true,
-      refresh: this.updateChannel.refresh === 'refreshing' ? 'idle' : this.updateChannel.refresh,
     });
   }
 
