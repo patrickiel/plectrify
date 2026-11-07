@@ -1,13 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowSquareOutIcon, ArrowsClockwiseIcon, XIcon } from 'phosphor-svelte';
+  import { ArrowSquareOutIcon, XIcon } from 'phosphor-svelte';
   import Button from '../../lib/components/Button.svelte';
   import type { EngineBridge } from '../../lib/engine/EngineBridge';
   import type { HostCapabilities } from '../../lib/engine/types';
   import {
     describeSystemUpdater,
     describeUpdateChannel,
-    updateChannelActions,
     judgeUpdateChannel,
   } from '../../lib/engine/updateChannel';
   import {
@@ -92,15 +91,13 @@
   const channel = $derived(updateChannel());
   const verdict = $derived(judgeUpdateChannel(latest, channel));
   const updaterName = $derived(describeSystemUpdater(channel.updater));
-  // Which buttons the verdict earns is one rule shared with the About row
-  // (updateChannelActions); the wording follows the same buttons.
-  const actions = $derived(updateChannelActions(verdict, channel));
-  const offerRefresh = $derived(systemUpdates && actions.refresh);
-  const offerUpdater = $derived(systemUpdates && actions.updater);
-  const offerDownload = $derived(actions.download);
-  const channelLine = $derived(
-    describeUpdateChannel(verdict, latest, channel.updater, offerRefresh),
-  );
+  const channelLine = $derived(describeUpdateChannel(verdict, latest, channel.updater));
+  // The updater only once the index has the release — opened before that it
+  // shows nothing to install, which is the confusion the channel exists to
+  // end. Until then the line carries the terminal command; the download is
+  // the answer once the source itself is gone.
+  const offerUpdater = $derived(systemUpdates && channel.updater !== '' && verdict === 'ready');
+  const offerDownload = $derived(verdict === 'sourceMissing');
 
   // Re-ask the moment the notice shows: the boot probe predates the release
   // check, and the user may have run `apt update` by hand since.
@@ -159,10 +156,7 @@
       {:else}
         <p class="mt-[.15rem] opacity-75">You are running {installed}.</p>
         {#if linux}
-          <p
-            class="mt-[.3rem] opacity-75"
-            class:text-warn={offerDownload || verdict === 'refreshFailed'}
-          >
+          <p class="mt-[.3rem] opacity-75" class:text-warn={offerDownload}>
             {channelLine.text}
             {#if channelLine.command}
               <code class="font-mono">{channelLine.command}</code>.
@@ -187,25 +181,10 @@
               </Button>
             {/if}
           {:else if linux}
-            <!-- The system installs it, so the primary action is whatever
-                 gets the system to: a refresh while its index is behind,
-                 then its updater; the download only once the source itself
-                 is the problem. Browsing the release notes stays beside. -->
-            {#if offerRefresh}
-              <Button
-                size="sm"
-                tone={offerDownload ? 'neutral' : 'accent'}
-                class="gap-1.5"
-                onclick={() => engine.refreshUpdateChannel()}
-              >
-                <ArrowsClockwiseIcon size={12} />
-                {verdict === 'refreshFailed'
-                  ? 'Try again'
-                  : verdict === 'sourceStale'
-                    ? 'Refresh again'
-                    : 'Refresh'}
-              </Button>
-            {/if}
+            <!-- The system installs it, so the primary action is its updater
+                 once its index has the release; the download only once the
+                 source itself is the problem. Browsing the release notes
+                 stays beside. -->
             {#if offerUpdater}
               <Button size="sm" tone="accent" onclick={() => engine.openSystemUpdater()}>
                 Open {updaterName}
@@ -217,12 +196,10 @@
                 <ArrowSquareOutIcon size={12} />
               </Button>
             {/if}
-            {#if verdict !== 'refreshing'}
-              <Button size="sm" class="gap-1.5" onclick={download}>
-                What's new
-                <ArrowSquareOutIcon size={12} />
-              </Button>
-            {/if}
+            <Button size="sm" class="gap-1.5" onclick={download}>
+              What's new
+              <ArrowSquareOutIcon size={12} />
+            </Button>
           {:else}
             <Button size="sm" class="gap-1.5" onclick={download}>
               Download

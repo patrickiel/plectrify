@@ -327,11 +327,10 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         .withEventListener ("installUpdate",       onActivity ([this] (juce::var v) { if (host.capabilities().selfUpdate) host.handleInstallUpdate (v); }))
         .withEventListener ("cancelUpdateInstall", onActivity ([this] (juce::var)   { if (host.capabilities().selfUpdate) host.handleCancelUpdateInstall(); }))
         .withEventListener ("requestUpdateInstallState", [this] (juce::var) { host.handleRequestUpdateInstallState(); })
-        // The Linux notice's helpers, gated the same way. A refresh runs
-        // pkexec and the open starts a process, so both are user intent; the
-        // probe is read-only and answers a page that has just booted.
+        // The Linux notice's helpers, gated the same way. The open starts a
+        // process, so it is user intent; the probe is read-only and answers
+        // a page that has just booted.
         .withEventListener ("requestUpdateChannel", [this] (juce::var)              { if (host.capabilities().systemUpdates) host.handleRequestUpdateChannel(); })
-        .withEventListener ("refreshUpdateChannel", onActivity ([this] (juce::var) { if (host.capabilities().systemUpdates) host.handleRefreshUpdateChannel(); }))
         .withEventListener ("openSystemUpdater",    onActivity ([this] (juce::var) { if (host.capabilities().systemUpdates) host.handleOpenSystemUpdater(); }))
         // The setup wizard's own view of the audio stack. Asked for when it
         // opens and by its Refresh button; `rescan` re-enumerates the driver

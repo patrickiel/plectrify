@@ -104,11 +104,9 @@ public:
     void handleCancelUpdateInstall() override;
     void handleRequestUpdateInstallState() override;
     // The Linux notice's side of updating (Source/update/SystemUpdateChannel.h):
-    // what APT's index knows, a refresh of Plectrify's source through pkexec,
-    // the desktop's updater. Linux standalone only
+    // what APT's index knows and the desktop's updater. Linux standalone only
     // (HostCapabilities::systemUpdates); reported on the updateChannel stream.
     void handleRequestUpdateChannel() override;
-    void handleRefreshUpdateChannel() override;
     void handleOpenSystemUpdater() override;
 
     /** What the reset this launch performed left behind (Main.cpp), to be

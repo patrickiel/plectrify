@@ -17,11 +17,7 @@
   import { collectBrowserFacts, type BrowserFacts } from './browserFacts';
   import { formatDiagnostics, type DiagReport } from './diagnostics';
   import { buildBugReportUrl, buildIdeaUrl } from './issueReport';
-  import {
-    describeSystemUpdater,
-    judgeUpdateChannel,
-    updateChannelActions,
-  } from '../../lib/engine/updateChannel';
+  import { describeSystemUpdater, judgeUpdateChannel } from '../../lib/engine/updateChannel';
   import {
     describeUpdateInstallError,
     describeUpdateInstallPhase,
@@ -61,13 +57,10 @@
     /** Whether the engine can open the desktop's updater
         (HostCapabilities.systemUpdates — the Linux standalone). Then the row
         follows the update channel: opens the updater once APT's index has
-        the release, offers a refresh while it has not, and falls back to the
-        release page once the source itself is the problem. */
+        the release, and the release page otherwise. */
     systemUpdates?: boolean;
     /** Opens the desktop's updates application. */
     onOpenSystemUpdater?: () => void;
-    /** Refreshes Plectrify's APT source (the notice's Refresh). */
-    onRefreshUpdateChannel?: () => void;
     /** Asks the engine what APT's index knows now. Called on mount, because
         the boot-time probe is all the row would otherwise ever show: with
         the notice dismissed nothing else re-asks, and an `apt update` run by
@@ -85,7 +78,6 @@
     onInstallUpdate,
     systemUpdates = false,
     onOpenSystemUpdater,
-    onRefreshUpdateChannel,
     onRequestUpdateChannel,
   }: Props = $props();
 
@@ -120,19 +112,18 @@
   const install = $derived(updateInstall());
   const installing = $derived(isUpdateInstallBusy(install));
 
-  // The Linux channel (updateChannel.ts), through the one actions rule the
-  // notice reads too: the updater only once APT's index has the release, a
-  // refresh while it has not, the download once the source is the problem.
-  const linuxChannel = $derived(systemUpdates && info.platform === 'linux');
+  // The Linux channel (updateChannel.ts), read as the notice reads it: the
+  // updater only once APT's index has the release — opened before that it
+  // shows nothing to install — and the release page otherwise.
   const channel = $derived(updateChannel());
   const channelVerdict = $derived(judgeUpdateChannel(latest, channel));
-  const channelActions = $derived(updateChannelActions(channelVerdict, channel));
   const systemUpdater = $derived(
-    linuxChannel && channelActions.updater ? describeSystemUpdater(channel.updater) : '',
-  );
-  // The refreshing row stays while the run it started is in flight.
-  const channelRefresh = $derived(
-    linuxChannel && (channelActions.refresh || channelVerdict === 'refreshing'),
+    systemUpdates &&
+      info.platform === 'linux' &&
+      channel.updater !== '' &&
+      channelVerdict === 'ready'
+      ? describeSystemUpdater(channel.updater)
+      : '',
   );
 
   const updateMessage = $derived.by(() => {
@@ -266,32 +257,6 @@
       <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={onOpenSystemUpdater}>
         Open {systemUpdater} to install {latest}
       </RowButton>
-    {:else if updateAvailable && channelRefresh && onRefreshUpdateChannel}
-      <!-- APT's index has not seen the release yet: the same Refresh the
-           notice offers, so this row cannot send anyone to an updater with
-           nothing in it. A stale source gets the download beside it. -->
-      <RowButton
-        class="gap-2 rounded-none text-[.8rem]"
-        onclick={onRefreshUpdateChannel}
-        disabled={channelVerdict === 'refreshing'}
-      >
-        {channelVerdict === 'refreshing'
-          ? 'Refreshing the package list…'
-          : channelVerdict === 'refreshFailed'
-            ? "Couldn't refresh the package list — try again"
-            : channelVerdict === 'sourceStale'
-              ? `Refresh the package list again for ${latest}`
-              : `Refresh the package list to see ${latest}`}
-      </RowButton>
-      {#if channelActions.download}
-        <RowButton
-          class="gap-2 rounded-none text-[.8rem]"
-          onclick={() => onOpenUrl(LATEST_RELEASE_URL)}
-        >
-          Download {latest} to reinstall
-          <ArrowSquareOutIcon size={12} class="ml-auto opacity-55" />
-        </RowButton>
-      {/if}
     {:else if updateAvailable}
       <RowButton
         class="gap-2 rounded-none text-[.8rem]"

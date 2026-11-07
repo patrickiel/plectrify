@@ -2572,10 +2572,6 @@ export class JuceEngine implements EngineBridge {
     backend()?.emitEvent('requestUpdateChannel', {});
   }
 
-  refreshUpdateChannel(): void {
-    backend()?.emitEvent('refreshUpdateChannel', {});
-  }
-
   openSystemUpdater(): void {
     backend()?.emitEvent('openSystemUpdater', {});
   }

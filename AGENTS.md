@@ -1687,49 +1687,36 @@ learns of a release from GitHub the moment it is promoted; APT learns of it on
 its next index refresh, which the desktop runs on its own schedule — daily by
 default — so a player who opened Software Updater straight away found nothing
 to install and concluded the notice was wrong. The engine therefore answers
-three questions on the `updateChannel` stream (asked on boot and again when
-the notice shows): which version APT's index would install (`apt-cache policy
-plectrify`, run under `LC_ALL=C` because the parse keys on the English
-`Candidate:` label), whether the sources entry the .deb wrote is still on
-disk, and which desktop updater exists (Software Updater, GNOME Software or
-Discover, Discover first on a KDE session; `UpdateChannelRules.h`, with the
-`Plectrify.UpdateChannel` CTest). The page draws one verdict from that
-(`judgeUpdateChannel`): the index already has it → *Open Software Updater*;
-it is behind → say so and offer *Refresh*; the sources file is gone → reinstall
-from the download. **Refresh is the one package-manager command the app
-runs**: `pkexec apt-get update` scoped to Plectrify's own sources file
-(`-oDir::Etc::SourceList=… -oDir::Etc::SourceParts=-`), with
-`-oAPT::Get::List-Cleanup=0`, which is load-bearing — with the source list
-overridden, apt's default clean-up deletes every *other* repository's index as
-no longer configured — and `-oAPT::Update::Error-Mode=any`, which is too:
-by default `apt-get update` exits 0 when the fetch fails (offline, a dead
-host, a signature it cannot verify) and only warns, so without it an offline
-laptop would read as a successful refresh that found nothing and be told to
-reinstall. It changes nothing on disk but that one index, pkexec puts up the
-desktop's own password prompt (a dismissed one is exit 126, "not now", back
-to the offer; a failed fetch is 100, "try again"), and a refresh that
-*succeeds* and still finds nothing newer is the diagnosis the issue asked
-for: the index is fresh, so this machine's source — an older installer's
-entry — is what cannot see the release, and the notice says to reinstall from
-the download, keeping a *Refresh again* beside it because a minute after
-promotion the repository may still have been publishing. (A rotated key is a
-failed fetch instead, so that case reads "try again" with the terminal
-command, which is where the signature error shows.) Which buttons a verdict
-earns is one tested rule, `updateChannelActions`, read by the notice and the
-About row alike: the updater only once the index has the release — opening
-it before that shows nothing to install, which is the confusion the whole
-channel exists to end. The updater is started through `DetachedProcess.h`, the reset
-relaunch's fork-close-exec, rather than `startAsProcess`: a window left open
-after Plectrify quits must not keep the audio device's descriptors. The
-channel's waits honour the pool job being told to stop, so quitting with a
-password prompt up leaves pkexec where it is instead of ending in a forced
-thread kill — which aborts the process when it unwinds through JUCE's
-catch-all.
-Linux standalone only — the plugin declines it, since a password prompt from
-inside a DAW is not one, and `STANDALONE_CAPABILITIES.systemUpdates` defaults
-to false on the page like `selfUpdate`, for the same reason. The mock answers
-under `?platform=linux` (`&aptSource=stale|missing` for the two reinstall
-wordings).
+three questions on the `updateChannel` stream (asked on boot, when the notice
+shows and when About opens): which version APT's index would install
+(`apt-cache policy plectrify`, a local read that needs no password, run under
+`LC_ALL=C` because the parse keys on the English `Candidate:` label), whether
+the sources entry the .deb wrote is still on disk, and which desktop updater
+exists (Software Updater, GNOME Software or Discover, Discover first on a KDE
+session; `UpdateChannelRules.h`, with the `Plectrify.UpdateChannel` CTest).
+The page draws one verdict from that (`judgeUpdateChannel`): the index already
+has it → *Open Software Updater*; it is behind → say it arrives with the next
+check and print `sudo apt update && sudo apt upgrade`; the sources file is
+gone → reinstall from the download. The updater is offered on the first
+verdict alone, on the notice and the About row alike — opened before the
+index has the release it shows nothing to install, which is the confusion the
+whole channel exists to end. **The app deliberately runs no package-manager
+command that changes anything.** An in-app refresh (`pkexec apt-get update`
+scoped to our source) was built and taken out again: a password prompt, a
+root process the app cannot end, exit codes to word and a stale-source
+diagnosis to draw from them, all to turn a one-line terminal command into a
+click. What went with it is the ability to tell "index not refreshed yet"
+from "an older installer's source cannot see the release"; the second case
+exists only after a repository layout or key change (RELEASING.md's rotation
+rule) and reads as a pending that never resolves. The updater is started
+through `DetachedProcess.h`, the reset relaunch's fork-close-exec, rather
+than `startAsProcess`: a window left open after Plectrify quits must not keep
+the audio device's descriptors. Linux standalone only — the plugin declines
+it, since the updater would replace the .vst3 the DAW has loaded, and
+`STANDALONE_CAPABILITIES.systemUpdates` defaults to false on the page like
+`selfUpdate`, for the same reason. The mock answers under `?platform=linux`
+(`&aptIndex=ready` for the updater button, `&aptSource=missing` for the
+reinstall wording).
 
 ### Installed patches
 

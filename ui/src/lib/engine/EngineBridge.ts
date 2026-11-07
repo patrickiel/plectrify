@@ -609,11 +609,6 @@ export interface EngineBridge {
       event is dropped and the stream stays idle. Asked on boot and again
       whenever the notice shows, since it is one local read. */
   requestUpdateChannel(): void;
-  /** Refresh Plectrify's APT source — that one source, nothing else — through
-      pkexec, which puts up the desktop's own password prompt, then answer
-      with what the index knows now. Fire-and-forget like installUpdate: the
-      prompt can sit for minutes. Ignored while one is running. */
-  refreshUpdateChannel(): void;
   /** Open the desktop's updates application (Software Updater, GNOME
       Software or Discover, whichever the probe found), detached from the app
       so it outlives it. */

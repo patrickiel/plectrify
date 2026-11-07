@@ -1428,9 +1428,8 @@ export class MockEngine implements EngineBridge {
   }
 
   // The Linux update channel, simulated: a machine whose APT index is one
-  // release behind, with Software Updater installed. Refresh "asks for a
-  // password" for a moment and then finds the release — or, with
-  // `?aptSource=stale`, still does not, which is the reinstall wording.
+  // release behind, with Software Updater installed. `?aptIndex=ready` is the
+  // index that already has it, `?aptSource=missing` the reinstall wording.
   private updateChannel: UpdateChannelState = { ...IDLE_UPDATE_CHANNEL };
   private updateChannelListeners = new Set<(state: UpdateChannelState) => void>();
 
@@ -1440,33 +1439,13 @@ export class MockEngine implements EngineBridge {
   }
 
   requestUpdateChannel(): void {
-    // Mid-refresh the engine re-pushes the last state rather than probing —
-    // that run ends with a probe of its own — so a page reloaded then gets
-    // `refreshing` back, never `idle`.
-    if (this.updateChannel.refresh === 'refreshing') {
-      this.setUpdateChannelState({});
-      return;
-    }
-    const source = new URLSearchParams(location.search).get('aptSource');
+    const params = new URLSearchParams(location.search);
     this.setUpdateChannelState({
       probed: true,
       updater: 'update-manager',
-      candidate: this.updateChannel.candidate || '0.0.1',
-      sourceInstalled: source !== 'missing',
-      canRefresh: true,
+      candidate: params.get('aptIndex') === 'ready' ? '9.9.9' : '0.0.1',
+      sourceInstalled: params.get('aptSource') !== 'missing',
     });
-  }
-
-  refreshUpdateChannel(): void {
-    if (this.updateChannel.refresh === 'refreshing') return;
-    this.setUpdateChannelState({ refresh: 'refreshing' });
-    setTimeout(() => {
-      const stale = new URLSearchParams(location.search).get('aptSource') === 'stale';
-      this.setUpdateChannelState({
-        refresh: 'done',
-        candidate: stale ? this.updateChannel.candidate : '9.9.9',
-      });
-    }, 1800);
   }
 
   openSystemUpdater(): void {

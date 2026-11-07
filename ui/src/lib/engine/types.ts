@@ -1058,9 +1058,8 @@ export interface HostCapabilities {
   selfUpdate: boolean;
   /** The Linux counterpart: nothing is downloaded there, since the .deb
       registers Plectrify's APT repository and the system installs the update.
-      The engine instead reports what APT's index knows, refreshes that one
-      source under pkexec's password prompt, and opens the desktop's updater
-      (`ui/src/lib/engine/updateChannel.ts`). Linux standalone only — the
+      The engine instead reports what APT's index knows and opens the
+      desktop's updater (`ui/src/lib/engine/updateChannel.ts`). Linux standalone only — the
       plugin keeps the wording and offers no button. */
   systemUpdates: boolean;
 }

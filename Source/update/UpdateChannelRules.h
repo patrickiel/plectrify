@@ -8,10 +8,9 @@
 
 /**
     The pure rules behind the Linux update notice's helpers (SystemUpdateChannel.h):
-    what `apt-cache policy` says the package index knows, which desktop updater
-    to open, the one package-manager command the app may run, and how to read
-    pkexec's exit code. Nothing here touches a process or the disk, so all of
-    it is pinned by the Plectrify.UpdateChannel CTest.
+    what `apt-cache policy` says the package index knows, and which desktop
+    updater to open. Nothing here touches a process or the disk, so all of it
+    is pinned by the Plectrify.UpdateChannel CTest.
 
     Linux installs update through APT (scripts/aptRepository.ts): the .deb
     registers a sources entry pointing at the signed flat repository the
@@ -63,23 +62,5 @@ std::vector<SystemUpdater> updatersFor (const juce::String& currentDesktop);
     when the desktop has none the app knows how to open. */
 std::optional<SystemUpdater> chooseUpdater (const juce::String& currentDesktop,
                                             const std::function<bool (const juce::String&)>& isOnPath);
-
-/** The argv that refreshes Plectrify's APT source and nothing else, under
-    pkexec — polkit's own password prompt, the sudo of the desktop.
-
-    Scoped to the one sources file for three reasons: it is the only index the
-    question concerns, a full `apt-get update` can run for a minute against a
-    PPA that is down, and a failure then says something about *our* source
-    rather than about somebody else's. `APT::Get::List-Cleanup=0` is
-    load-bearing: with the source list overridden, apt's default clean-up
-    would delete every other repository's index as "no longer configured". */
-juce::StringArray refreshCommand();
-
-/** What pkexec's exit code means for the refresh: `done` (0), `declined`
-    (126, the user dismissed the password prompt — "not now", not an error)
-    or `failed` (127 is pkexec refusing or finding no authentication agent;
-    anything else is apt-get's own failure, 100 for an index it could not
-    fetch). The page words each. */
-juce::String refreshOutcome (juce::uint32 exitCode);
 
 } // namespace plectrify::updatechannel

@@ -5,10 +5,9 @@
 #include <iostream>
 
 /*
-    The rules behind the Linux update notice's helpers. One of them builds the
-    only package-manager command the app ever runs, under pkexec, so it is
-    pinned word for word; the rest decide what the notice says, from output
-    that apt prints and the page never sees.
+    The rules behind the Linux update notice's helpers: what the notice says,
+    from output that apt prints and the page never sees, and which updater
+    it opens. Nothing here runs anything.
 */
 
 namespace
@@ -99,31 +98,9 @@ namespace
         expect (chosen.has_value() && chosen->id == "gnome-software", "the first updater on PATH is chosen");
         expect (! chooseUpdater ("ubuntu:GNOME", [] (const juce::String&) { return false; }).has_value(),
                 "none on PATH is none");
-    }
 
-    void testRefresh()
-    {
-        const auto command = refreshCommand();
-        expectEquals (command[0], "pkexec", "the refresh runs under pkexec");
-        expectEquals (command[1], "apt-get", "…and is apt-get");
-        expectEquals (command[2], "update", "…update");
-        expect (command.contains (juce::String ("-oDir::Etc::SourceList=") + aptSourcesPath),
-                "scoped to the .deb's own sources file");
-        expect (command.contains ("-oDir::Etc::SourceParts=-"), "with sources.list.d disabled");
-        expect (command.contains ("-oAPT::Get::List-Cleanup=0"),
-                "and the clean-up off, or every other repository's index is deleted");
-        expect (command.contains ("-oAPT::Update::Error-Mode=any"),
-                "and a failed fetch is an error, or an offline machine reads as a stale source");
-        expect (! command.contains ("install") && ! command.contains ("upgrade"),
-                "it never installs anything");
         expectEquals (aptSourcesPath, "/etc/apt/sources.list.d/plectrify.sources",
                       "the sources path is scripts/aptRepository.ts's APT_SOURCES_PATH");
-
-        expectEquals (refreshOutcome (0), "done", "exit 0 is done");
-        expectEquals (refreshOutcome (126), "declined", "126 is the prompt dismissed");
-        expectEquals (refreshOutcome (127), "failed", "127 is pkexec refusing");
-        expectEquals (refreshOutcome (100), "failed", "100 is apt-get failing to fetch");
-        expectEquals (refreshOutcome (1), "failed", "anything else failed");
     }
 }
 
@@ -131,7 +108,6 @@ int main()
 {
     testCandidate();
     testUpdaters();
-    testRefresh();
 
     if (failures == 0)
         std::cout << "UpdateChannel tests passed\n";

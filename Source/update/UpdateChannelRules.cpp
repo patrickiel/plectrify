@@ -59,30 +59,4 @@ std::optional<SystemUpdater> chooseUpdater (const juce::String& currentDesktop,
     return std::nullopt;
 }
 
-juce::StringArray refreshCommand()
-{
-    // Error-Mode=any: by default apt-get update exits 0 when the fetch itself
-    // fails (no network, a dead host, a signature it cannot verify), with the
-    // failure as a warning — so without this a laptop that is offline would
-    // read as a refresh that succeeded and found nothing, and the notice
-    // would tell the player to reinstall. With it, only a fetched index is
-    // "done".
-    return { "pkexec", "apt-get", "update",
-             juce::String ("-o") + "Dir::Etc::SourceList=" + aptSourcesPath,
-             "-oDir::Etc::SourceParts=-",
-             "-oAPT::Get::List-Cleanup=0",
-             "-oAPT::Update::Error-Mode=any" };
-}
-
-juce::String refreshOutcome (juce::uint32 exitCode)
-{
-    if (exitCode == 0)
-        return "done";
-
-    if (exitCode == 126)
-        return "declined";
-
-    return "failed";
-}
-
 } // namespace plectrify::updatechannel
