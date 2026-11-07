@@ -1676,9 +1676,8 @@ one capability that defaults to **false** on the page: an engine older than
 the field has no handler for the event. A Debug build honours
 `PLECTRIFY_UPDATE_BASE_URL`, a directory holding a manifest and installer of
 one's own, which is how the whole run is exercised against a build that has
-not shipped: build the installer with ISCC against a staged tree, write a
-manifest naming it (a version above `VERSION`, its SHA-256), serve the folder
-over HTTP, lower `VERSION` so the API check offers the notice, and `pnpm app`.
+not shipped — `packaging/windows/UPDATE-TESTING.md` is the recipe, variants
+included.
 
 ### Installed patches
 
