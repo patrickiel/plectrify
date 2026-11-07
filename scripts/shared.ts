@@ -280,6 +280,7 @@ export const TEST_TARGETS = [
   'PlectrifyAudioSetupTests',
   'PlectrifyNoiseGateTests',
   'PlectrifyPluginBinaryTests',
+  'PlectrifyUpdateManifestTests',
 ] as const;
 
 /** A plugin Plectrify ships inside the installer rather than offers for download

@@ -18,6 +18,7 @@ import type {
   StatusState,
 } from './types';
 import type { BackupState } from './backup';
+import type { UpdateInstallState } from './updateInstall';
 import type { InstallFinished, InstallProgress, CatalogueState } from './catalogue';
 import type { Tone3000InstallEvent, Tone3000State } from './tone3000';
 import type { ModuleIcon, ModuleStyleVariant, ModuleTexture } from './moduleAppearance';
@@ -578,6 +579,26 @@ export interface EngineBridge {
   /** Subscribe to the progress and outcome of the three calls above. Returns
       an unsubscribe function. */
   subscribeBackup(listener: (state: BackupState) => void): () => void;
+
+  /** Download the newest release's installer, verify it against the release
+      manifest, run it silently and quit so it can replace the files; the
+      installer relaunches the new version when it is done.
+
+      Windows standalone only (HostCapabilities.selfUpdate). Fire-and-forget
+      rather than a promise, like installPackages: a download runs for a minute
+      or more, far past the bridge's request deadline, so the run reports on
+      subscribeUpdateInstall instead. The engine refuses while a Plectrify
+      plugin runs in another app (which holds the files the update replaces)
+      and while a package install is in flight; a declined UAC prompt comes
+      back as `idle`, not as a failure. Ignored while a run is in flight. */
+  installUpdate(): void;
+  /** Stop a download in progress; the state returns to idle. Nothing to cancel
+      once the installer has been started. */
+  cancelUpdateInstall(): void;
+  /** Subscribe to the run's state. Replays the last known state, so a page
+      reloaded mid-download picks it up where it stands. Returns an
+      unsubscribe function. */
+  subscribeUpdateInstall(listener: (state: UpdateInstallState) => void): () => void;
 
   /** Update application preferences. These are persisted independently of
       rigs and the working session. */

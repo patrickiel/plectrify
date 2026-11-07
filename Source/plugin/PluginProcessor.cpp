@@ -226,6 +226,12 @@ plectrify::HostCapabilities PlectrifyAudioProcessor::capabilities() const
     // one instance and one session: the standalone.
     caps.backup = false;
 
+    // The in-app update: it ends by quitting the process to let the installer
+    // replace the files, and the process here is the DAW — which also has the
+    // very bundle the installer would replace loaded. The notice keeps its
+    // "Download" button, which opens the release page in the browser.
+    caps.selfUpdate = false;
+
     return caps;
 }
 

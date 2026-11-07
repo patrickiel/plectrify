@@ -9,6 +9,8 @@
  * differently — the notice honours the user's dismissal, the dialog does not.
  */
 import { untrack } from 'svelte';
+import type { EngineBridge } from '../../lib/engine/EngineBridge';
+import { IDLE_UPDATE_INSTALL, type UpdateInstallState } from '../../lib/engine/updateInstall';
 import { fetchLatestReleaseTag } from './updateCheck';
 
 export type UpdateCheckPhase = 'idle' | 'checking' | 'checked' | 'failed';
@@ -41,4 +43,24 @@ export async function checkForUpdate(force = false): Promise<void> {
   const tag = await fetchLatestReleaseTag();
   latest = tag ?? '';
   phase = tag === null ? 'failed' : 'checked';
+}
+
+// --- Installing it (Windows standalone, HostCapabilities.selfUpdate) --------
+// The engine's updateInstallState stream, mirrored here for the same reason
+// the check result is: the notice and the About dialog both show it, and both
+// must agree on where the run stands. The notice, which is always mounted,
+// owns the subscription (bindUpdateInstall); the dialog only reads.
+
+let install = $state<UpdateInstallState>({ ...IDLE_UPDATE_INSTALL });
+
+/** Where the in-app install has got to; idle until one is started. */
+export function updateInstall(): UpdateInstallState {
+  return install;
+}
+
+/** Subscribes the store to the engine's stream. Returns the unsubscribe. */
+export function bindUpdateInstall(engine: EngineBridge): () => void {
+  return engine.subscribeUpdateInstall((state) => {
+    install = state;
+  });
 }

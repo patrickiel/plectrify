@@ -2,8 +2,10 @@
  * Is there a newer Plectrify than this one? Pure comparison plus the single
  * request that answers it — no state, so every rule here is unit-testable.
  *
- * The app ships as a locally-built installer attached to a GitHub release, so
- * "the newest version" is exactly the newest published release's tag.
+ * The app ships as installers attached to a GitHub release (built by the
+ * Release workflow, see RELEASING.md), so "the newest version" is exactly the
+ * newest published release's tag. Installing it is the engine's job on
+ * Windows (`EngineBridge.installUpdate`); here is only the question.
  */
 import { LATEST_RELEASE_API_URL } from '../../lib/links';
 

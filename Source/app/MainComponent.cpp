@@ -122,6 +122,13 @@ MainComponent::MainComponent()
     engine = std::make_unique<PlectrifyEngine> (*this);
     auto& rack = engine->getRack();
 
+    // The in-app updater, and the folder a previous run's installer was
+    // downloaded to: this launch is either the new version that installer
+    // produced, or one whose run failed — either way the file is done with.
+    plectrify::UpdateInstaller::cleanUpLeftovers();
+    updater = std::make_unique<plectrify::UpdateInstaller> (
+        [this] (const plectrify::UpdateInstaller::State& state) { emitUpdateInstallState (state); });
+
     if (savedState != nullptr)
     {
         // Before the gains: it is a graph edit, and doing it while the rack is
@@ -298,6 +305,12 @@ bool MainComponent::blocksAutoStandby() const
     // No device means no peaks arrive at all, so the detector would read
     // permanent silence and park a rig the user can't even hear yet.
     if (deviceManager.getCurrentAudioDevice() == nullptr)
+        return true;
+
+    // An update downloading, or its installer sitting on the UAC prompt: a
+    // multi-minute stretch with no input, during which parking the rig would
+    // be exactly wrong — the user is watching a progress bar.
+    if (updater != nullptr && updater->isBusy())
         return true;
 
     // The setup wizard's input step asks the player to hold a guitar and strum
@@ -603,6 +616,54 @@ void MainComponent::handleResetApp (const juce::var&)
 void MainComponent::reportResetLeftovers (const juce::StringArray& leftBehind)
 {
     resetLeftBehind = leftBehind;
+}
+
+void MainComponent::emitUpdateInstallState (const plectrify::UpdateInstaller::State& state)
+{
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("phase", state.phase);
+    payload->setProperty ("version", state.version);
+    payload->setProperty ("receivedBytes", state.receivedBytes);
+    payload->setProperty ("totalBytes", state.totalBytes);
+    payload->setProperty ("error", state.error);
+    engine->emit ("updateInstallState", juce::var (payload));
+}
+
+void MainComponent::handleInstallUpdate (const juce::var&)
+{
+    if (updater->isBusy())
+        return;
+
+    const auto refuse = [this] (const char* error)
+    {
+        plectrify::UpdateInstaller::State failed;
+        failed.phase = "failed";
+        failed.error = error;
+        emitUpdateInstallState (failed);
+    };
+
+    // The installer replaces {commoncf64}\VST3\Plectrify.vst3, and a DAW that
+    // has it loaded holds the file: Setup would stop on a file-in-use box
+    // with this app already gone. Same probe as the reset's
+    // (DataRootLease.h), same answer — close the DAW first.
+    if (plectrify::dataRootInUseElsewhere (plectrify::appDataDir()))
+        return refuse ("pluginInUse");
+
+    // The run ends by quitting, which would cut a package download short.
+    if (engine->catalogueInstallRunning())
+        return refuse ("busy");
+
+    updater->start (JUCE_APPLICATION_VERSION_STRING);
+}
+
+void MainComponent::handleCancelUpdateInstall()
+{
+    updater->cancel();
+}
+
+void MainComponent::handleRequestUpdateInstallState()
+{
+    emitUpdateInstallState (updater->lastState());
 }
 
 void MainComponent::handleRequestBackupState()

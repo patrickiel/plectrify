@@ -534,6 +534,7 @@
      that float over everything. -->
 <UpdateNotice
   {engine}
+  capabilities={caps}
   dismissedVersion={appSettings.updateDismissedVersion}
   onDismiss={(version) => engine.setAppSettings({ updateDismissedVersion: version })}
 />

@@ -11,6 +11,9 @@ Grab the build for your machine from the [download section](/#download).
   redistributable, so there is nothing else to set up. It also offers **Plectrify as a VST3
   plug-in** (checked by default), installed to `C:\Program Files\Common Files\VST3` — the same
   rig, running on a track inside your DAW, sharing your rigs and patches with the standalone.
+  From version 0.1.9, updates install from inside the app: when a newer version is out, the
+  notice in the corner offers **Install update**, Plectrify downloads and verifies it, Windows
+  asks once for permission, and the new version reopens by itself.
 - **macOS** (Apple Silicon, 13.3 or newer): run the installer. It installs the app to
   Applications and **Plectrify as a plug-in** — VST3 to `/Library/Audio/Plug-Ins/VST3` and
   Audio Unit to `/Library/Audio/Plug-Ins/Components`, for Logic and GarageBand — the same

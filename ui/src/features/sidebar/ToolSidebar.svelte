@@ -576,6 +576,8 @@
               {status}
               onOpenUrl={(url) => engine.openExternalUrl(url)}
               onRefresh={() => engine.refreshAppInfo()}
+              selfUpdate={capabilities.selfUpdate}
+              onInstallUpdate={() => engine.installUpdate()}
             />
           {/if}
         </div>

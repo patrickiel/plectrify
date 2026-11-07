@@ -348,7 +348,8 @@ set(PLECTRIFY_ENGINE_SOURCES
     Source/tone3000/Tone3000WindowState.cpp)
 
 # Deliberately not in PLECTRIFY_ENGINE_SOURCES: backing up and resetting the
-# per-user data root are standalone-only features (HostCapabilities::backup),
+# per-user data root (HostCapabilities::backup) and installing an update from
+# inside the app (HostCapabilities::selfUpdate) are standalone-only features,
 # so the plugin neither offers nor compiles them.
 target_sources(Plectrify PRIVATE
     ${PLECTRIFY_ENGINE_SOURCES}
@@ -356,7 +357,9 @@ target_sources(Plectrify PRIVATE
     Source/app/MainComponent.cpp
     Source/app/WindowLookAndFeel.cpp
     Source/backup/AppReset.cpp
-    Source/backup/BackupArchive.cpp)
+    Source/backup/BackupArchive.cpp
+    Source/update/UpdateInstaller.cpp
+    Source/update/UpdateManifest.cpp)
 
 # ---------------------------------------------------------------------------
 # Build provenance for the About dialog's diagnostics: commit, dirty flag and
@@ -470,6 +473,7 @@ function(plectrify_configure_target target)
         Source/plugins
         Source/rackui
         Source/tone3000
+        Source/update
         "${PLECTRIFY_BUILD_INFO_DIR}")
 
     # Windows-only build switches. None of these may leak onto other
@@ -1182,4 +1186,25 @@ if (BUILD_TESTING)
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
     add_test(NAME Plectrify.PluginBinary COMMAND PlectrifyPluginBinaryTests)
+
+    # The rules behind installing an update from inside the app: what a release
+    # manifest must say before its installer is downloaded, which version
+    # counts as newer, and the command line the installer is run with. Pure
+    # functions — the network, the disk and the process live in
+    # UpdateInstaller, which is not under test here.
+    juce_add_console_app(PlectrifyUpdateManifestTests PRODUCT_NAME "Plectrify Update Manifest Tests")
+    juce_generate_juce_header(PlectrifyUpdateManifestTests)
+    target_sources(PlectrifyUpdateManifestTests PRIVATE
+        Source/update/UpdateManifest.cpp
+        Tests/update/UpdateManifestTests.cpp)
+    target_include_directories(PlectrifyUpdateManifestTests PRIVATE Source/update)
+    target_compile_definitions(PlectrifyUpdateManifestTests PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0)
+    target_link_libraries(PlectrifyUpdateManifestTests PRIVATE
+        juce::juce_core
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    add_test(NAME Plectrify.UpdateManifest COMMAND PlectrifyUpdateManifestTests)
 endif()

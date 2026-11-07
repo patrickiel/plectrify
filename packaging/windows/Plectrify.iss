@@ -88,9 +88,28 @@ Source: "{#VCRedistInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall igno
 Name: "{group}\Plectrify"; Filename: "{app}\Plectrify.exe"
 
 [Run]
-Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft WebView2 Runtime..."; Flags: waituntilterminated
+; Only when the runtime is not there yet (see WebView2RuntimeInstalled). The
+; bootstrapper is the evergreen one: even with the runtime installed it goes
+; to Microsoft's update service before it decides there is nothing to do,
+; which on an update took longer than copying the files — all of it behind a
+; progress bar Inno has already filled, since [Run] comes after the files.
+; Microsoft's own guidance is to check the registry before running it. The
+; VC++ redistributable is not gated: its installer exits at once when the
+; installed copy is current, and the key it leaves has no reliable floor to
+; compare the bundled version against.
+Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft WebView2 Runtime..."; Flags: waituntilterminated; Check: not WebView2RuntimeInstalled
 Filename: "{tmp}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime..."; Flags: waituntilterminated
 Filename: "{app}\Plectrify.exe"; Description: "Launch Plectrify"; Flags: nowait postinstall skipifsilent
+; The in-app update's relaunch (see [Code]). The entry above never fires under
+; /SILENT, and the app that started this Setup has quit by now, so this is the
+; only way the player gets Plectrify back. runasoriginaluser is what the
+; postinstall entry gets by default and this one must ask for: Setup is
+; elevated, and an elevated Plectrify would run WebView2 as administrator and
+; own every file it writes into the profile. Keyed on the parameter rather
+; than on WizardSilent, so a silent deployment nobody is sitting at does not
+; launch the app. RestartApplications cannot do this — it relaunches only
+; programs that registered with Restart Manager, which JUCE does not.
+Filename: "{app}\Plectrify.exe"; Flags: nowait runasoriginaluser; Check: LaunchedByApp
 
 [UninstallDelete]
 ; User data intentionally lives outside {app} and is preserved on uninstall.
@@ -106,3 +125,74 @@ Type: filesandordirs; Name: "{app}\plugins"
 ; the user's own build — so it goes with the app. Only the bundle: the shared
 ; {commoncf64}\VST3 folder belongs to every vendor on the machine.
 Type: filesandordirs; Name: "{commoncf64}\VST3\Plectrify.vst3"
+
+[Code]
+{ The in-app update (Source/update/UpdateInstaller.h). Plectrify downloads this
+  Setup, verifies it and runs it with /SILENT and /PLECTRIFYRELAUNCH=1, and the
+  two halves of the handshake live here.
+
+  First, Setup says when it is through the UAC prompt. Setup.exe runs
+  as-invoker and re-spawns itself elevated, so the prompt is Setup's own and the
+  app cannot see it being declined — a declined prompt is exit code 2 and
+  nothing on screen. InitializeSetup runs only in the elevated child, so a mutex
+  created here is the app's signal that the installation is actually going to
+  happen and it may quit. Inno's CreateMutex uses a null DACL, which is what
+  lets the non-elevated app open it.
+
+  Second, Setup waits for the app to be gone before it touches a file. JUCE's
+  single-instance lock is a named mutex held for the app's lifetime and
+  released only after its last write (audio_settings.xml, window.json), which
+  is exactly when the files may be replaced. CheckForMutexes opens each name as
+  given, so both the Global and the session-local spelling JUCE may have ended
+  up with are named. A standard user elevating with another account's password
+  cannot open the user's mutex, so there the wait falls through at once and
+  Setup's ordinary file-in-use handling is the fallback.
+
+  An ordinary interactive install — no parameter — does none of this. }
+
+function LaunchedByApp: Boolean;
+begin
+  Result := ExpandConstant('{param:PLECTRIFYRELAUNCH|0}') = '1';
+end;
+
+{ Whether the WebView2 Runtime is installed, read the way Microsoft documents
+  it: the Edge Update client key, per machine (in the 32-bit view, on every
+  Windows) or per user, holding a version in `pv` other than 0.0.0.0. The
+  evergreen runtime keeps itself current, so any installed version will do. }
+function WebView2RuntimeInstalled: Boolean;
+var
+  Version: String;
+begin
+  Result := False;
+  if RegQueryStringValue(HKLM32, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version)
+     or RegQueryStringValue(HKCU, 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) then
+    Result := (Version <> '') and (Version <> '0.0.0.0');
+end;
+
+function InitializeSetup: Boolean;
+var
+  Waited: Integer;
+begin
+  Result := True;
+  if not LaunchedByApp then
+    Exit;
+
+  CreateMutex('Global\PlectrifyUpdateInProgress');
+
+  { Up to a minute: a quit is a second or two, and a plugin editor that will
+    not close is the only thing that makes it longer. Past that, racing the
+    exit would end on Inno's file-in-use box with the app already half gone,
+    so say what is happening and stop instead. }
+  Waited := 0;
+  while CheckForMutexes('Global\juceAppLock_Plectrify,Local\juceAppLock_Plectrify') and (Waited < 600) do
+  begin
+    Sleep(100);
+    Waited := Waited + 1;
+  end;
+
+  if CheckForMutexes('Global\juceAppLock_Plectrify,Local\juceAppLock_Plectrify') then
+  begin
+    SuppressibleMsgBox('Plectrify is still running. Close it, then run the update again.', mbError, MB_OK, IDOK);
+    Result := False;
+  end;
+end;

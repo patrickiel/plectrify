@@ -45,6 +45,18 @@ struct HostCapabilities
     bool looper        = true;  ///< the loop recorder and its session archive
     bool metronome     = true;  ///< the practice click
     bool feedbackGuard = true;  ///< the acoustic-feedback detector and its latch
+
+    // Installing a newer Plectrify from inside the app: download the
+    // installer, verify it, run it silently, quit, come back as the new
+    // version (Source/update/UpdateInstaller.h). Windows standalone only. The
+    // plugin cannot quit the DAW, and the installer replaces the very bundle
+    // the DAW has loaded; macOS has no silent pkg path and Linux updates
+    // through APT — the page keeps its "Download"/"What's new" button there.
+   #if JUCE_WINDOWS
+    bool selfUpdate = true;     ///< the update notice's Install button
+   #else
+    bool selfUpdate = false;
+   #endif
 };
 
 class HostServices
@@ -142,6 +154,13 @@ public:
     // it: a reset the previous launch could not finish is reported here, since
     // the push that would have said so predates the page.
     virtual void handleRequestBackupState() {}
+    // The in-app update (HostCapabilities::selfUpdate): start the download-
+    // verify-install run, call a download off, and replay the stream's last
+    // state to a page that has just (re)loaded — a download outlives a page
+    // reload, and the push that said where it stood predates the new page.
+    virtual void handleInstallUpdate (const juce::var&) {}
+    virtual void handleCancelUpdateInstall() {}
+    virtual void handleRequestUpdateInstallState() {}
     virtual void handleSetWindowTheme (const juce::var&) {}
     // The inverse gate of the two above: served by the plugin, no-op in the
     // standalone (whose window the OS resizes). AUv2 gives a host no way to

@@ -6,6 +6,7 @@
 #include "InputProbe.h"
 #include "MidiInputManager.h"
 #include "PlectrifyEngine.h"
+#include "UpdateInstaller.h"
 
 #include <functional>
 #include <memory>
@@ -90,6 +91,17 @@ public:
     // Replays what the stream still owes a page that has just booted: the
     // targets a reset performed at launch could not remove, if any.
     void handleRequestBackupState() override;
+    // Installing a newer Plectrify from inside the app (Source/update/
+    // UpdateInstaller.h): download, verify, run the installer silently and
+    // quit once it is past the UAC prompt; the installer relaunches the new
+    // version. Standalone-only like backup, and Windows-only on top
+    // (HostCapabilities::selfUpdate). Reported on the updateInstallState
+    // stream. Refused while a Plectrify plugin in some DAW holds the data root
+    // — the installer would find the bundle it replaces in use — and while a
+    // Packages-panel install runs, which the quit would cut short.
+    void handleInstallUpdate (const juce::var& payload) override;
+    void handleCancelUpdateInstall() override;
+    void handleRequestUpdateInstallState() override;
 
     /** What the reset this launch performed left behind (Main.cpp), to be
         reported to the page once it asks — the push cannot be made before the
@@ -101,6 +113,8 @@ private:
         reduces over (see ui/src/lib/engine/backup.ts). */
     void emitBackupState (const juce::String& action, const juce::String& phase,
                           const plectrify::backup::Result& result, const juce::String& detail = {});
+    /** One updateInstallState push (see ui/src/lib/engine/updateInstall.ts). */
+    void emitUpdateInstallState (const plectrify::UpdateInstaller::State& state);
     // The device manager broadcasts a change when the audio setup is edited
     // (buffer size, driver, device); the About block would otherwise keep
     // reporting the device that was open at boot.
@@ -163,6 +177,10 @@ private:
     // options) and destroyed before it (the TONE3000 slice it owns holds a
     // second WebView2 environment on Windows).
     std::unique_ptr<PlectrifyEngine> engine;
+
+    // After the engine, whose emit() its state callback reaches, so it is
+    // destroyed first — and its destructor joins the download thread.
+    std::unique_ptr<plectrify::UpdateInstaller> updater;
 
     // Created after the web view (its callbacks emit bridge events); reset
     // first in the destructor so no MIDI callback can fire into teardown.

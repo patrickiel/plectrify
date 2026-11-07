@@ -1049,10 +1049,21 @@ export interface HostCapabilities {
       the *global* rigs and settings is not what that session owns, and a
       restore would replace them under every other instance at once. */
   backup: boolean;
+  /** Installing a newer Plectrify from inside the app: the engine downloads
+      the installer, verifies it, runs it silently and quits once it is past
+      the UAC prompt, and the installer relaunches the new version. Windows
+      standalone only — the plugin cannot quit the DAW, macOS has no silent
+      installer path and Linux updates through APT — so elsewhere the update
+      notice keeps its browser "Download" button. */
+  selfUpdate: boolean;
 }
 
 /** What absence of the capabilities field means: the standalone, which has it
-    all — every engine older than the field was one. */
+    all — every engine older than the field was one.
+
+    `selfUpdate` is the one exception and defaults to false: an engine older
+    than that field has no `installUpdate` handler, so offering the button on
+    its say-so would be a button that does nothing. */
 export const STANDALONE_CAPABILITIES: HostCapabilities = {
   audioDevices: true,
   midiDevices: true,
@@ -1062,6 +1073,7 @@ export const STANDALONE_CAPABILITIES: HostCapabilities = {
   metronome: true,
   feedbackGuard: true,
   backup: true,
+  selfUpdate: false,
 };
 
 /** Facts about the running host only the engine knows — the About dialog and the

@@ -17,8 +17,13 @@
   import { collectBrowserFacts, type BrowserFacts } from './browserFacts';
   import { formatDiagnostics, type DiagReport } from './diagnostics';
   import { buildBugReportUrl, buildIdeaUrl } from './issueReport';
+  import {
+    describeUpdateInstallError,
+    describeUpdateInstallPhase,
+    isUpdateInstallBusy,
+  } from '../../lib/engine/updateInstall';
   import { hasUpdate, parseVersion } from './updateCheck';
-  import { checkForUpdate, latestVersion, updatePhase } from './updateStore.svelte';
+  import { checkForUpdate, latestVersion, updateInstall, updatePhase } from './updateStore.svelte';
 
   interface Props {
     info: AppInfo;
@@ -36,9 +41,23 @@
         counts — and a push can be dropped while the window is occluded, so the
         panel asks again instead of reporting a device that is no longer open. */
     onRefresh: () => void;
+    /** Whether the engine can install the update itself
+        (HostCapabilities.selfUpdate — the Windows standalone). Then the row
+        installs instead of opening the release page. */
+    selfUpdate?: boolean;
+    /** Starts the in-app install; progress arrives through the update store. */
+    onInstallUpdate?: () => void;
   }
 
-  let { info, getReport, status, onOpenUrl, onRefresh }: Props = $props();
+  let {
+    info,
+    getReport,
+    status,
+    onOpenUrl,
+    onRefresh,
+    selfUpdate = false,
+    onInstallUpdate,
+  }: Props = $props();
 
   onMount(() => onRefresh());
 
@@ -63,7 +82,14 @@
   // answer even for a release they told the start-up notice to stop mentioning.
   const updateAvailable = $derived(updatePhase() === 'checked' && hasUpdate(info.version, latest));
 
+  // The in-app install, where the engine offers it. While it runs the status
+  // line follows it; a failure stays on the line beside the row to try again.
+  const install = $derived(updateInstall());
+  const installing = $derived(isUpdateInstallBusy(install));
+
   const updateMessage = $derived.by(() => {
+    if (installing) return describeUpdateInstallPhase(install);
+    if (install.phase === 'failed') return describeUpdateInstallError(install.error);
     if (checking) return 'Checking for updates…';
     if (updatePhase() === 'failed') return "Couldn't reach GitHub. Check your connection.";
     if (updateAvailable) return `Plectrify ${latest} is available.`;
@@ -170,7 +196,25 @@
         {checking ? 'Checking…' : 'Check now'}
       </Button>
     </div>
-    {#if updateAvailable}
+    {#if updateAvailable && selfUpdate && onInstallUpdate}
+      <RowButton
+        class="gap-2 rounded-none text-[.8rem]"
+        onclick={onInstallUpdate}
+        disabled={installing}
+      >
+        {installing ? `Installing ${latest}…` : `Install ${latest}`}
+      </RowButton>
+      {#if install.phase === 'failed'}
+        <!-- The browser is the way forward whatever went wrong in here. -->
+        <RowButton
+          class="gap-2 rounded-none text-[.8rem]"
+          onclick={() => onOpenUrl(LATEST_RELEASE_URL)}
+        >
+          Download {latest} in the browser
+          <ArrowSquareOutIcon size={12} class="ml-auto opacity-55" />
+        </RowButton>
+      {/if}
+    {:else if updateAvailable}
       <RowButton
         class="gap-2 rounded-none text-[.8rem]"
         onclick={() => onOpenUrl(LATEST_RELEASE_URL)}

@@ -76,6 +76,11 @@ public:
         footswitch press is user intent even while the rig is parked. */
     void noteStandbyActivity();
 
+    /** True while a Packages-panel install or uninstall runs. The standalone
+        refuses to start an in-app update over one: the update ends by quitting
+        the process, which would cut the run short mid-download. */
+    bool catalogueInstallRunning() const { return catalogue.isRunning(); }
+
     // The plugin editor's last size, remembered here because the editor dies
     // with every close while the engine lives on (and persisted with the host
     // state, so a reopened project's window matches). The standalone never
