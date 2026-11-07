@@ -232,6 +232,12 @@ plectrify::HostCapabilities PlectrifyAudioProcessor::capabilities() const
     // "Download" button, which opens the release page in the browser.
     caps.selfUpdate = false;
 
+    // Its Linux counterpart, for the same reason in the other direction: a
+    // refresh runs pkexec, whose password prompt would appear to come from
+    // the DAW, and the updater it opens would replace the .vst3 the DAW has
+    // loaded. The notice keeps its wording there and offers no button.
+    caps.systemUpdates = false;
+
     return caps;
 }
 

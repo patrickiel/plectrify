@@ -578,6 +578,8 @@
               onRefresh={() => engine.refreshAppInfo()}
               selfUpdate={capabilities.selfUpdate}
               onInstallUpdate={() => engine.installUpdate()}
+              systemUpdates={capabilities.systemUpdates}
+              onOpenSystemUpdater={() => engine.openSystemUpdater()}
             />
           {/if}
         </div>

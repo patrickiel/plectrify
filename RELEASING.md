@@ -60,7 +60,7 @@ One sentence on what matters most to someone playing guitar.
 - **Change:** name the OS if it only applies to one.
 
 **Download:** <https://plectrify.com>
-**Update:** Plectrify shows a notice when it starts. On Linux, use Software Updater.
+**Update:** Plectrify shows a notice when it starts. On Linux, use Software Updater — the notice can refresh the package list and open it.
 **On a Mac:** opening it takes an extra step: <https://plectrify.com/docs/opening-on-macos>
 ```
 

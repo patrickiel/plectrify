@@ -52,6 +52,11 @@ import {
 import { normalizeAudioDevices } from './audioDevices';
 import { IDLE_BACKUP, reduceBackupState, type BackupState } from './backup';
 import {
+  IDLE_UPDATE_CHANNEL,
+  reduceUpdateChannelState,
+  type UpdateChannelState,
+} from './updateChannel';
+import {
   IDLE_UPDATE_INSTALL,
   reduceUpdateInstallState,
   type UpdateInstallState,
@@ -460,6 +465,8 @@ export class JuceEngine implements EngineBridge {
   // so the last state replays to a late subscriber and is asked for on boot.
   private updateInstall: UpdateInstallState = { ...IDLE_UPDATE_INSTALL };
   private updateInstallListeners = new Set<(state: UpdateInstallState) => void>();
+  private updateChannel: UpdateChannelState = { ...IDLE_UPDATE_CHANNEL };
+  private updateChannelListeners = new Set<(state: UpdateChannelState) => void>();
   /** Set the moment a restore is asked for and never cleared: from here on the
       files under this page belong to the archive, and everything it holds in
       memory is the *previous* installation. Both persistence paths check it. */
@@ -769,6 +776,7 @@ export class JuceEngine implements EngineBridge {
     b?.addEventListener('sessionWritten', (data) => this.resolvePending(data));
     b?.addEventListener('backupState', (data) => this.onBackupState(data));
     b?.addEventListener('updateInstallState', (data) => this.onUpdateInstallState(data));
+    b?.addEventListener('updateChannel', (data) => this.onUpdateChannel(data));
     b?.addEventListener('looperSessionSaved', (data) => this.onLooperSessionSaved(data));
     b?.addEventListener('looperSessionLoaded', (data) => this.resolvePending(data));
     b?.addEventListener('tone3000State', (data) => this.onTone3000State(data));
@@ -794,6 +802,9 @@ export class JuceEngine implements EngineBridge {
     // download (dev HMR, a WebView recovery) must come back to its progress
     // bar, not to the offer that started it.
     b?.emitEvent('requestUpdateInstallState', {});
+    // And what APT's index knows, on Linux — a refresh this page was not
+    // there for comes back the same way. Dropped by every other host.
+    b?.emitEvent('requestUpdateChannel', {});
     // The input probe lives in the engine and outlives this document, so a page
     // reloaded (dev HMR, a WebView recovery) while the wizard's input step was
     // open would leave it metering every channel for nobody. Nothing here ever
@@ -2555,6 +2566,29 @@ export class JuceEngine implements EngineBridge {
   private onUpdateInstallState(data: unknown): void {
     this.updateInstall = reduceUpdateInstallState(this.updateInstall, data);
     for (const listener of this.updateInstallListeners) listener(this.updateInstall);
+  }
+
+  requestUpdateChannel(): void {
+    backend()?.emitEvent('requestUpdateChannel', {});
+  }
+
+  refreshUpdateChannel(): void {
+    backend()?.emitEvent('refreshUpdateChannel', {});
+  }
+
+  openSystemUpdater(): void {
+    backend()?.emitEvent('openSystemUpdater', {});
+  }
+
+  subscribeUpdateChannel(listener: (state: UpdateChannelState) => void): () => void {
+    this.updateChannelListeners.add(listener);
+    listener(this.updateChannel);
+    return () => this.updateChannelListeners.delete(listener);
+  }
+
+  private onUpdateChannel(data: unknown): void {
+    this.updateChannel = reduceUpdateChannelState(this.updateChannel, data);
+    for (const listener of this.updateChannelListeners) listener(this.updateChannel);
   }
 
   private onBackupState(data: unknown): void {

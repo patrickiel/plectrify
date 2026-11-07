@@ -1,9 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowSquareOutIcon, XIcon } from 'phosphor-svelte';
+  import { ArrowSquareOutIcon, ArrowsClockwiseIcon, XIcon } from 'phosphor-svelte';
   import Button from '../../lib/components/Button.svelte';
   import type { EngineBridge } from '../../lib/engine/EngineBridge';
   import type { HostCapabilities } from '../../lib/engine/types';
+  import {
+    describeSystemUpdater,
+    describeUpdateChannel,
+    judgeUpdateChannel,
+  } from '../../lib/engine/updateChannel';
   import {
     describeUpdateInstallError,
     describeUpdateInstallPhase,
@@ -12,16 +17,18 @@
   import { LATEST_RELEASE_URL } from '../../lib/links';
   import { shouldOfferUpdate } from './updateCheck';
   import {
+    bindUpdateChannel,
     bindUpdateInstall,
     checkForUpdate,
     latestVersion,
+    updateChannel,
     updateInstall,
   } from './updateStore.svelte';
 
   interface Props {
     engine: EngineBridge;
-    /** Which host-owned facilities exist — `selfUpdate` is the one read here,
-        already defaulted by App so it is never absent. */
+    /** Which host-owned facilities exist — `selfUpdate` and `systemUpdates`
+        are the two read here, already defaulted by App so neither is absent. */
     capabilities: HostCapabilities;
     /** The release the user already waved away, from AppSettings. */
     dismissedVersion: string;
@@ -54,8 +61,10 @@
   });
 
   // The in-app install's stream, owned here because this component is always
-  // mounted; the About dialog reads the same store.
+  // mounted; the About dialog reads the same store. The Linux channel's
+  // stream likewise.
   onMount(() => bindUpdateInstall(engine));
+  onMount(() => bindUpdateChannel(engine));
 
   // Closing is session-only on purpose — that is "not now". Only the explicit
   // button means "never", and only for this release.
@@ -74,6 +83,33 @@
   // engine ever claimed it — APT owns updates there.
   const selfUpdate = $derived(capabilities.selfUpdate && !linux);
   const failed = $derived(install.phase === 'failed');
+
+  // The Linux channel: what APT's index knows decides the wording and the
+  // buttons (updateChannel.ts). Only the Linux standalone answers; the plugin
+  // and an older engine leave the verdict `unknown`, which is today's text.
+  const systemUpdates = $derived(capabilities.systemUpdates && linux);
+  const channel = $derived(updateChannel());
+  const verdict = $derived(judgeUpdateChannel(latest, channel));
+  const channelLine = $derived(describeUpdateChannel(verdict, latest, channel.updater));
+  const updaterName = $derived(describeSystemUpdater(channel.updater));
+  // A refresh that is done is the answer; one that failed or was declined
+  // leaves the offer to try again. The sources file gone or stale is
+  // beyond what a refresh can fix, so the download is what is offered.
+  const offerRefresh = $derived(
+    systemUpdates && channel.canRefresh && (verdict === 'pending' || verdict === 'refreshFailed'),
+  );
+  const offerUpdater = $derived(
+    systemUpdates &&
+      channel.updater !== '' &&
+      (verdict === 'ready' || verdict === 'pending' || verdict === 'refreshFailed'),
+  );
+  const offerDownload = $derived(verdict === 'sourceMissing' || verdict === 'sourceStale');
+
+  // Re-ask the moment the notice shows: the boot probe predates the release
+  // check, and the user may have run `apt update` by hand since.
+  $effect(() => {
+    if (visible && systemUpdates && !busy) engine.requestUpdateChannel();
+  });
   const percent = $derived(
     install.phase === 'downloading' && install.totalBytes > 0
       ? Math.min(100, (install.receivedBytes / install.totalBytes) * 100)
@@ -126,9 +162,14 @@
       {:else}
         <p class="mt-[.15rem] opacity-75">You are running {installed}.</p>
         {#if linux}
-          <p class="mt-[.3rem] opacity-75">
-            It installs with your system updates: open Software Updater, or run
-            <code class="font-mono">sudo apt update &amp;&amp; sudo apt upgrade</code>.
+          <p
+            class="mt-[.3rem] opacity-75"
+            class:text-warn={offerDownload || verdict === 'refreshFailed'}
+          >
+            {channelLine.text}
+            {#if channelLine.command}
+              <code class="font-mono">{channelLine.command}</code>.
+            {/if}
           </p>
         {/if}
         {#if failed && selfUpdate}
@@ -148,9 +189,46 @@
                 <ArrowSquareOutIcon size={12} />
               </Button>
             {/if}
+          {:else if linux}
+            <!-- The system installs it, so the primary action is whatever
+                 gets the system to: a refresh while its index is behind,
+                 then its updater; the download only once the source itself
+                 is the problem. Browsing the release notes stays beside. -->
+            {#if offerRefresh}
+              <Button
+                size="sm"
+                tone="accent"
+                class="gap-1.5"
+                onclick={() => engine.refreshUpdateChannel()}
+              >
+                <ArrowsClockwiseIcon size={12} />
+                {verdict === 'refreshFailed' ? 'Try again' : 'Refresh'}
+              </Button>
+            {/if}
+            {#if offerUpdater}
+              <Button
+                size="sm"
+                tone={offerRefresh ? 'neutral' : 'accent'}
+                onclick={() => engine.openSystemUpdater()}
+              >
+                Open {updaterName}
+              </Button>
+            {/if}
+            {#if offerDownload}
+              <Button size="sm" tone="accent" class="gap-1.5" onclick={download}>
+                Download
+                <ArrowSquareOutIcon size={12} />
+              </Button>
+            {/if}
+            {#if verdict !== 'refreshing'}
+              <Button size="sm" class="gap-1.5" onclick={download}>
+                What's new
+                <ArrowSquareOutIcon size={12} />
+              </Button>
+            {/if}
           {:else}
             <Button size="sm" class="gap-1.5" onclick={download}>
-              {linux ? "What's new" : 'Download'}
+              Download
               <ArrowSquareOutIcon size={12} />
             </Button>
           {/if}

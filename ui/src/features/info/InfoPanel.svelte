@@ -17,13 +17,20 @@
   import { collectBrowserFacts, type BrowserFacts } from './browserFacts';
   import { formatDiagnostics, type DiagReport } from './diagnostics';
   import { buildBugReportUrl, buildIdeaUrl } from './issueReport';
+  import { describeSystemUpdater, judgeUpdateChannel } from '../../lib/engine/updateChannel';
   import {
     describeUpdateInstallError,
     describeUpdateInstallPhase,
     isUpdateInstallBusy,
   } from '../../lib/engine/updateInstall';
   import { hasUpdate, parseVersion } from './updateCheck';
-  import { checkForUpdate, latestVersion, updateInstall, updatePhase } from './updateStore.svelte';
+  import {
+    checkForUpdate,
+    latestVersion,
+    updateChannel,
+    updateInstall,
+    updatePhase,
+  } from './updateStore.svelte';
 
   interface Props {
     info: AppInfo;
@@ -47,6 +54,13 @@
     selfUpdate?: boolean;
     /** Starts the in-app install; progress arrives through the update store. */
     onInstallUpdate?: () => void;
+    /** Whether the engine can open the desktop's updater
+        (HostCapabilities.systemUpdates — the Linux standalone). Then the row
+        opens that instead of the release page, unless the update store says
+        this machine's APT source can no longer see the release. */
+    systemUpdates?: boolean;
+    /** Opens the desktop's updates application. */
+    onOpenSystemUpdater?: () => void;
   }
 
   let {
@@ -57,6 +71,8 @@
     onRefresh,
     selfUpdate = false,
     onInstallUpdate,
+    systemUpdates = false,
+    onOpenSystemUpdater,
   }: Props = $props();
 
   onMount(() => onRefresh());
@@ -86,6 +102,20 @@
   // line follows it; a failure stays on the line beside the row to try again.
   const install = $derived(updateInstall());
   const installing = $derived(isUpdateInstallBusy(install));
+
+  // The Linux channel (updateChannel.ts): the row hands over to the system's
+  // updater wherever the probe found one and the source is not the problem.
+  const channel = $derived(updateChannel());
+  const channelVerdict = $derived(judgeUpdateChannel(latest, channel));
+  const systemUpdater = $derived(
+    systemUpdates &&
+      info.platform === 'linux' &&
+      channel.updater !== '' &&
+      channelVerdict !== 'sourceMissing' &&
+      channelVerdict !== 'sourceStale'
+      ? describeSystemUpdater(channel.updater)
+      : '',
+  );
 
   const updateMessage = $derived.by(() => {
     if (installing) return describeUpdateInstallPhase(install);
@@ -214,6 +244,10 @@
           <ArrowSquareOutIcon size={12} class="ml-auto opacity-55" />
         </RowButton>
       {/if}
+    {:else if updateAvailable && systemUpdater && onOpenSystemUpdater}
+      <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={onOpenSystemUpdater}>
+        Open {systemUpdater} to install {latest}
+      </RowButton>
     {:else if updateAvailable}
       <RowButton
         class="gap-2 rounded-none text-[.8rem]"

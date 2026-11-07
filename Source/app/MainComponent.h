@@ -6,6 +6,7 @@
 #include "InputProbe.h"
 #include "MidiInputManager.h"
 #include "PlectrifyEngine.h"
+#include "SystemUpdateChannel.h"
 #include "UpdateInstaller.h"
 
 #include <functional>
@@ -102,6 +103,13 @@ public:
     void handleInstallUpdate (const juce::var& payload) override;
     void handleCancelUpdateInstall() override;
     void handleRequestUpdateInstallState() override;
+    // The Linux notice's side of updating (Source/update/SystemUpdateChannel.h):
+    // what APT's index knows, a refresh of Plectrify's source through pkexec,
+    // the desktop's updater. Linux standalone only
+    // (HostCapabilities::systemUpdates); reported on the updateChannel stream.
+    void handleRequestUpdateChannel() override;
+    void handleRefreshUpdateChannel() override;
+    void handleOpenSystemUpdater() override;
 
     /** What the reset this launch performed left behind (Main.cpp), to be
         reported to the page once it asks — the push cannot be made before the
@@ -115,6 +123,8 @@ private:
                           const plectrify::backup::Result& result, const juce::String& detail = {});
     /** One updateInstallState push (see ui/src/lib/engine/updateInstall.ts). */
     void emitUpdateInstallState (const plectrify::UpdateInstaller::State& state);
+    /** One updateChannel push (see ui/src/lib/engine/updateChannel.ts). */
+    void emitUpdateChannel (const plectrify::SystemUpdateChannel::State& state);
     // The device manager broadcasts a change when the audio setup is edited
     // (buffer size, driver, device); the About block would otherwise keep
     // reporting the device that was open at boot.
@@ -181,6 +191,8 @@ private:
     // After the engine, whose emit() its state callback reaches, so it is
     // destroyed first — and its destructor joins the download thread.
     std::unique_ptr<plectrify::UpdateInstaller> updater;
+    // Same ordering, same reason: its probe thread reports through emit().
+    std::unique_ptr<plectrify::SystemUpdateChannel> updateChannel;
 
     // Created after the web view (its callbacks emit bridge events); reset
     // first in the destructor so no MIDI callback can fire into teardown.

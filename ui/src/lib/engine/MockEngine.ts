@@ -50,6 +50,7 @@ import {
 } from './patches';
 import { resolveInstallIds } from './catalogue';
 import { IDLE_BACKUP, type BackupState } from './backup';
+import { IDLE_UPDATE_CHANNEL, type UpdateChannelState } from './updateChannel';
 import { IDLE_UPDATE_INSTALL, type UpdateInstallState } from './updateInstall';
 import { decideStarterAutoInstall, STARTER_BUNDLE_ID } from './starterBundle';
 import type {
@@ -695,8 +696,14 @@ const MOCK_APP_INFO: AppInfo = {
   os: navigator.platform || 'browser',
   // Derived from the browser rather than hardcoded, so mock sessions on a Mac
   // exercise the same wording branches (Finder, WebKit, no ASIO line) the
-  // native mac build takes.
-  platform: /mac/i.test(navigator.platform) ? 'macos' : 'windows',
+  // native mac build takes. `?platform=linux` asks for the third, whose
+  // update notice is the one that differs most.
+  platform:
+    new URLSearchParams(location.search).get('platform') === 'linux'
+      ? 'linux'
+      : /mac/i.test(navigator.platform)
+        ? 'macos'
+        : 'windows',
   host: mockHostMode(),
   capabilities:
     mockHostMode() === 'plugin'
@@ -710,6 +717,7 @@ const MOCK_APP_INFO: AppInfo = {
           feedbackGuard: false,
           backup: false,
           selfUpdate: false,
+          systemUpdates: false,
         }
       : {
           audioDevices: true,
@@ -723,6 +731,9 @@ const MOCK_APP_INFO: AppInfo = {
           // Offered whatever the browser's OS, so the notice's install path is
           // drivable in `pnpm dev` on a Mac too.
           selfUpdate: true,
+          // Likewise the Linux notice's buttons, which only show under
+          // `?platform=linux` (the notice words itself by platform).
+          systemUpdates: true,
         },
   juceVersion: '—',
   buildInfo: {
@@ -1414,6 +1425,52 @@ export class MockEngine implements EngineBridge {
     this.updateInstallListeners.add(listener);
     listener(this.updateInstall);
     return () => this.updateInstallListeners.delete(listener);
+  }
+
+  // The Linux update channel, simulated: a machine whose APT index is one
+  // release behind, with Software Updater installed. Refresh "asks for a
+  // password" for a moment and then finds the release — or, with
+  // `?aptSource=stale`, still does not, which is the reinstall wording.
+  private updateChannel: UpdateChannelState = { ...IDLE_UPDATE_CHANNEL };
+  private updateChannelListeners = new Set<(state: UpdateChannelState) => void>();
+
+  private setUpdateChannelState(next: Partial<UpdateChannelState>): void {
+    this.updateChannel = { ...this.updateChannel, ...next };
+    for (const listener of this.updateChannelListeners) listener(this.updateChannel);
+  }
+
+  requestUpdateChannel(): void {
+    const source = new URLSearchParams(location.search).get('aptSource');
+    this.setUpdateChannelState({
+      probed: true,
+      updater: 'update-manager',
+      candidate: this.updateChannel.candidate || '0.0.1',
+      sourceInstalled: source !== 'missing',
+      canRefresh: true,
+      refresh: this.updateChannel.refresh === 'refreshing' ? 'idle' : this.updateChannel.refresh,
+    });
+  }
+
+  refreshUpdateChannel(): void {
+    if (this.updateChannel.refresh === 'refreshing') return;
+    this.setUpdateChannelState({ refresh: 'refreshing' });
+    setTimeout(() => {
+      const stale = new URLSearchParams(location.search).get('aptSource') === 'stale';
+      this.setUpdateChannelState({
+        refresh: 'done',
+        candidate: stale ? this.updateChannel.candidate : '9.9.9',
+      });
+    }, 1800);
+  }
+
+  openSystemUpdater(): void {
+    console.info('[MockEngine] the real app would open', this.updateChannel.updater || 'nothing');
+  }
+
+  subscribeUpdateChannel(listener: (state: UpdateChannelState) => void): () => void {
+    this.updateChannelListeners.add(listener);
+    listener(this.updateChannel);
+    return () => this.updateChannelListeners.delete(listener);
   }
 
   private setBackupState(next: Partial<BackupState>): void {
