@@ -320,6 +320,13 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         .withEventListener ("restoreBackup", onActivity ([this] (juce::var v) { if (host.capabilities().backup) host.handleRestoreBackup (v); }))
         .withEventListener ("resetApp",      onActivity ([this] (juce::var v) { if (host.capabilities().backup) host.handleResetApp (v); }))
         .withEventListener ("requestBackupState", [this] (juce::var) { host.handleRequestBackupState(); })
+        // Installing an update from inside the app. User intent, and gated
+        // like the backup trio: the plugin declines the capability and drops
+        // the work. The download itself is covered by the host's
+        // blocksAutoStandby(), as a catalogue install is by standbyIsBlocked().
+        .withEventListener ("installUpdate",       onActivity ([this] (juce::var v) { if (host.capabilities().selfUpdate) host.handleInstallUpdate (v); }))
+        .withEventListener ("cancelUpdateInstall", onActivity ([this] (juce::var)   { if (host.capabilities().selfUpdate) host.handleCancelUpdateInstall(); }))
+        .withEventListener ("requestUpdateInstallState", [this] (juce::var) { host.handleRequestUpdateInstallState(); })
         // The setup wizard's own view of the audio stack. Asked for when it
         // opens and by its Refresh button; `rescan` re-enumerates the driver
         // families, which loads every ASIO driver on the machine and is far too
@@ -642,6 +649,7 @@ juce::var PlectrifyEngine::buildCapabilitiesState() const
     capabilities->setProperty ("metronome", caps.metronome);
     capabilities->setProperty ("feedbackGuard", caps.feedbackGuard);
     capabilities->setProperty ("backup", caps.backup);
+    capabilities->setProperty ("selfUpdate", caps.selfUpdate);
     return juce::var (capabilities);
 }
 

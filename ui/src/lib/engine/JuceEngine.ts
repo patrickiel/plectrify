@@ -51,6 +51,11 @@ import {
 } from './types';
 import { normalizeAudioDevices } from './audioDevices';
 import { IDLE_BACKUP, reduceBackupState, type BackupState } from './backup';
+import {
+  IDLE_UPDATE_INSTALL,
+  reduceUpdateInstallState,
+  type UpdateInstallState,
+} from './updateInstall';
 import { DEFAULT_APP_SETTINGS, normalizeAppSettings } from './appSettings';
 import { firstFreePos, moveKnobToPos, normalizePositions } from './knobLayout';
 import { laneName, makeLane, nextLaneName, normalizeRoutingState } from './routing';
@@ -451,6 +456,10 @@ export class JuceEngine implements EngineBridge {
   // reopening the Settings panel still shows where the last backup went.
   private backup: BackupState = { ...IDLE_BACKUP };
   private backupListeners = new Set<(state: BackupState) => void>();
+  // The in-app update's stream, same shape: a download outlives a page reload,
+  // so the last state replays to a late subscriber and is asked for on boot.
+  private updateInstall: UpdateInstallState = { ...IDLE_UPDATE_INSTALL };
+  private updateInstallListeners = new Set<(state: UpdateInstallState) => void>();
   /** Set the moment a restore is asked for and never cleared: from here on the
       files under this page belong to the archive, and everything it holds in
       memory is the *previous* installation. Both persistence paths check it. */
@@ -759,6 +768,7 @@ export class JuceEngine implements EngineBridge {
     b?.addEventListener('sessionRead', (data) => this.resolvePending(data));
     b?.addEventListener('sessionWritten', (data) => this.resolvePending(data));
     b?.addEventListener('backupState', (data) => this.onBackupState(data));
+    b?.addEventListener('updateInstallState', (data) => this.onUpdateInstallState(data));
     b?.addEventListener('looperSessionSaved', (data) => this.onLooperSessionSaved(data));
     b?.addEventListener('looperSessionLoaded', (data) => this.resolvePending(data));
     b?.addEventListener('tone3000State', (data) => this.onTone3000State(data));
@@ -780,6 +790,10 @@ export class JuceEngine implements EngineBridge {
     // Anything the backupState stream owes a page that was not there to hear
     // it: a reset the launch could not finish.
     b?.emitEvent('requestBackupState', {});
+    // Likewise an update download this page was not there for — a reload mid-
+    // download (dev HMR, a WebView recovery) must come back to its progress
+    // bar, not to the offer that started it.
+    b?.emitEvent('requestUpdateInstallState', {});
     // The input probe lives in the engine and outlives this document, so a page
     // reloaded (dev HMR, a WebView recovery) while the wizard's input step was
     // open would leave it metering every channel for nobody. Nothing here ever
@@ -2520,6 +2534,27 @@ export class JuceEngine implements EngineBridge {
     this.backupListeners.add(listener);
     listener(this.backup);
     return () => this.backupListeners.delete(listener);
+  }
+
+  installUpdate(): void {
+    // Flush the working session first: the run ends with the engine quitting
+    // the app, and an autosave still on its debounce would be lost with it.
+    void this.flushSessionSave().then(() => backend()?.emitEvent('installUpdate', {}));
+  }
+
+  cancelUpdateInstall(): void {
+    backend()?.emitEvent('cancelUpdateInstall', {});
+  }
+
+  subscribeUpdateInstall(listener: (state: UpdateInstallState) => void): () => void {
+    this.updateInstallListeners.add(listener);
+    listener(this.updateInstall);
+    return () => this.updateInstallListeners.delete(listener);
+  }
+
+  private onUpdateInstallState(data: unknown): void {
+    this.updateInstall = reduceUpdateInstallState(this.updateInstall, data);
+    for (const listener of this.updateInstallListeners) listener(this.updateInstall);
   }
 
   private onBackupState(data: unknown): void {

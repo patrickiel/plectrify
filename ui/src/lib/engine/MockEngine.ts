@@ -50,6 +50,7 @@ import {
 } from './patches';
 import { resolveInstallIds } from './catalogue';
 import { IDLE_BACKUP, type BackupState } from './backup';
+import { IDLE_UPDATE_INSTALL, type UpdateInstallState } from './updateInstall';
 import { decideStarterAutoInstall, STARTER_BUNDLE_ID } from './starterBundle';
 import type {
   InstallFinished,
@@ -708,6 +709,7 @@ const MOCK_APP_INFO: AppInfo = {
           metronome: false,
           feedbackGuard: false,
           backup: false,
+          selfUpdate: false,
         }
       : {
           audioDevices: true,
@@ -718,6 +720,9 @@ const MOCK_APP_INFO: AppInfo = {
           metronome: true,
           feedbackGuard: true,
           backup: true,
+          // Offered whatever the browser's OS, so the notice's install path is
+          // drivable in `pnpm dev` on a Mac too.
+          selfUpdate: true,
         },
   juceVersion: '—',
   buildInfo: {
@@ -1348,6 +1353,68 @@ export class MockEngine implements EngineBridge {
   // exportView.ts uses.
   private backup: BackupState = { ...IDLE_BACKUP };
   private backupListeners = new Set<(state: BackupState) => void>();
+
+  // The in-app update, simulated: a download that takes a few seconds, a
+  // verify, the installer "waiting for Windows", then the moment the real app
+  // quits — which here is a console line and a return to idle, since a
+  // browser tab has nothing to relaunch. Cancel is honoured mid-download.
+  private updateInstall: UpdateInstallState = { ...IDLE_UPDATE_INSTALL };
+  private updateInstallListeners = new Set<(state: UpdateInstallState) => void>();
+  private updateInstallTimer: ReturnType<typeof setTimeout> | undefined;
+
+  private setUpdateInstallState(next: Partial<UpdateInstallState>): void {
+    this.updateInstall = { ...this.updateInstall, ...next };
+    for (const listener of this.updateInstallListeners) listener(this.updateInstall);
+  }
+
+  installUpdate(): void {
+    if (this.updateInstall.phase !== 'idle' && this.updateInstall.phase !== 'failed') return;
+
+    const total = 37_574_188;
+    const version = '9.9.9';
+    this.setUpdateInstallState({
+      phase: 'downloading',
+      version,
+      receivedBytes: 0,
+      totalBytes: total,
+      error: undefined,
+    });
+
+    let received = 0;
+    const step = () => {
+      received = Math.min(total, received + total / 24);
+      if (received < total) {
+        this.setUpdateInstallState({ receivedBytes: received });
+        this.updateInstallTimer = setTimeout(step, 120);
+        return;
+      }
+      this.setUpdateInstallState({ phase: 'verifying', receivedBytes: total });
+      this.updateInstallTimer = setTimeout(() => {
+        this.setUpdateInstallState({ phase: 'launching' });
+        this.updateInstallTimer = setTimeout(() => {
+          this.setUpdateInstallState({ phase: 'installing' });
+          this.updateInstallTimer = setTimeout(() => {
+            console.info('[MockEngine] the real app would quit here and come back as', version);
+            this.setUpdateInstallState({ ...IDLE_UPDATE_INSTALL });
+          }, 1500);
+        }, 1500);
+      }, 700);
+    };
+    this.updateInstallTimer = setTimeout(step, 120);
+  }
+
+  cancelUpdateInstall(): void {
+    if (this.updateInstall.phase !== 'downloading' && this.updateInstall.phase !== 'verifying')
+      return;
+    clearTimeout(this.updateInstallTimer);
+    this.setUpdateInstallState({ ...IDLE_UPDATE_INSTALL });
+  }
+
+  subscribeUpdateInstall(listener: (state: UpdateInstallState) => void): () => void {
+    this.updateInstallListeners.add(listener);
+    listener(this.updateInstall);
+    return () => this.updateInstallListeners.delete(listener);
+  }
 
   private setBackupState(next: Partial<BackupState>): void {
     this.backup = { ...this.backup, ...next };

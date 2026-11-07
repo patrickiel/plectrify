@@ -204,7 +204,9 @@ users exactly as for the download buttons, and refuses a release without those
 files. The signing key is the `APT_SIGNING_KEY` secret of the `apt-signing`
 environment; `scripts/aptRepository.ts` and RELEASING.md carry the reasoning
 and the rotation rule. The update notice tells Linux users to use Software
-Updater instead of offering a download.
+Updater instead of offering a download; on Windows it installs the update
+itself (see *Updating* under Architecture), and on macOS it opens the release
+page.
 
 **Window chrome is per-platform.** Windows gets Plectrify's own title bar, the
 themed surface `WindowLookAndFeel` draws, with square caption buttons; macOS
@@ -1012,7 +1014,7 @@ project moves machines. On restore the plugin's page **adopts** the session's
 metadata without re-applying the rack — the engine's rack is already live, and
 rebuilding it on every editor open would cut audio.
 
-**Five things the plugin does not offer**, each declined through
+**Six things the plugin does not offer**, each declined through
 `HostCapabilities` so the page hides the surface and the engine drops the work.
 Auto Standby, because offline render and freeze are the host's business. The
 **metronome**, because the DAW has one locked to the project tempo and this one
@@ -1031,7 +1033,10 @@ a DAW session's rack rides its project document instead — so Back up would
 archive rigs and settings this instance is not playing, and Restore would
 replace them under every other Plectrify in the session at once, mid-render,
 with no way to tell the other editors what happened. It belongs where there is
-one instance and one session. The tuner remains.
+one instance and one session. And the **in-app update** (`selfUpdate`), because
+it ends by quitting the process to let the installer replace the files, and
+the process is the DAW — which also has the very bundle the installer replaces
+loaded; the notice keeps its browser "Download" button there. The tuner remains.
 
 Declining a tool takes its **node out of the chain**, not just its panel off the
 screen: `RackProcessor::setToolAvailability` is called from the engine's
@@ -1606,6 +1611,74 @@ clears its `plectrify.*` localStorage keys and reloads, which is the relaunch's
 browser equivalent. One gap on macOS: WKWebView keeps TONE3000's site cookie in
 the system's per-app store, outside the data root, so their website may still
 recognise the account after Plectrify has forgotten it.
+
+### Updating
+
+The page checks GitHub's API once per launch for the newest release
+(`ui/src/features/info/updateCheck.ts`, `updateStore.svelte.ts`) and the
+start-up notice (`UpdateNotice.svelte`) says so. What the notice *does* about
+it is per platform. On Linux it points at Software Updater, since the .deb
+installs an APT source (above). On macOS it opens the release page in the
+browser. **On Windows the standalone installs the update itself**
+(`HostCapabilities::selfUpdate`, `Source/update/`): the Install button sends
+`installUpdate`, and `UpdateInstaller` fetches `release-manifest.json` from
+`/releases/latest/download/` — the same prefix as the download buttons, so
+promotion is the switch here too — checks it names a newer version than this
+build, downloads the installer it names, verifies the SHA-256 the manifest
+pins, starts the installer with `/SILENT`, and quits so it can replace the
+files; the installer relaunches the new version when it is done. The old path
+was six steps (release page, find the asset, browser warning, SmartScreen, UAC,
+the wizard's pages); this is one click and the UAC prompt.
+
+Four things in that run are load-bearing. **The app does not quit when it
+launches the installer.** Inno Setup's `Setup.exe` runs as-invoker and
+re-spawns itself elevated, so the UAC prompt is Setup's, not the launch's, and
+a declined prompt is exit code 2 with nothing on screen — had the app already
+quit, the user would be left with no app and no word why. So
+`packaging/windows/Plectrify.iss` creates the mutex
+`Global\PlectrifyUpdateInProgress` in `InitializeSetup`, which only runs in the
+elevated child, and the app polls for it while Setup is alive: mutex seen →
+`installing`, quit; Setup gone first → back to the offer (declined) or `failed`.
+**Setup then waits for the app to be gone** before it touches a file, by
+polling JUCE's single-instance mutex (`juceAppLock_Plectrify`, the same lock a
+reset's relaunch waits on in `Main.cpp`), which is released only after the
+app's last write; after a minute it stops with a message rather than racing
+the exit. **The relaunch is a `[Run]` entry with `runasoriginaluser`**, keyed
+on the `/PLECTRIFYRELAUNCH=1` parameter the app passes: the ordinary
+`postinstall` entry never fires under `/SILENT`, and an elevated Plectrify
+would run WebView2 as administrator and own what it writes into the profile.
+And **Setup is run with `/NOCLOSEAPPLICATIONS` and without
+`/SUPPRESSMSGBOXES`**: in silent mode Restart Manager would close a program
+holding a file "without asking", and the program would be the user's DAW; a
+suppressed message box answers file-in-use with Abort and leaves no app on
+screen. The app refuses the run outright while a plugin instance holds the
+data root (`dataRootInUseElsewhere`, the reset's probe — the installer
+replaces the bundle the DAW has loaded) and while a Packages-panel install is
+in flight (the quit would cut it short), and blocks Auto Standby for its
+duration.
+
+The download lands in `<temp>/Plectrify/updates/`, not the per-user root:
+that is roaming `%APPDATA%` on Windows, and a 40 MB installer has no business
+roaming. The next launch empties the folder (a file the still-running Setup
+holds fails to delete and goes the time after). A file our own process writes
+carries no Mark-of-the-Web, so SmartScreen never interposes; the hash check is
+therefore the integrity gate, and both the manifest and the installer come
+over TLS from the same GitHub release. The installer is still unsigned, so the
+UAC prompt reads "Unknown publisher" — code signing is the fix for that, not
+anything here. It rides the `updateInstallState` stream rather than
+`request()`, the `installPackages`/`backupState` shape (a download outlives
+the 15 s deadline, and a page reloaded mid-download asks for the last state on
+boot); phases, reducer and wording are in `ui/src/lib/engine/updateInstall.ts`,
+the pure rules — what a manifest must say, which version counts as newer, the
+installer's command line — in `UpdateManifest.h` with the
+`Plectrify.UpdateManifest` CTest. `STANDALONE_CAPABILITIES.selfUpdate` is the
+one capability that defaults to **false** on the page: an engine older than
+the field has no handler for the event. A Debug build honours
+`PLECTRIFY_UPDATE_BASE_URL`, a directory holding a manifest and installer of
+one's own, which is how the whole run is exercised against a build that has
+not shipped: build the installer with ISCC against a staged tree, write a
+manifest naming it (a version above `VERSION`, its SHA-256), serve the folder
+over HTTP, lower `VERSION` so the API check offers the notice, and `pnpm app`.
 
 ### Installed patches
 
