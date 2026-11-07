@@ -4,7 +4,6 @@
 
 #include "UpdateChannelRules.h"
 
-#include <atomic>
 #include <functional>
 
 /**
@@ -64,12 +63,15 @@ public:
     explicit SystemUpdateChannel (std::function<void (const State&)> onState);
     ~SystemUpdateChannel();
 
-    /** Reads the index and the desktop and pushes the answer. Ignored while
-        a refresh is in flight — that one ends with a probe of its own. */
+    /** Reads the index and the desktop and pushes the answer. While a
+        refresh is in flight it re-pushes the last state instead — that run
+        ends with a probe of its own, and the asker may be a page reloaded
+        mid-refresh that missed the `refreshing` push. */
     void probe();
 
-    /** Refreshes Plectrify's APT source through pkexec, then probes.
-        Ignored while one is already running. */
+    /** Refreshes Plectrify's APT source through pkexec, then probes. Queued
+        behind a probe in flight, never dropped for one; ignored while a
+        refresh is already running. */
     void refresh();
 
     /** Starts the desktop's updater found by the last probe, detached, so it
@@ -86,8 +88,11 @@ private:
     std::function<void (const State&)> onState;
     State state;
 
+    // One thread, so a refresh asked for during a probe queues behind it.
     juce::ThreadPool pool { 1 };
-    std::atomic<bool> busy { false };
+    // Message-thread only, like everything public here.
+    bool probing = false;
+    bool refreshing = false;
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (SystemUpdateChannel)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SystemUpdateChannel)

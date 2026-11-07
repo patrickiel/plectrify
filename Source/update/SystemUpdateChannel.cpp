@@ -2,6 +2,20 @@
 
 #include "DetachedProcess.h"
 
+#if JUCE_LINUX
+ #include <cerrno>
+ #include <cstring>
+ #include <fcntl.h>
+ #include <signal.h>
+ #include <spawn.h>
+ #include <string>
+ #include <sys/wait.h>
+ #include <unistd.h>
+ #include <vector>
+
+extern char** environ;
+#endif
+
 namespace plectrify
 {
 
@@ -9,9 +23,14 @@ namespace
 {
     // apt-cache reads a local cache; this is a hung machine, not a slow one.
     constexpr int policyTimeoutMs = 15'000;
-    // The password prompt can sit for a while, and apt then fetches three
-    // small files from GitHub. Past this the run is called off as failed.
-    constexpr int refreshTimeoutMs = 5 * 60 * 1000;
+    // The password prompt can sit for as long as the user leaves it, and
+    // past authentication the process is root's and cannot be ended from
+    // here anyway (see runToCompletion), so a refresh has no deadline of its
+    // own: pkexec with no agent exits at once, a dismissed prompt exits 126,
+    // and apt's own fetch timeouts end a dead host. Nothing is left that a
+    // deadline would catch, and one that fired under an open prompt reported
+    // a failure the user then turned into a success nobody learnt of.
+    constexpr int refreshTimeoutMs = 0;
 
     /** `name` resolved against PATH, or a non-existent File. */
     juce::File findOnPath (const juce::String& name)
@@ -32,49 +51,163 @@ namespace
         return {};
     }
 
-    /** Runs `command` to completion under `timeoutMs` and reports its exit
-        code; `output` collects stdout when `captureOutput`. Returns false on a
-        process that could not start or outlived the deadline (and is killed),
-        and on the pool job it runs in being told to stop — then the process
-        is left running: the one that matters is pkexec, whose prompt would
-        be orphaned by a kill, and the shell's destructor is what asks.
+   #if JUCE_LINUX
+    /** Runs `command` to completion and reports its exit code; `output`
+        collects stdout when `captureOutput`. Returns false on a process that
+        could not start, that died from a signal, or that outlived `timeoutMs`
+        (and was killed) — and on the pool job it runs in being told to stop,
+        when the process is left running: the one that matters is pkexec,
+        whose prompt would be orphaned by a kill, and the shell's destructor
+        is what asks.
 
-        The wait is sliced for that, and the job must honour it: a job the
+        Not juce::ChildProcess, which has no word for a child that died from a
+        signal: its exit code for one is 0, so an apt-get killed mid-run read
+        as a refresh that succeeded and found nothing — the one outcome that
+        tells the user to reinstall. The wait status is read here instead.
+
+        The deadline bounds a hang, not a process this app cannot end: once
+        pkexec has authenticated it runs as root, kill() fails with EPERM,
+        and the process is then waited out — it is still this app's child,
+        its answer is still coming, and apt's own fetch timeouts end it. A
+        deadline of 0 is no deadline.
+
+        The wait is sliced so the job can honour being stopped: a job the
         pool cannot stop is killed by force (pthread_cancel) at shutdown, and
         the forced unwind through the pool's catch-all aborts the process.
-
-        Waited on first and read afterwards, not read while it runs: JUCE's
-        pipe read blocks, which would make the deadline unenforceable. The
-        commands here print well under the pipe's 64 KB, so none blocks on
-        the write side while the parent is waiting. */
+        Output is drained in the same slices, so a child that prints more
+        than the pipe holds cannot deadlock against a parent that only waits. */
     bool runToCompletion (const juce::StringArray& command, int timeoutMs, bool captureOutput,
                           juce::String& output, juce::uint32& exitCode)
     {
-        juce::ChildProcess process;
-        if (! process.start (command, captureOutput ? juce::ChildProcess::wantStdOut : 0))
+        std::vector<std::string> args;
+        for (const auto& argument : command)
+            args.push_back (argument.toStdString());
+
+        std::vector<char*> argv;
+        for (auto& argument : args)
+            argv.push_back (const_cast<char*> (argument.c_str()));
+        argv.push_back (nullptr);
+
+        int pipeFds[2] { -1, -1 };
+        if (captureOutput && ::pipe2 (pipeFds, O_CLOEXEC | O_NONBLOCK) != 0)
             return false;
 
-        const auto* job = juce::ThreadPoolJob::getCurrentThreadPoolJob();
-        const auto deadline = juce::Time::getMillisecondCounter() + (juce::uint32) timeoutMs;
-
-        while (! process.waitForProcessToFinish (100))
-        {
-            if (job != nullptr && job->shouldExit())
-                return false;
-
-            if (juce::Time::getMillisecondCounter() >= deadline)
-            {
-                process.kill();
-                return false;
-            }
-        }
+        posix_spawn_file_actions_t actions;
+        posix_spawn_file_actions_init (&actions);
 
         if (captureOutput)
-            output = process.readAllProcessOutput();
+        {
+            posix_spawn_file_actions_adddup2 (&actions, pipeFds[1], STDOUT_FILENO);
+        }
+        else
+        {
+            posix_spawn_file_actions_addopen (&actions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
+        }
 
-        exitCode = process.getExitCode();
+       #if defined (__GLIBC__) && __GLIBC_PREREQ (2, 34)
+        // Nothing of this process's — the audio device above all — rides into
+        // apt-get or a prompt that may sit for minutes (DetachedProcess.h).
+        posix_spawn_file_actions_addclosefrom_np (&actions, 3);
+       #endif
+
+        pid_t pid = 0;
+        const auto spawned = ::posix_spawnp (&pid, argv[0], &actions, nullptr, argv.data(), environ);
+        posix_spawn_file_actions_destroy (&actions);
+
+        if (captureOutput)
+            ::close (pipeFds[1]);
+
+        if (spawned != 0)
+        {
+            if (captureOutput)
+                ::close (pipeFds[0]);
+            return false;
+        }
+
+        juce::MemoryOutputStream collected;
+        const auto drain = [&]
+        {
+            if (! captureOutput || pipeFds[0] < 0)
+                return;
+
+            char buffer[4096];
+            for (;;)
+            {
+                const auto got = ::read (pipeFds[0], buffer, sizeof (buffer));
+                if (got > 0)
+                {
+                    collected.write (buffer, (size_t) got);
+                    continue;
+                }
+                if (got < 0 && errno == EINTR)
+                    continue;
+                // EOF, or nothing more yet (EAGAIN): either way, later.
+                break;
+            }
+        };
+
+        const auto* job = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+        auto deadline = timeoutMs > 0 ? juce::Time::getMillisecondCounter() + (juce::uint32) timeoutMs : 0u;
+        bool killed = false;
+
+        int status = 0;
+        for (;;)
+        {
+            drain();
+
+            const auto reaped = ::waitpid (pid, &status, WNOHANG);
+            if (reaped == pid)
+                break;
+
+            if (reaped < 0 && errno != EINTR)
+            {
+                // Lost track of the child; nothing honest can be said about it.
+                if (captureOutput)
+                    ::close (pipeFds[0]);
+                return false;
+            }
+
+            if (job != nullptr && job->shouldExit())
+            {
+                if (captureOutput)
+                    ::close (pipeFds[0]);
+                return false;
+            }
+
+            if (deadline != 0 && juce::Time::getMillisecondCounter() >= deadline)
+            {
+                if (::kill (pid, SIGKILL) == 0)
+                {
+                    killed = true;
+                }
+                else
+                {
+                    juce::Logger::writeToLog ("Update channel: " + command[0]
+                                              + " outlived its deadline and cannot be killed ("
+                                              + juce::String (strerror (errno)) + "); waiting for it");
+                }
+                // Killed or not, the end is now the wait status: a killed child
+                // reads as signalled below, an unkillable one is waited out.
+                deadline = 0;
+            }
+
+            juce::Thread::sleep (100);
+        }
+
+        drain();
+        if (captureOutput)
+        {
+            ::close (pipeFds[0]);
+            output = collected.toString();
+        }
+
+        if (killed || ! WIFEXITED (status))
+            return false;
+
+        exitCode = (juce::uint32) WEXITSTATUS (status);
         return true;
     }
+   #endif
 }
 
 SystemUpdateChannel::SystemUpdateChannel (std::function<void (const State&)> onStateIn)
@@ -131,8 +264,19 @@ SystemUpdateChannel::State SystemUpdateChannel::read()
 
 void SystemUpdateChannel::probe()
 {
-    if (busy.exchange (true))
+    // A refresh ends with a probe of its own, so none is owed; but the page
+    // that asked may be one reloaded mid-refresh, and what it is owed is the
+    // state it missed. A probe already queued answers for this one.
+    if (refreshing)
+    {
+        publish (state);
         return;
+    }
+
+    if (probing)
+        return;
+
+    probing = true;
 
     juce::WeakReference<SystemUpdateChannel> weak (this);
     pool.addJob ([weak, this]
@@ -142,10 +286,11 @@ void SystemUpdateChannel::probe()
         {
             if (weak == nullptr)
                 return;
-            // A probe never reports a refresh; keep the last outcome on the
-            // state so the page's wording survives a re-probe.
-            found.refresh = state.refresh == "refreshing" ? juce::String ("idle") : state.refresh;
-            busy = false;
+            // A probe never reports a refresh: keep the last outcome on the
+            // state so the page's wording survives a re-probe — including
+            // `refreshing`, for a refresh queued behind this probe.
+            found.refresh = state.refresh;
+            probing = false;
             publish (std::move (found));
         });
     });
@@ -153,13 +298,18 @@ void SystemUpdateChannel::probe()
 
 void SystemUpdateChannel::refresh()
 {
-    if (busy.exchange (true))
+    if (refreshing)
         return;
+
+    refreshing = true;
 
     State begun = state;
     begun.refresh = "refreshing";
     publish (begun);
 
+    // The pool has one thread, so a probe in flight finishes first and this
+    // runs behind it rather than being dropped — the notice asks for a probe
+    // the moment it shows, which is also the moment Refresh becomes clickable.
     juce::WeakReference<SystemUpdateChannel> weak (this);
     pool.addJob ([weak, this]
     {
@@ -188,7 +338,7 @@ void SystemUpdateChannel::refresh()
         {
             if (weak == nullptr)
                 return;
-            busy = false;
+            refreshing = false;
             publish (std::move (found));
         });
     });

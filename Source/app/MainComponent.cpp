@@ -587,7 +587,8 @@ void MainComponent::handleRequestUpdateChannel()
     // A probe is cheap (one apt-cache read), so a request is always answered
     // fresh rather than from the last state: the page asks after the user
     // has been told to refresh by hand, among other times. While a refresh
-    // runs the probe is dropped and that run's own answer will arrive.
+    // runs the channel re-pushes the last state instead, and that run's own
+    // answer follows.
     updateChannel->probe();
 }
 

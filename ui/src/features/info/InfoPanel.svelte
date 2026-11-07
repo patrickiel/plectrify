@@ -56,11 +56,14 @@
     onInstallUpdate?: () => void;
     /** Whether the engine can open the desktop's updater
         (HostCapabilities.systemUpdates — the Linux standalone). Then the row
-        opens that instead of the release page, unless the update store says
-        this machine's APT source can no longer see the release. */
+        follows the update channel: opens the updater once APT's index has
+        the release, offers a refresh while it has not, and falls back to the
+        release page once the source itself is the problem. */
     systemUpdates?: boolean;
     /** Opens the desktop's updates application. */
     onOpenSystemUpdater?: () => void;
+    /** Refreshes Plectrify's APT source (the notice's Refresh). */
+    onRefreshUpdateChannel?: () => void;
   }
 
   let {
@@ -73,6 +76,7 @@
     onInstallUpdate,
     systemUpdates = false,
     onOpenSystemUpdater,
+    onRefreshUpdateChannel,
   }: Props = $props();
 
   onMount(() => onRefresh());
@@ -103,18 +107,24 @@
   const install = $derived(updateInstall());
   const installing = $derived(isUpdateInstallBusy(install));
 
-  // The Linux channel (updateChannel.ts): the row hands over to the system's
-  // updater wherever the probe found one and the source is not the problem.
+  // The Linux channel (updateChannel.ts), read the way the notice reads it:
+  // the updater is only offered once APT's index actually has the release —
+  // opening it before that shows nothing to install, which is the confusion
+  // the channel exists to end — and until then the row offers the refresh.
+  const linuxChannel = $derived(systemUpdates && info.platform === 'linux');
   const channel = $derived(updateChannel());
   const channelVerdict = $derived(judgeUpdateChannel(latest, channel));
   const systemUpdater = $derived(
-    systemUpdates &&
-      info.platform === 'linux' &&
-      channel.updater !== '' &&
-      channelVerdict !== 'sourceMissing' &&
-      channelVerdict !== 'sourceStale'
+    linuxChannel && channel.updater !== '' && channelVerdict === 'ready'
       ? describeSystemUpdater(channel.updater)
       : '',
+  );
+  const channelRefresh = $derived(
+    linuxChannel &&
+      channel.canRefresh &&
+      (channelVerdict === 'pending' ||
+        channelVerdict === 'refreshing' ||
+        channelVerdict === 'refreshFailed'),
   );
 
   const updateMessage = $derived.by(() => {
@@ -247,6 +257,21 @@
     {:else if updateAvailable && systemUpdater && onOpenSystemUpdater}
       <RowButton class="gap-2 rounded-none text-[.8rem]" onclick={onOpenSystemUpdater}>
         Open {systemUpdater} to install {latest}
+      </RowButton>
+    {:else if updateAvailable && channelRefresh && onRefreshUpdateChannel}
+      <!-- APT's index has not seen the release yet: the same Refresh the
+           notice offers, so this row cannot send anyone to an updater with
+           nothing in it. -->
+      <RowButton
+        class="gap-2 rounded-none text-[.8rem]"
+        onclick={onRefreshUpdateChannel}
+        disabled={channelVerdict === 'refreshing'}
+      >
+        {channelVerdict === 'refreshing'
+          ? 'Refreshing the package list…'
+          : channelVerdict === 'refreshFailed'
+            ? "Couldn't refresh the package list — try again"
+            : `Refresh the package list to see ${latest}`}
       </RowButton>
     {:else if updateAvailable}
       <RowButton

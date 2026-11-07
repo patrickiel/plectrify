@@ -7,6 +7,7 @@
  #include <fcntl.h>
  #include <string>
  #include <sys/resource.h>
+ #include <sys/wait.h>
  #include <unistd.h>
  #include <vector>
 #endif
@@ -29,16 +30,23 @@
     window left open after Plectrify has quit, and a target of the reset about
     to be performed may be a file the relaunch now holds open itself.
 
-    So: fork, close every descriptor past the standard three, start a session
-    of its own (a terminal's hang-up must not take it down with this process),
-    and exec the executable by path — ours, in the reset's case, so that is
-    also a direct launch of the binary on macOS rather than a LaunchServices
-    request. A pipe with CLOEXEC set is the classic honest signal: the exec
-    closes it and the parent reads end-of-file; a failed exec writes errno
-    through it first. Everything between fork and exec is async-signal-safe.
+    So: fork twice, close every descriptor past the standard three, start a
+    session of its own (a terminal's hang-up must not take it down with this
+    process), and exec the executable by path — ours, in the reset's case, so
+    that is also a direct launch of the binary on macOS rather than a
+    LaunchServices request. Twice, because a child this process never waits
+    for is a zombie until it exits: the reset's relaunch got away with one
+    fork because its parent quits at once, but an updater opened from a
+    Plectrify that runs on all evening would sit in `ps` as `<defunct>` per
+    click. The middle process exits the moment it has forked, is reaped here,
+    and the grandchild — the process that matters — belongs to init. A pipe
+    with CLOEXEC set is the classic honest signal: the exec closes it and the
+    parent reads end-of-file; a failed fork or exec writes errno through it
+    first. Everything between fork and exec is async-signal-safe.
 
     On Windows it is ShellExecute through startAsProcess, which reports
-    failure itself.
+    failure itself; an argument with a space in it is quoted, since the
+    arguments travel as one command line there.
 */
 namespace plectrify
 {
@@ -48,7 +56,11 @@ namespace plectrify
 #if JUCE_WINDOWS
 inline bool startDetached (const juce::File& exe, const juce::StringArray& arguments)
 {
-    return exe.startAsProcess (arguments.joinIntoString (" "));
+    juce::StringArray quoted;
+    for (const auto& argument : arguments)
+        quoted.add (argument.containsAnyOf (" \t") ? argument.quoted() : argument);
+
+    return exe.startAsProcess (quoted.joinIntoString (" "));
 }
 #else
 inline bool startDetached (const juce::File& exe, const juce::StringArray& arguments)
@@ -83,6 +95,21 @@ inline bool startDetached (const juce::File& exe, const juce::StringArray& argum
 
     if (pid == 0)
     {
+        // The middle process: fork the real one and leave, so the parent has
+        // something to reap now and the grandchild answers to init.
+        const pid_t grandchild = ::fork();
+
+        if (grandchild < 0)
+        {
+            const int error = errno;
+            const auto written = ::write (signal[1], &error, sizeof (error));
+            juce::ignoreUnused (written);
+            ::_exit (127);
+        }
+
+        if (grandchild > 0)
+            ::_exit (0);
+
         ::setsid();
 
         struct rlimit limit {};
@@ -111,6 +138,13 @@ inline bool startDetached (const juce::File& exe, const juce::StringArray& argum
     } while (got < 0 && errno == EINTR);
 
     ::close (signal[0]);
+
+    // The middle process has exited by now (it does so right after its fork,
+    // and the pipe only closes once it has); reap it so it is not a zombie.
+    int status = 0;
+    while (::waitpid (pid, &status, 0) < 0 && errno == EINTR)
+    {
+    }
 
     // End-of-file is the exec having happened; anything read is its errno.
     return got == 0;
