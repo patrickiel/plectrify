@@ -88,7 +88,16 @@ Source: "{#VCRedistInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall igno
 Name: "{group}\Plectrify"; Filename: "{app}\Plectrify.exe"
 
 [Run]
-Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft WebView2 Runtime..."; Flags: waituntilterminated
+; Only when the runtime is not there yet (see WebView2RuntimeInstalled). The
+; bootstrapper is the evergreen one: even with the runtime installed it goes
+; to Microsoft's update service before it decides there is nothing to do,
+; which on an update took longer than copying the files — all of it behind a
+; progress bar Inno has already filled, since [Run] comes after the files.
+; Microsoft's own guidance is to check the registry before running it. The
+; VC++ redistributable is not gated: its installer exits at once when the
+; installed copy is current, and the key it leaves has no reliable floor to
+; compare the bundled version against.
+Filename: "{tmp}\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft WebView2 Runtime..."; Flags: waituntilterminated; Check: not WebView2RuntimeInstalled
 Filename: "{tmp}\VC_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime..."; Flags: waituntilterminated
 Filename: "{app}\Plectrify.exe"; Description: "Launch Plectrify"; Flags: nowait postinstall skipifsilent
 ; The in-app update's relaunch (see [Code]). The entry above never fires under
@@ -144,6 +153,20 @@ Type: filesandordirs; Name: "{commoncf64}\VST3\Plectrify.vst3"
 function LaunchedByApp: Boolean;
 begin
   Result := ExpandConstant('{param:PLECTRIFYRELAUNCH|0}') = '1';
+end;
+
+{ Whether the WebView2 Runtime is installed, read the way Microsoft documents
+  it: the Edge Update client key, per machine (in the 32-bit view, on every
+  Windows) or per user, holding a version in `pv` other than 0.0.0.0. The
+  evergreen runtime keeps itself current, so any installed version will do. }
+function WebView2RuntimeInstalled: Boolean;
+var
+  Version: String;
+begin
+  Result := False;
+  if RegQueryStringValue(HKLM32, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version)
+     or RegQueryStringValue(HKCU, 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', Version) then
+    Result := (Version <> '') and (Version <> '0.0.0.0');
 end;
 
 function InitializeSetup: Boolean;
