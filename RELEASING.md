@@ -45,6 +45,36 @@ names carry no version for exactly that reason — keep it that way, or those
 links break on the next release. Until a version is promoted the buttons keep
 serving the previous one, since GitHub's "latest" skips pre-releases.
 
+**5. Announce it on Discord.** Post in the server's release channel, by hand,
+after Promote has finished. Before that, the download buttons and APT still
+serve the previous version. Start from this template:
+
+```md
+https://github.com/patrickiel/plectrify/releases/tag/vX.Y.Z
+
+**Plectrify X.Y.Z is out**
+
+One sentence on what matters most to someone playing guitar.
+
+- **Change:** what the player can do now.
+- **Change:** name the OS if it only applies to one.
+
+**Download:** <https://plectrify.com>
+**Update:** Plectrify shows a notice when it starts. On Linux, use Software Updater.
+**On a Mac:** opening it takes an extra step: <https://plectrify.com/docs/opening-on-macos>
+```
+
+Write the bullets from the corrected release notes, in a player's words:
+
+- Use at most five bullets, and leave out chores, refactors and internal fixes.
+- Stay under Discord's 2000-character limit.
+- Start with the bare release link, so it unfurls into a preview. Keep the angle
+  brackets around the other links so they don't.
+- Follow the *Legacy plugins* rules in `AGENTS.md`: never write "VST2", refer to
+  those plugins by file extension, and don't lead with them.
+- Avoid "VST3" and "ASIO", because a short post has no room for the Steinberg
+  trademark line that public text naming them must carry.
+
 ## Notes
 
 **Secrets.** Step 4 needs nothing but the built-in `GITHUB_TOKEN`; step 2's
