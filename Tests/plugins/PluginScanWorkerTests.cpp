@@ -167,6 +167,32 @@ void testResultsRejectNoise()
     check (decoded.isEmpty(), "nothing is appended for a rejected reply");
 }
 
+void testHello()
+{
+    const auto decoded = decodeHello (encodeHello (41'872));
+    check (decoded.has_value() && *decoded == 41'872, "a hello carries the process id");
+
+    const auto wide = decodeHello (encodeHello (juce::int64 (1) << 40));
+    check (wide.has_value() && *wide == (juce::int64 (1) << 40), "a process id wider than 32 bits survives");
+
+    check (! decodeHello ({}).has_value(), "an empty block is not a hello");
+    check (! decodeHello (encodeHello (0)).has_value(), "a hello needs a real process id");
+    check (! decodeHello (encodeHello (-5)).has_value(), "a negative process id is noise");
+
+    auto padded = encodeHello (7);
+    padded.append ("!", 1);
+    check (! decodeHello (padded).has_value(), "trailing bytes are rejected");
+
+    // The three message kinds never pass for one another: the app tells a
+    // hello from a reply by decoding, and a reply must not be swallowed as one.
+    check (! decodeHello (encodeRequest ({ "VST3", "x" })).has_value(), "a request is not a hello");
+    juce::OwnedArray<juce::PluginDescription> none;
+    check (! decodeHello (encodeResults (none)).has_value(), "a reply is not a hello");
+    juce::OwnedArray<juce::PluginDescription> sink;
+    check (! decodeResults (encodeHello (7), sink) && sink.isEmpty(), "a hello is not a reply");
+    check (! decodeRequest (encodeHello (7)).has_value(), "a hello is not a request");
+}
+
 void testTimeouts()
 {
     check (connectionTimeoutMs > fileTimeoutMs,
@@ -185,6 +211,7 @@ int main()
     testResultsRoundTrip();
     testEmptyResults();
     testResultsRejectNoise();
+    testHello();
     testTimeouts();
 
     if (failures == 0)

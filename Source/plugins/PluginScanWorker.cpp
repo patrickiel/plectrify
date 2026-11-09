@@ -17,6 +17,7 @@ namespace plectrify::scanworker
         // happen to parse; the lengths are what make a truncated one fail
         // instead of yielding a shorter path.
         constexpr juce::int32 requestMagic = 0x50534352; // 'PSCR'
+        constexpr juce::int32 helloMagic   = 0x50534348; // 'PSCH'
 
         void writeSizedString (juce::OutputStream& out, const juce::String& text)
         {
@@ -186,6 +187,32 @@ namespace plectrify::scanworker
 
         return true;
     }
+
+    juce::MemoryBlock encodeHello (juce::int64 processId)
+    {
+        juce::MemoryBlock block;
+        {
+            juce::MemoryOutputStream out (block, false);
+            out.writeInt (helloMagic);
+            out.writeInt64 (processId);
+        }
+        return block;
+    }
+
+    std::optional<juce::int64> decodeHello (const juce::MemoryBlock& block)
+    {
+        juce::MemoryInputStream in (block, false);
+
+        if (block.getSize() != sizeof (juce::int32) + sizeof (juce::int64) || in.readInt() != helloMagic)
+            return std::nullopt;
+
+        const auto processId = in.readInt64();
+
+        if (processId <= 0)
+            return std::nullopt;
+
+        return processId;
+    }
 }
 
 //==============================================================================
@@ -309,6 +336,20 @@ void PluginScanWorker::reply (const juce::OwnedArray<juce::PluginDescription>& f
     sendMessageToCoordinator (plectrify::scanworker::encodeResults (found));
 }
 
+void PluginScanWorker::handleConnectionMade()
+{
+    // On the IPC thread, on the coordinator's start message — which precedes
+    // its first request, so this is the first thing the app receives and no
+    // reply can be mistaken for it.
+   #if JUCE_WINDOWS
+    const juce::int64 processId = GetCurrentProcessId();
+   #else
+    const juce::int64 processId = getpid();
+   #endif
+
+    sendMessageToCoordinator (plectrify::scanworker::encodeHello (processId));
+}
+
 void PluginScanWorker::handleConnectionLost()
 {
     // The app has gone, or ended the scan. Quit — and in case a plugin has this
@@ -327,7 +368,20 @@ void PluginScanWorker::handleConnectionLost()
 //==============================================================================
 /** The ChildProcessCoordinator: launches the worker, forwards requests, and
     hands its replies — or its death — across to the scan thread waiting in
-    OutOfProcessPluginScanner::ask. */
+    OutOfProcessPluginScanner::ask.
+
+    A worker's death reaches the app two ways, and on Windows only the second
+    is prompt. The pipe: on Linux and macOS a dead peer breaks it and JUCE
+    reports the connection lost at once, but on Windows this side *owns* the
+    named pipe, and JUCE's server end answers a broken pipe by disconnecting
+    and waiting for the next client — so nothing is reported until the ping
+    timeout (launchTimeoutMs) runs out, and a send to the dead worker blocks
+    for that long again waiting for a client. Measured at 20 s per crashing
+    plugin. So the process itself: the worker's first message is its process
+    id (scanworker::encodeHello), and on Windows a handle to it is opened and
+    polled while waiting (processHasExited), which notices a death within the
+    poll interval. The pipe's report remains the path on the other platforms
+    and the fallback everywhere. */
 class OutOfProcessPluginScanner::Worker final : private juce::ChildProcessCoordinator
 {
 public:
@@ -343,6 +397,24 @@ public:
         // issue #40's own fix crashing: a scan ended with a reply in flight.
         // The worker process quits by itself on losing the connection.
         killWorkerProcess();
+
+       #if JUCE_WINDOWS
+        if (processHandle != nullptr)
+            CloseHandle (processHandle);
+       #endif
+    }
+
+    /** Whether the worker process is known to have ended. Windows only — see
+        the class comment; false elsewhere, where the pipe says so instead.
+        Also false before the worker's hello has arrived. */
+    bool processHasExited() const
+    {
+       #if JUCE_WINDOWS
+        const std::lock_guard<std::mutex> lock (mutex);
+        return processHandle != nullptr && WaitForSingleObject (processHandle, 0) == WAIT_OBJECT_0;
+       #else
+        return false;
+       #endif
     }
 
     bool launch (const juce::File& executable)
@@ -357,6 +429,11 @@ public:
 
     bool send (const juce::MemoryBlock& request)
     {
+        // A send to a dead worker would otherwise block for the ping timeout
+        // on Windows (class comment) before failing.
+        if (processHasExited())
+            return false;
+
         return sendMessageToWorker (request);
     }
 
@@ -396,6 +473,16 @@ private:
     void handleMessageFromWorker (const juce::MemoryBlock& mb) override
     {
         const std::lock_guard<std::mutex> lock (mutex);
+
+        if (const auto processId = plectrify::scanworker::decodeHello (mb))
+        {
+           #if JUCE_WINDOWS
+            if (processHandle == nullptr)
+                processHandle = OpenProcess (SYNCHRONIZE, FALSE, (DWORD) *processId);
+           #endif
+            return;
+        }
+
         reply = mb;
         replied = true;
         condition.notify_one();
@@ -408,11 +495,12 @@ private:
         condition.notify_one();
     }
 
-    std::mutex mutex;
+    mutable std::mutex mutex;
     std::condition_variable condition;
     juce::MemoryBlock reply;
     bool replied = false;
     bool lost = false;
+    void* processHandle = nullptr;   // Windows: a SYNCHRONIZE handle to the worker, from its hello
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Worker)
 };
@@ -429,6 +517,27 @@ OutOfProcessPluginScanner::~OutOfProcessPluginScanner() = default;
 void OutOfProcessPluginScanner::scanFinished()
 {
     worker = nullptr;
+}
+
+void OutOfProcessPluginScanner::discardWorker()
+{
+    if (worker == nullptr)
+        return;
+
+    if (! worker->processHasExited())
+    {
+        worker = nullptr;
+        return;
+    }
+
+    // Dead already (Windows, where that is known — Worker's class comment).
+    // JUCE's killWorkerProcess, which the destructor runs, first sends the
+    // worker a kill message, and a write to that pipe now waits the ping
+    // timeout for a client that will never come: ten seconds the next file
+    // has no reason to wait. So the object is torn down on a thread of its
+    // own; the one it was on carries on with the scan.
+    std::shared_ptr<Worker> dead (worker.release());
+    juce::Thread::launch ([dead]() mutable { dead.reset(); });
 }
 
 bool OutOfProcessPluginScanner::findPluginTypesFor (juce::AudioPluginFormat& format,
@@ -483,11 +592,11 @@ bool OutOfProcessPluginScanner::findPluginTypesFor (juce::AudioPluginFormat& for
             case Outcome::notSent:
                 // Gone before this file was even asked for.
                 log ("the scan process had already ended before " + fileOrIdentifier + "; starting another");
-                worker = nullptr;
+                discardWorker();
                 continue;
 
             case Outcome::died:
-                worker = nullptr;
+                discardWorker();
 
                 if (! workerHasAnswered && ++launchesThatDiedUnanswered >= 2)
                 {
@@ -531,6 +640,10 @@ OutOfProcessPluginScanner::Outcome OutOfProcessPluginScanner::ask (const juce::S
         return Outcome::notSent;
 
     const auto deadline = juce::Time::getMillisecondCounter() + (juce::uint32) plectrify::scanworker::fileTimeoutMs;
+    const auto decode = [&] (const juce::MemoryBlock& message)
+    {
+        return plectrify::scanworker::decodeResults (message, result) ? Outcome::found : Outcome::badReply;
+    };
 
     for (;;)
     {
@@ -542,6 +655,17 @@ OutOfProcessPluginScanner::Outcome OutOfProcessPluginScanner::ask (const juce::S
         switch (response.state)
         {
             case Worker::State::waiting:
+                if (worker->processHasExited())
+                {
+                    // Dead, and the pipe will not say so for a while (Worker's
+                    // class comment). What it wrote before dying is still in
+                    // the pipe, though — a plugin that answered and then took
+                    // the worker down with a leftover thread is not a crash
+                    // of this file — so give that reply a moment to land.
+                    const auto last = worker->waitFor (500);
+                    return last.state == Worker::State::replied ? decode (last.message) : Outcome::died;
+                }
+
                 if (juce::Time::getMillisecondCounter() >= deadline)
                     return Outcome::hung;
                 break;
@@ -550,8 +674,7 @@ OutOfProcessPluginScanner::Outcome OutOfProcessPluginScanner::ask (const juce::S
                 return Outcome::died;
 
             case Worker::State::replied:
-                return plectrify::scanworker::decodeResults (response.message, result) ? Outcome::found
-                                                                                        : Outcome::badReply;
+                return decode (response.message);
         }
     }
 }

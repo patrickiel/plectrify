@@ -149,6 +149,31 @@ If the Windows test fails, first look at `plectrify-scan.log`'s last
 "Scanning …" line (names the file a dead worker was loading) and at the
 attribution rules above.
 
+## Verified on Windows (2026-11-09)
+
+- `pnpm app --dist --no-run`: MSVC builds with no new warnings, CTest 15/15.
+- Probe, Debug exe, 30 rounds over the 9 real VST3s here (inner `.vst3`
+  paths — pass those, not the bundle folders, or the probe counts 0 for
+  bundles): all found every round, ~300 ms/round, no leftover processes.
+- Failure paths, with synthetic plugins compiled from a few lines of C++
+  (`GetPluginFactory` that faults / `Sleep(INFINITE)` / returns null and
+  leaves a thread that faults 1.5 s later; a `.dll` whose `VSTPluginMain`
+  returns null): crash → CRASH line in `plectrify-scan.log`, blacklisted;
+  hang → killed at 90.0 s, blacklisted; lingerer and the legacy fakes →
+  answered, not blamed. App-level: with the cache removed and the fakes in
+  `third_party/plugins`, the startup scan blacklisted the crasher, kept NAM,
+  and the app stayed up.
+- **Found and fixed** (commit after `704f7fe`): on Windows a dead worker
+  was noticed only after 20 s — the app owns the named pipe and JUCE's
+  server end waits for a new client on a broken pipe instead of reporting
+  it, so only the 10 s ping timeout spoke, and the kill message in
+  `killWorkerProcess` then waited another 10 s. The worker now sends its
+  pid as a hello, the app polls a process handle while waiting, and a dead
+  worker is torn down on its own thread. Crash cost: 20 s → ~0.6 s.
+- Not done here: a Rescan clicked in the UI (no real legacy `.dll` is
+  installed on this machine either), and the Release-install exe path.
+  Both are a minute of hand-testing for the reporter's setup.
+
 ## Memory
 
 `~/.claude/projects/-home-patrick-dev-plectrify/memory/rescan-crash-0-1-8.md`

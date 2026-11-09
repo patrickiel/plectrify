@@ -71,11 +71,12 @@ namespace plectrify::scanworker
         is a plugin the user has to Retry. */
     constexpr int fileTimeoutMs = 90'000;
 
-    /** The IPC ping timeout on both ends, which has to outlast fileTimeoutMs:
+    /** The worker side's IPC ping timeout, which has to outlast fileTimeoutMs:
         while the worker is inside a plugin's load its pings are not read, and
-        the connection must not be declared dead for that alone. A worker that
-        actually dies is noticed at once through the broken pipe, so this is
-        only ever the hang case. */
+        the connection must not be declared dead for that alone. The app's
+        death is noticed through the pipe on every platform, so for the worker
+        this is only ever the hang case. (The app side is the other way round
+        on Windows — see OutOfProcessPluginScanner::Worker.) */
     constexpr int connectionTimeoutMs = 120'000;
     static_assert (connectionTimeoutMs > fileTimeoutMs, "a load must not outlive the connection");
 
@@ -102,6 +103,14 @@ namespace plectrify::scanworker
         for a malformed reply. An empty list is a valid reply: the worker
         loaded the file and found no plugin in it. */
     bool decodeResults (const juce::MemoryBlock& block, juce::OwnedArray<juce::PluginDescription>& into);
+
+    /** The worker's first message once connected: its process id, which is how
+        the app watches the process itself rather than only the pipe (see
+        OutOfProcessPluginScanner::Worker). Sent before any reply, and never
+        mistakable for one: a reply is XML, this is a magic word and a number. */
+    juce::MemoryBlock encodeHello (juce::int64 processId);
+    /** nullopt for anything that is not a hello. */
+    std::optional<juce::int64> decodeHello (const juce::MemoryBlock& block);
 }
 
 //==============================================================================
@@ -130,6 +139,7 @@ public:
 
 private:
     void handleMessageFromCoordinator (const juce::MemoryBlock& mb) override;
+    void handleConnectionMade() override;
     void handleConnectionLost() override;
     void handleAsyncUpdate() override;
 
@@ -192,6 +202,9 @@ private:
     Outcome ask (const juce::String& formatName,
                  const juce::String& fileOrIdentifier,
                  juce::OwnedArray<juce::PluginDescription>& result);
+    /** Lets go of `worker` after it died — off this thread when ending it
+        would block (Windows, see Worker). A live worker is ended in place. */
+    void discardWorker();
 
     const juce::File executable;
     const std::function<bool()> shouldAbandon;

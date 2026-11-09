@@ -1279,7 +1279,16 @@ page hides the surface behind `HostCapabilities`).
   file's leftovers, so a fresh one is started and nobody is blamed. Two
   fresh workers in a row dying before describing a single file means the
   worker itself cannot run here, and the rest of that scan falls back to
-  in-process loading, logged. The dead-man's-pedal file is written only for
+  in-process loading, logged. How a death is *noticed* is per platform: a
+  broken pipe reports it at once on Linux and macOS, but on Windows the app
+  owns the named pipe and JUCE's server end answers a broken pipe by
+  waiting for the next client, so only the ping timeout would say — 20 s
+  per crashing plugin, measured. The worker therefore sends its process id
+  as its first message and the app polls a handle to the process while it
+  waits (`OutOfProcessPluginScanner::Worker::processHasExited`), with a
+  short grace for a reply the worker wrote before it died — a plugin that
+  answered and then took the worker down with a leftover thread is not a
+  crash of that file. The dead-man's-pedal file is written only for
   in-process scans — out of process, the app being killed mid-scan is no
   evidence against the file the worker happened to hold — but a pedal an
   older build left behind is still honoured at the start of every scan.
