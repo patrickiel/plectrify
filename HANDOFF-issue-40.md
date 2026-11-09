@@ -81,6 +81,34 @@ Worker on connection lost: 5 s watchdog thread → `TerminateProcess`, then
 and a top-level filter that logs one CRASH line and returns
 `EXCEPTION_EXECUTE_HANDLER` (no WER UI, no dump).
 
+## Crash found on Linux after the first push (fixed, commit after `fa9a121`)
+
+A reset + starter-bundle install on Linux crashed the app at the end of the
+scan: SIGSEGV on the IPC read thread in
+`OutOfProcessPluginScanner::Worker::handleMessageFromWorker`, `reply = mb`.
+Cause: `waitFor` handed the reply out with `std::move`, and JUCE's
+`MemoryBlock` move constructor takes the buffer but **leaves the old size**
+behind, so the moved-from `reply` read as N bytes at a null pointer. The next
+reply of exactly N bytes made `setSize` a no-op and `memcpy` wrote to null.
+Two consecutive plugin descriptions of equal length (Lupex Delay → peakeater)
+was all it took, hence intermittent. Fixed with `swapWith` instead of a move.
+A second, latent bug fixed alongside: `~Worker` now calls `killWorkerProcess()`
+in its own body, before its mutex and reply block are destroyed.
+
+Reproduced and verified with the new manual probe (not a CTest):
+
+```
+PlectrifyScanWorkerProbe <Plectrify exe> <rounds> <plugin files...>
+# Linux: build-linux-debug/PlectrifyScanWorkerProbe_artefacts/Debug/PlectrifyScanWorkerProbe \
+#          build-linux-debug/Plectrify_artefacts/Debug/Plectrify 30 ~/.vst3/*.vst3
+# Windows: build\PlectrifyScanWorkerProbe_artefacts\Debug\PlectrifyScanWorkerProbe.exe ^
+#          build\Plectrify_artefacts\Debug\Plectrify.exe 30 "C:\Program Files\Common Files\VST3\*.vst3" <.dll files...>
+```
+
+Before the fix it crashed in round 1; after it, 30 rounds over 13 files agreed
+(~100 ms per round), no leftover worker processes. Run it on Windows too; the
+wildcard needs expanding by hand or in PowerShell (`(Get-ChildItem ...).FullName`).
+
 ## Verified on Linux
 
 - `pnpm app --dist --no-run`: UI format/check OK, 761 vitest tests pass,

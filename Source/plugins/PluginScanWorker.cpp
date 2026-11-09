@@ -332,7 +332,18 @@ class OutOfProcessPluginScanner::Worker final : private juce::ChildProcessCoordi
 {
 public:
     Worker() = default;
-    ~Worker() override = default; // killWorkerProcess(): the worker quits on losing the connection
+
+    ~Worker() override
+    {
+        // Ends the connection *here*, while the mutex and the reply block below
+        // still exist. The base destructor would do it too, but only after
+        // this class's members are gone — and until the connection's read
+        // thread has been stopped, a reply still coming in lands in
+        // handleMessageFromWorker, writing into destroyed members. That was
+        // issue #40's own fix crashing: a scan ended with a reply in flight.
+        // The worker process quits by itself on losing the connection.
+        killWorkerProcess();
+    }
 
     bool launch (const juce::File& executable)
     {
@@ -369,8 +380,16 @@ public:
         if (lost)
             return { State::lost, {} };
 
+        // Swapped out rather than moved: juce::MemoryBlock's move constructor
+        // takes the buffer but leaves the old size behind, so a moved-from
+        // `reply` reads as N bytes at a null pointer — and the next reply of
+        // exactly N bytes makes the copy's setSize a no-op and its memcpy a
+        // write to null. Two plugin descriptions of the same length in a row
+        // was all it took (first seen with the starter bundle on Linux).
+        Response response { State::replied, {} };
+        response.message.swapWith (reply);
         replied = false;
-        return { State::replied, std::move (reply) };
+        return response;
     }
 
 private:

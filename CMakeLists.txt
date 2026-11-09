@@ -1115,6 +1115,34 @@ if (BUILD_TESTING)
             juce::juce_recommended_warning_flags)
     endif()
 
+    # Manual, not a CTest: drives OutOfProcessPluginScanner against real
+    # worker processes (the app itself) over the given plugin files, round
+    # after round, and compares the rounds — the teardown and attribution
+    # races a single scan hides. See Tests/plugins/ScanWorkerProbe.cpp.
+    #   PlectrifyScanWorkerProbe <Plectrify executable> <rounds> <plugin file>...
+    juce_add_console_app(PlectrifyScanWorkerProbe PRODUCT_NAME "Plectrify Scan Worker Probe")
+    juce_generate_juce_header(PlectrifyScanWorkerProbe)
+    target_sources(PlectrifyScanWorkerProbe PRIVATE
+        Source/plugins/PluginScanWorker.cpp
+        Tests/plugins/ScanWorkerProbe.cpp)
+    target_include_directories(PlectrifyScanWorkerProbe PRIVATE Source/plugins)
+    target_compile_definitions(PlectrifyScanWorkerProbe PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_MODAL_LOOPS_PERMITTED=1)
+    if (PLECTRIFY_HOST_LEGACY_PLUGINS)
+        target_include_directories(PlectrifyScanWorkerProbe SYSTEM PRIVATE
+            "${PLECTRIFY_LEGACY_PLUGIN_INCLUDE_DIR}")
+        target_compile_definitions(PlectrifyScanWorkerProbe PRIVATE JUCE_PLUGINHOST_VST=1)
+    endif()
+    target_link_libraries(PlectrifyScanWorkerProbe PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_utils
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
     # The fixed click generator: timing, subdivisions, accent pattern and
     # transparent passthrough, exercised without the rack graph.
     juce_add_console_app(PlectrifyMetronomeTests PRODUCT_NAME "Plectrify Metronome Tests")

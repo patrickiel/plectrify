@@ -1283,6 +1283,10 @@ page hides the surface behind `HostCapabilities`).
   in-process scans — out of process, the app being killed mid-scan is no
   evidence against the file the worker happened to hold — but a pedal an
   older build left behind is still honoured at the start of every scan.
+  `PlectrifyScanWorkerProbe` (manual, not a CTest) drives this scanner
+  against real workers over a list of plugin files round after round and
+  compares the rounds; it is what found the reply hand-over crash a single
+  scan only hits when two consecutive descriptions are the same length.
 
   **The VST3 build still scans in-process.** Inside a DAW the executable is
   the DAW's, so there is no worker to launch; `HostServices::
