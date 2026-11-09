@@ -2090,7 +2090,12 @@ player's own gain, EQ and noise gate. With no module on screen the plugin is
 instantiated off the graph for its factory state, which is why no template blob
 has to be shipped and kept in step with NAM's version. That factory path is the
 one place a tone starts fresh, so it also sets NAM's `NoiseGateActive` off on
-that instance: the rig's gate already sits ahead of the chain. Not a changed
+that instance: the rig's gate already sits ahead of the chain. It is also the
+one place the user's **tone template** values land: "Set as tone template" on a
+NAM module stores its knob layout and where those knobs stand
+(`AppSettings.tone3000TemplateKnobs` / `tone3000TemplateValues`), the page
+states the values on every `tone3000Browse`, and `captureFactoryState` sets
+them on the off-graph instance after the gate. Not a changed
 plugin default, because Windows and macOS ship upstream's binary and a plain NAM
 module keeps upstream's gate-on. A swap on an existing module keeps that module's
 gate, and a patch already on disk keeps what it saved.

@@ -1021,18 +1021,23 @@
     knobEditModuleId = knobEditModuleId === moduleId ? null : moduleId;
   }
 
-  /** Keep a module's current knob layout as the template every newly
-      downloaded TONE3000 tone starts from — the patch menu's "Set as tone
-      template" row, offered on NAM modules only. Meters are dropped: the
-      template maps knobs, not displays. Anything the settings normalizer
-      would refuse (an over-long layout, a parked far-right cell) is resolved
-      by it on the write. */
+  /** Keep a module's current knob layout, and where those knobs stand, as
+      the template every newly downloaded TONE3000 tone starts from — the
+      patch menu's "Set as tone template" row, offered on NAM modules only.
+      Meters are dropped: the template maps knobs, not displays. Anything the
+      settings normalizer would refuse (an over-long layout, a parked
+      far-right cell) is resolved by it on the write. */
   function setTone3000Template(module: RackModule) {
+    const knobs = normalizePositions(module.params)
+      .filter((k) => !k.isMeter)
+      .slice(0, MAX_TEMPLATE_KNOBS);
     onSetAppSettings({
-      tone3000TemplateKnobs: normalizePositions(module.params)
-        .filter((k) => !k.isMeter)
-        .slice(0, MAX_TEMPLATE_KNOBS)
-        .map((k) => ({ paramIndex: k.paramIndex, label: k.label, pos: k.pos })),
+      tone3000TemplateKnobs: knobs.map((k) => ({
+        paramIndex: k.paramIndex,
+        label: k.label,
+        pos: k.pos,
+      })),
+      tone3000TemplateValues: knobs.map((k) => ({ paramIndex: k.paramIndex, value: k.value })),
     });
   }
 
