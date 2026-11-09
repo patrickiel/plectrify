@@ -5,8 +5,11 @@ repo root; delete it once the PR is merged.
 
 - Issue: https://github.com/patrickiel/plectrify/issues/40
 - PR: https://github.com/patrickiel/plectrify/pull/42
-- Branch: `issue-40-out-of-process-plugin-scan` (one commit on top of main,
-  `ca93878 fix: scan plugins in a worker process so a crashing plugin cannot take the app down`)
+- Branch: `issue-40-out-of-process-plugin-scan`, three commits on top of main:
+  - `ca93878 fix: scan plugins in a worker process so a crashing plugin cannot take the app down`
+  - `fa9a121 docs: add handoff note for the Windows test of the scan worker` (this file)
+  - `dd207e3 fix: hand scan replies over by swap, not move, and end the worker before its members go`
+    (the Linux crash below; also adds the probe)
 - Reporter's files: `~/Downloads/Plectrify/` on the Linux box
   (`plectrify.log`, `known_plugins.xml`, `Plectrify-20261105-231357.dmp`)
 
@@ -81,7 +84,7 @@ Worker on connection lost: 5 s watchdog thread → `TerminateProcess`, then
 and a top-level filter that logs one CRASH line and returns
 `EXCEPTION_EXECUTE_HANDLER` (no WER UI, no dump).
 
-## Crash found on Linux after the first push (fixed, commit after `fa9a121`)
+## Crash found on Linux after the first push (fixed in `dd207e3`)
 
 A reset + starter-bundle install on Linux crashed the app at the end of the
 scan: SIGSEGV on the IPC read thread in
@@ -109,7 +112,7 @@ Before the fix it crashed in round 1; after it, 30 rounds over 13 files agreed
 (~100 ms per round), no leftover worker processes. Run it on Windows too; the
 wildcard needs expanding by hand or in PowerShell (`(Get-ChildItem ...).FullName`).
 
-## Verified on Linux
+## Verified on Linux (re-run after `dd207e3`)
 
 - `pnpm app --dist --no-run`: UI format/check OK, 761 vitest tests pass,
   native app builds, CTest 15/15 (incl. new `Plectrify.PluginScanWorker`).
