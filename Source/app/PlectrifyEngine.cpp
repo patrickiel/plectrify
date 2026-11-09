@@ -100,6 +100,11 @@ PlectrifyEngine::PlectrifyEngine (plectrify::HostServices& hostServices)
     const auto caps = host.capabilities();
     rack.setToolAvailability ({ caps.looper, caps.metronome, caps.feedbackGuard });
 
+    // Before the first scan (the bundled one below): the standalone loads the
+    // plugins a scan finds in a worker process, a DAW-hosted instance in its
+    // own — see PluginScanWorker.h.
+    pluginManager.setScanWorkerExecutable (host.pluginScanWorkerExecutable());
+
     looperSessions = std::make_unique<LooperSessionStore> (appDataDir().getChildFile ("looper-sessions"));
 
     // Its first act may be to emit a session state; with no web view attached

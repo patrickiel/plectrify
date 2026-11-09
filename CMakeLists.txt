@@ -335,6 +335,7 @@ set(PLECTRIFY_ENGINE_SOURCES
     Source/audio/RackProcessor.cpp
     Source/audio/TunerDetector.cpp
     Source/plugins/PluginManager.cpp
+    Source/plugins/PluginScanWorker.cpp
     Source/plugins/Catalogue.cpp
     Source/plugins/CatalogueInstaller.cpp
     Source/rackui/PluginEditorWindow.cpp
@@ -1186,6 +1187,27 @@ if (BUILD_TESTING)
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
     add_test(NAME Plectrify.PluginBinary COMMAND PlectrifyPluginBinaryTests)
+
+    # The plugin-scan worker's protocol (Source/plugins/PluginScanWorker.h):
+    # the command line a worker process is recognised by and the request/reply
+    # codec between the app and that process. Pure functions; the process
+    # launching itself is exercised by every scan the standalone runs.
+    juce_add_console_app(PlectrifyPluginScanWorkerTests PRODUCT_NAME "Plectrify Plugin Scan Worker Tests")
+    juce_generate_juce_header(PlectrifyPluginScanWorkerTests)
+    target_sources(PlectrifyPluginScanWorkerTests PRIVATE
+        Source/plugins/PluginScanWorker.cpp
+        Tests/plugins/PluginScanWorkerTests.cpp)
+    target_include_directories(PlectrifyPluginScanWorkerTests PRIVATE Source/plugins)
+    target_compile_definitions(PlectrifyPluginScanWorkerTests PRIVATE
+        JUCE_USE_CURL=0
+        JUCE_WEB_BROWSER=0
+        JUCE_PLUGINHOST_VST3=0)     # the codec needs no format
+    target_link_libraries(PlectrifyPluginScanWorkerTests PRIVATE
+        juce::juce_audio_processors
+        PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    add_test(NAME Plectrify.PluginScanWorker COMMAND PlectrifyPluginScanWorkerTests)
 
     # The rules behind installing an update from inside the app: what a release
     # manifest must say before its installer is downloaded, which version

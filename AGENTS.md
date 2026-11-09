@@ -1060,9 +1060,10 @@ macOS creates `Components` and `HAL` under `/Library/Audio/Plug-Ins`, never
 install meets; `customize="never"` makes an app/plugin version skew
 unrepresentable, the Windows `[InstallDelete]` promise by other means. The
 Steinberg VST3 SDK notice electing GPLv3 is in `THIRD_PARTY_NOTICES.md`,
-ASIO-notice pattern. Still to come: out-of-process scanning — Rescan inside a
-DAW still loads plugins in-process, where a crashing plugin takes the host
-down.
+ASIO-notice pattern. Still to come: out-of-process scanning *inside a DAW* —
+the standalone scans in a worker process (see `PluginManager` under *Audio*),
+but Rescan from the plugin still loads plugins in-process, where a crashing
+plugin takes the host down, because the bundle ships no executable to launch.
 
 ### UI ↔ engine contract
 
@@ -1246,9 +1247,49 @@ page hides the surface behind `HostCapabilities`).
   a reloaded page cannot un-arm what the previous one left set).
 - `PluginManager` (`Source/plugins/`) — `AudioPluginFormatManager` (VST3, plus the older format) +
   `KnownPluginList` cached to disk; instantiation is async (message thread);
-  scanning runs on a background thread with a crash blacklist
-  (dead-man's-pedal file). `KnownPluginList` is internally locked, so the
-  message thread can read it while a scan runs.
+  scanning runs on a background thread with a crash blacklist.
+  `KnownPluginList` is internally locked, so the message thread can read it
+  while a scan runs.
+
+  **The standalone scans in a separate process** (`PluginScanWorker.h`,
+  issue #40). A scan instantiates every plugin file it finds, and a plugin
+  is arbitrary code: one that crashes takes the process down, and one that
+  leaves a thread, a timer or a window procedure behind after JUCE unloads
+  it takes the process down *later* — seconds after "Scan complete", which
+  is what 0.1.8 did on a machine full of VST2-era `.dll`s, with no dump and
+  no log line because a plugin had also replaced the crash handler on its
+  way through. So the scan thread no longer loads anything: for each file it
+  asks a **worker** — this same executable, relaunched with
+  `--plectrify-scan-worker:<pipe>` (JUCE's `ChildProcessCoordinator` /
+  `ChildProcessWorker`, the AudioPluginHost arrangement) — which loads the
+  file and sends back the `PluginDescription`s as XML. `Main.cpp` constructs
+  a `PluginScanWorker` instead of the main window when it sees that command
+  line, allows itself beside the running instance, and gives the worker its
+  own `plectrify-scan.log` (whose last "Scanning …" line names the file a
+  dead worker was loading) and *no* crash handler: its deaths are the point,
+  and a dump per crashing plugin per scan would fill `crashes/` with other
+  people's bugs. On Windows it suppresses the OS error boxes a missing
+  dependency or a crash would otherwise park behind the app. The worker is
+  killed when the scan ends, so anything a plugin left running dies with
+  it. `OutOfProcessPluginScanner` is the app's side, a
+  `KnownPluginList::CustomScanner`: a worker that dies **after** a request
+  was sent, or that does not answer within 90 s, means that file is
+  blacklisted (returning false there is what blacklists); a worker found
+  dead **before** the next request could be sent was killed by the previous
+  file's leftovers, so a fresh one is started and nobody is blamed. Two
+  fresh workers in a row dying before describing a single file means the
+  worker itself cannot run here, and the rest of that scan falls back to
+  in-process loading, logged. The dead-man's-pedal file is written only for
+  in-process scans — out of process, the app being killed mid-scan is no
+  evidence against the file the worker happened to hold — but a pedal an
+  older build left behind is still honoured at the start of every scan.
+
+  **The VST3 build still scans in-process.** Inside a DAW the executable is
+  the DAW's, so there is no worker to launch; `HostServices::
+  pluginScanWorkerExecutable()` is the switch (the standalone answers with
+  its own exe, the plugin inherits the empty default) and
+  `PluginManager::setScanWorkerExecutable` is what it feeds. Shipping a
+  scanner binary inside the plugin bundle is the way to close that gap.
 - `MainComponent` (`Source/app/`) — the standalone shell and the engine's
   `HostServices`: owns the device manager, `AudioProcessorPlayer`, the web
   view and the MIDI inputs, and the `PlectrifyEngine` that owns everything
@@ -2241,7 +2282,10 @@ as are AU and CLAP hosting.
   `Plectrify.RackProcessor` (headless graph topology: slot order, connection
   rebuilding, split-position arithmetic, using dummy in-memory plugins) and
   `Plectrify.PluginBinary` (the PE/ELF/Mach-O header sniffing behind the
-  "Skipped plugins" reasons, on synthetic headers).
+  "Skipped plugins" reasons, on synthetic headers) and
+  `Plectrify.PluginScanWorker` (the scan worker's command-line marker and
+  request/reply codec; the process itself is exercised by every scan the
+  standalone runs).
   Build the targets (`PlectrifyTests`, `PlectrifyRackTests`) then run
   `ctest --test-dir build -C Debug --output-on-failure` (ctest sits beside the
   VS-bundled cmake). `pnpm app --dist` and both release scripts run these
@@ -2260,8 +2304,10 @@ as are AU and CLAP hosting.
 
 - Never commit `third_party/` (fetched dependency payloads), `build*/`,
   `ui/dist/`, or any `node_modules/` — all are gitignored.
-- The app loads and executes third-party plugin binaries in-process; plugin
-  scanning is user-triggered and cached, not automatic. The macOS build keeps
+- The app loads and executes third-party plugin binaries in-process (a scan
+  in the standalone loads them in a worker process instead — see
+  `PluginScanWorker.h`); plugin scanning is user-triggered and cached, not
+  automatic. The macOS build keeps
   that possible under the hardened runtime via the
   `com.apple.security.cs.disable-library-validation` entitlement
   (`cmake/Plectrify.entitlements`), paired with `audio-input`; the signed

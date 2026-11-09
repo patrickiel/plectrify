@@ -51,6 +51,12 @@ public:
     int deviceLatencySamples() const override;
     juce::var audioDeviceInfo() const override;
     bool blocksAutoStandby() const override;
+    /** This very executable, relaunched with the worker's command line — see
+        PlectrifyApplication::initialise. */
+    juce::File pluginScanWorkerExecutable() const override
+    {
+        return juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+    }
     juce::StringArray midiDeviceNames() const override;
     void refreshMidiDevices() override;
     void onEngineTick() override;

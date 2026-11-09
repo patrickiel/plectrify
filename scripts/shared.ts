@@ -280,6 +280,7 @@ export const TEST_TARGETS = [
   'PlectrifyAudioSetupTests',
   'PlectrifyNoiseGateTests',
   'PlectrifyPluginBinaryTests',
+  'PlectrifyPluginScanWorkerTests',
   'PlectrifyUpdateManifestTests',
 ] as const;
 

@@ -42,13 +42,14 @@
       <WarningIcon size={18} weight="fill" class="text-warn" aria-hidden="true" />
       Skipped plugins
     </h2>
-    <!-- Two facts and no more: a scan stopped on these, and rescanning won't
-         bring them back. The "or the app closed" clause stays because it is why
-         a perfectly good plugin can end up here. -->
+    <!-- Two facts and no more: loading these ended a scan's worker, and
+         rescanning won't bring them back. The "or the app closed" clause stays
+         because it is still how a perfectly good plugin can end up here in the
+         plugin build, which scans in-process. -->
     <p id="blacklist-dialog-description" class="mt-2 text-sm leading-6 text-muted">
       {#if retryable.length > 0}
-        A scan stopped while these were loading, so every scan since has skipped them. The plugin
-        may have crashed, or the app may have closed mid-scan. Retry loads them again.
+        These crashed or stopped responding while a scan loaded them, so every scan since has
+        skipped them. One may also land here if the app closed mid-scan. Retry loads them again.
       {:else if unloadable.length > 0}
         These plugins were found but cannot run in Plectrify. Each line says why.
       {:else}
