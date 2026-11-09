@@ -148,6 +148,31 @@ describe('normalizeAppSettings', () => {
     ]);
   });
 
+  it('starts the TONE3000 template with no parameter values when none are stored', () => {
+    expect(normalizeAppSettings({}).tone3000TemplateValues).toEqual([]);
+    expect(normalizeAppSettings({ tone3000TemplateValues: 'loud' }).tone3000TemplateValues).toEqual(
+      [],
+    );
+  });
+
+  it('rebuilds TONE3000 template values, clamping them and dropping unusable entries', () => {
+    const values = normalizeAppSettings({
+      tone3000TemplateValues: [
+        { paramIndex: 1, value: 0.25, stray: true },
+        { paramIndex: 3, value: 1.7 }, // clamped
+        { paramIndex: 1, value: 0.9 }, // dropped: already named
+        { paramIndex: -2, value: 0.5 }, // dropped: no such parameter
+        { paramIndex: 4, value: 'half' }, // dropped: not a value
+        { paramIndex: 5, value: Number.NaN },
+        null,
+      ],
+    }).tone3000TemplateValues;
+    expect(values).toEqual([
+      { paramIndex: 1, value: 0.25 },
+      { paramIndex: 3, value: 1 },
+    ]);
+  });
+
   it('resolves duplicate TONE3000 template positions to free cells', () => {
     const knobs = normalizeAppSettings({
       tone3000TemplateKnobs: [

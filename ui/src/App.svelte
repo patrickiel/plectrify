@@ -239,6 +239,10 @@
       // as a switch and drop the place remembered under the real choice.
       // Omitted, the engine keeps the architecture it last browsed by.
       architecture: settingsLoaded ? appSettings.tone3000Architecture : undefined,
+      // Where the template's knobs stood ("Set as tone template"). Only a tone
+      // built from the factory state takes them; one picked onto a module
+      // keeps that module's settings.
+      templateValues: appSettings.tone3000TemplateValues,
     });
   }
 

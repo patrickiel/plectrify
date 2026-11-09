@@ -47,11 +47,14 @@ public:
         std::function<juce::String (const juce::String& moduleId)> captureModuleState;
 
         /** Instantiate `pluginId` off the graph and answer with its factory
-            state (NAM's own gate off) and its parameter list, or an empty state on failure. Async,
+            state (NAM's own gate off, then `templateValues` — the page's array of
+            `{ paramIndex, value }`, the user's tone template — applied on top)
+            and its parameter list, or an empty state on failure. Async,
             because plugin instantiation is. Used when a patch is being created
             from the drawer with no module to start from — which is why no
             template blob has to be shipped and kept in step with NAM's version. */
         std::function<void (const juce::String& pluginId,
+                            const juce::var& templateValues,
                             std::function<void (juce::String state, juce::var parameters)>)>
             captureFactoryState;
 
@@ -198,6 +201,11 @@ private:
         cannot carry it round the flow for us. */
     juce::String browseModuleId;
     juce::String browsePluginId;
+    /** The tone template's parameter values as the page sent them — an array
+        of `{ paramIndex, value }`, value normalised — or void. Applied only to
+        a factory state: a tone landing on a module starts from that module's
+        own state and keeps the player's settings. */
+    juce::var browseTemplateValues;
     /** The architecture the window was opened for, and what `chooseModel`
         prefers. Single-valued, and **omitting it is not "all"** — see
         Tone3000Auth::AuthorizeOptions. The page's Settings choose it (A2, A1

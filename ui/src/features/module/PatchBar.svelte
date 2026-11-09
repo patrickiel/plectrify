@@ -354,7 +354,9 @@
           onSetToneTemplate();
           open = false;
         }}
-        {@attach tooltip('New tones from TONE3000 will arrive with this knob layout')}
+        {@attach tooltip(
+          'New tones from TONE3000 will arrive with this knob layout and these knob settings',
+        )}
       >
         <Tone3000Logo variant="mark" height={9} class="shrink-0" />
         Set as tone template

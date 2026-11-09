@@ -112,8 +112,9 @@ PlectrifyEngine::PlectrifyEngine (plectrify::HostServices& hostServices)
     // re-asks — the same recovery every occluded-window drop relies on.
     tone3000 = std::make_unique<Tone3000Service> (Tone3000Service::Delegate {
         [this] (const juce::String& moduleId) { return captureStateOf (moduleId); },
-        [this] (const juce::String& pluginId, std::function<void (juce::String, juce::var)> onDone)
-        { captureFactoryState (pluginId, std::move (onDone)); },
+        [this] (const juce::String& pluginId, const juce::var& templateValues,
+                std::function<void (juce::String, juce::var)> onDone)
+        { captureFactoryState (pluginId, templateValues, std::move (onDone)); },
         [this] { return findNamPluginId(); },
         [this] (const juce::String& eventId, const juce::var& payload) { emit (eventId, payload); } });
 
@@ -2122,6 +2123,7 @@ juce::String PlectrifyEngine::findNamPluginId()
 }
 
 void PlectrifyEngine::captureFactoryState (const juce::String& pluginId,
+                                           const juce::var& templateValues,
                                            std::function<void (juce::String, juce::var)> onDone)
 {
     const auto description = findKnownPlugin (pluginId);
@@ -2136,7 +2138,7 @@ void PlectrifyEngine::captureFactoryState (const juce::String& pluginId,
 
     pluginManager.createInstanceAsync (
         *description, sampleRate, blockSize,
-        [onDone] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String&)
+        [onDone, templateValues] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String&)
         {
             if (instance == nullptr)
             {
@@ -2149,6 +2151,27 @@ void PlectrifyEngine::captureFactoryState (const juce::String& pluginId,
             for (auto* parameter : instance->getParameters())
                 if (parameter->getName (64) == "NoiseGateActive")
                     parameter->setValue (0.0f);
+
+            // Then the user's tone template: where their knobs stood when they
+            // chose "Set as tone template". After the gate above, so a template
+            // that maps the gate switch has the last word on it. Indices come
+            // off the page, so they are checked against this instance.
+            if (const auto* values = templateValues.getArray())
+            {
+                const auto& parameters = instance->getParameters();
+
+                for (const auto& entry : *values)
+                {
+                    const auto index = entry["paramIndex"];
+                    const auto value = entry["value"];
+
+                    if (! index.isInt() || ! (value.isDouble() || value.isInt()))
+                        continue;
+
+                    if (juce::isPositiveAndBelow ((int) index, parameters.size()))
+                        parameters[(int) index]->setValue (juce::jlimit (0.0f, 1.0f, (float) (double) value));
+                }
+            }
 
             juce::MemoryBlock block;
             instance->getStateInformation (block);

@@ -30,6 +30,7 @@ import type {
   Scene,
   SceneState,
   StatusState,
+  TemplateParamValue,
 } from './types';
 import type { PluginFormat } from './legacyPlugins';
 import {
@@ -1081,7 +1082,12 @@ export class JuceEngine implements EngineBridge {
       this.onTone3000Install({ runId: 'connect', stage: 'failed', error: done.error });
   }
 
-  tone3000Browse(options?: { moduleId?: string; pluginId?: string; architecture?: string }): void {
+  tone3000Browse(options?: {
+    moduleId?: string;
+    pluginId?: string;
+    architecture?: string;
+    templateValues?: TemplateParamValue[];
+  }): void {
     backend()?.emitEvent('tone3000Connect', { ...options });
   }
 

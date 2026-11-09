@@ -237,6 +237,13 @@ export interface Setlist {
 /** One knob in a saved patch — just the mapping (which parameter, what
     label), without a live value. A loaded patch's knob *values* come from the
     plugin state it was saved with, not from here. */
+/** One parameter of the TONE3000 template and the normalised (0..1) value it
+    was at when the template was set. See `AppSettings.tone3000TemplateValues`. */
+export interface TemplateParamValue {
+  paramIndex: number;
+  value: number;
+}
+
 export interface KnobDef {
   paramIndex: number;
   label: string;
@@ -585,6 +592,13 @@ export interface AppSettings {
       can still be re-mapped individually afterwards. An empty list is a real
       choice — the tone then lands with no knobs mapped. */
   tone3000TemplateKnobs: KnobDef[];
+  /** Where the template's knobs stood when it was set: normalised parameter
+      values by parameter index, captured by the same "Set as tone template"
+      click as the layout above. Applied by the engine to the factory state a
+      fresh tone is built from — so only where a tone starts fresh; a tone
+      picked onto an existing module keeps that module's own settings. Empty
+      means the plugin's own defaults. */
+  tone3000TemplateValues: TemplateParamValue[];
   /** Which Neural Amp Modeler generation the TONE3000 window lists. TONE3000's
       Select flow takes one architecture, so a tone only ever published as A1
       or Custom is invisible while browsing for A2 — this is how it is

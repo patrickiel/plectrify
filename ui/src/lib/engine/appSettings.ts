@@ -1,6 +1,7 @@
 import type {
   AppSettings,
   KnobDef,
+  TemplateParamValue,
   MidiTrigger,
   NeedlePrecision,
   StrobePrecision,
@@ -99,6 +100,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   updateDismissedVersion: '',
   midiBindings: {},
   tone3000TemplateKnobs: namDefaultKnobs(),
+  tone3000TemplateValues: [],
   tone3000Architecture: '2',
   activeTool: null,
   songs: [],
@@ -252,6 +254,37 @@ function templateKnobs(value: unknown): KnobDef[] {
   return normalizePositions(knobs);
 }
 
+/** Keep only well-formed parameter values from a persisted TONE3000 template.
+
+    Anything unusable — including a missing field, which is every settings file
+    written before the template carried values — is "no values": new tones then
+    start from the plugin's own defaults, as they always did. Values are
+    normalised, so they are clamped to 0..1 rather than dropped when out of
+    range; a parameter named twice keeps its first value. */
+function templateValues(value: unknown): TemplateParamValue[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<number>();
+  const values: TemplateParamValue[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const { paramIndex, value: v } = entry as { paramIndex?: unknown; value?: unknown };
+    if (
+      typeof paramIndex !== 'number' ||
+      !Number.isInteger(paramIndex) ||
+      paramIndex < 0 ||
+      paramIndex > MAX_TEMPLATE_PARAM_INDEX ||
+      typeof v !== 'number' ||
+      !Number.isFinite(v) ||
+      seen.has(paramIndex)
+    )
+      continue;
+    seen.add(paramIndex);
+    values.push({ paramIndex, value: Math.min(1, Math.max(0, v)) });
+    if (values.length === MAX_TEMPLATE_KNOBS) break;
+  }
+  return values;
+}
+
 /** Guard the TONE3000 browse architecture. Anything unrecognised — including
     a missing field, which is every settings file written before the switch —
     is A2: that is what the window always browsed by, and an empty value would
@@ -370,6 +403,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
       typeof candidate?.updateDismissedVersion === 'string' ? candidate.updateDismissedVersion : '',
     midiBindings: midiBindingsMap(candidate?.midiBindings),
     tone3000TemplateKnobs: templateKnobs(candidate?.tone3000TemplateKnobs),
+    tone3000TemplateValues: templateValues(candidate?.tone3000TemplateValues),
     tone3000Architecture: tone3000Architecture(candidate?.tone3000Architecture),
     activeTool: activeTool(
       candidate?.activeTool,

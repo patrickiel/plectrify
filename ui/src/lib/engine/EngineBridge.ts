@@ -16,6 +16,7 @@ import type {
   RoutingState,
   SceneState,
   StatusState,
+  TemplateParamValue,
 } from './types';
 import type { BackupState } from './backup';
 import type { UpdateInstallState } from './updateInstall';
@@ -282,6 +283,11 @@ export interface EngineBridge {
         of the three), the engine keeps the architecture it last browsed by,
         which it persists; TONE3000 itself is always sent one. */
     architecture?: string;
+    /** The tone template's parameter values (`AppSettings.tone3000TemplateValues`).
+        Applied to the factory state when a tone is built with no module to
+        start from; a tone landing on `moduleId` keeps that module's settings.
+        Stated on every open — omitted means the plugin's defaults. */
+    templateValues?: TemplateParamValue[];
   }): void;
   /** Forget the connected account and its tokens — and the page the window was
       left on, which belongs to that session. Downloaded models and the patches

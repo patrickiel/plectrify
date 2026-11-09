@@ -30,6 +30,7 @@ import type {
   Scene,
   SceneState,
   StatusState,
+  TemplateParamValue,
 } from './types';
 import { looperSessionName, normalizeLooperSessions, pruneLooperSessions } from './looperSessions';
 import { DEFAULT_STATUS_STATE } from './types';
@@ -2285,7 +2286,14 @@ export class MockEngine implements EngineBridge {
     for (const l of this.tone3000Listeners) l(this.tone3000);
   }
 
-  tone3000Browse(options?: { moduleId?: string; pluginId?: string; architecture?: string }): void {
+  tone3000Browse(options?: {
+    moduleId?: string;
+    pluginId?: string;
+    architecture?: string;
+    /** Accepted for the contract; the mock's patch state is a token, so there
+        is no plugin state for the values to be written into. */
+    templateValues?: TemplateParamValue[];
+  }): void {
     // The real thing opens TONE3000's own window and waits on the user. There
     // is no window here, so the mock plays the whole thing through: connect,
     // pick a tone, download it. That is the flow the app now has â€” one click

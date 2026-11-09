@@ -338,6 +338,10 @@ void Tone3000Service::connect (const juce::var& payload)
     browseModuleId = stringProperty (payload, "moduleId");
     browsePluginId = stringProperty (payload, "pluginId");
 
+    // The tone template's knob settings, for a tone built from the factory
+    // state. Stated on every open like the two above; absent means none.
+    browseTemplateValues = payload["templateValues"];
+
     // A different generation is a different catalogue. The open window's flow
     // was authorized with the old filter, so it cannot simply be shown again —
     // it is rebuilt through the fresh path below, exactly as after a pick. And
@@ -1130,7 +1134,7 @@ void Tone3000Service::buildPatchState (const InstallRun& current, juce::String n
     if (! delegate.captureFactoryState)
         return finishInstall (false, "Neural Amp Modeler is not available");
 
-    delegate.captureFactoryState (current.pluginId, rewriteAndFinish);
+    delegate.captureFactoryState (current.pluginId, browseTemplateValues, rewriteAndFinish);
 }
 
 void Tone3000Service::finishInstall (bool ok,
