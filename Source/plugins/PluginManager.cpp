@@ -1,20 +1,13 @@
 #include "PluginManager.h"
 #include "AppPaths.h"
 #include "PluginBinary.h"
+#include "PluginScanWorker.h"
 
 PluginManager::PluginManager() : juce::Thread ("Plectrify plugin scan")
 {
-    formatManager.addFormat (std::make_unique<juce::VST3PluginFormat>());
-
-   #if JUCE_PLUGINHOST_VST
-    // The VST2-era format (.dll / .vst / .so), compiled against the FST header
-    // — see CMakeLists.txt for why that is possible and the rules that come
-    // with it. JUCE's own class: the scan, the cache, the blacklist and
-    // instantiation below know nothing format-specific, and a description's
-    // identifier string embeds the format name, so a .dll and a .vst3 of the
-    // same plugin are two entries that never stand in for each other.
-    formatManager.addFormat (std::make_unique<juce::VSTPluginFormat>());
-   #endif
+    // VST3, plus the VST2-era format when the build enables it — one list,
+    // shared with the scan worker process so both sides name the same formats.
+    plectrify::scanworker::addHostedFormats (formatManager);
 
     loadFromSettings();
     loadUserFolders();
@@ -28,8 +21,23 @@ PluginManager::PluginManager() : juce::Thread ("Plectrify plugin scan")
 PluginManager::~PluginManager()
 {
     // A hostile plugin can hang its own load; after the grace period the scan
-    // thread is force-killed rather than hanging app shutdown forever.
+    // thread is force-killed rather than hanging app shutdown forever. (With
+    // the worker process that hang is the worker's, and the scan thread only
+    // waits on it, polling threadShouldExit — so it ends promptly here.)
     stopThread (10000);
+}
+
+void PluginManager::setScanWorkerExecutable (const juce::File& executable)
+{
+    jassert (! isScanning());
+
+    scanOutOfProcess = executable.existsAsFile();
+
+    if (scanOutOfProcess)
+        knownPlugins.setCustomScanner (std::make_unique<OutOfProcessPluginScanner> (
+            executable, [this] { return threadShouldExit(); }));
+    else
+        knownPlugins.setCustomScanner (nullptr);
 }
 
 juce::File PluginManager::getManagedPluginDirectory()
@@ -246,19 +254,27 @@ bool PluginManager::scanAndAddPluginsAsync (const juce::FileSearchPath& paths,
 
 void PluginManager::run()
 {
-    // Scanning instantiates every plugin in this process, so a crashing VST3
-    // takes the whole app down mid-scan. The dead-man's-pedal file names the
-    // plugin about to be scanned; if a previous scan died, blacklist that file
-    // so this scan skips it instead of crashing the same way every time.
+    // Scanning in-process instantiates every plugin in this process, so a
+    // crashing plugin takes the whole app down mid-scan. The dead-man's-pedal
+    // file names the plugin about to be scanned; if a previous scan died,
+    // blacklist that file so this scan skips it instead of crashing the same
+    // way every time. Out of process the pedal is not written: a worker's
+    // death is reported to the scanner directly and blacklisted there
+    // (OutOfProcessPluginScanner), and the app dying mid-scan — a kill, a
+    // crash elsewhere — is then no evidence against whatever file the worker
+    // happened to hold. A pedal an older in-process scan left behind is
+    // still honoured.
     const auto pedal = getCacheFile().getSiblingFile ("scan_in_progress.txt");
     pedal.getParentDirectory().createDirectory(); // a first-ever scan precedes any cache write
     juce::PluginDirectoryScanner::applyBlacklistingsFromDeadMansPedal (knownPlugins, pedal);
     pedal.deleteFile();
+    const auto pedalForThisScan = scanOutOfProcess ? juce::File() : pedal;
 
     pruneMissingPlugins();
     pruneFilesInsideBundles();
 
     auto lastCount = knownPlugins.getNumTypes();
+    auto lastBlacklisted = knownPlugins.getBlacklistedFiles().size();
 
     // Each format's files are listed once and that one list serves both the
     // scanner and recordUnloadablePlugins. The scanner is built over an empty
@@ -274,7 +290,7 @@ void PluginManager::run()
 
         juce::PluginDirectoryScanner scanner (knownPlugins, *format, juce::FileSearchPath(),
                                               /*recursive*/ true,
-                                              pedal,
+                                              pedalForThisScan,
                                               /*allowAsync*/ false);
         scanner.setFilesOrIdentifiersToScan (scannedFiles[(size_t) f]);
 
@@ -282,15 +298,20 @@ void PluginManager::run()
         // Persist whenever a file adds plugins, so those found before a
         // mid-scan crash survive it — but not for files skipped as already
         // known, or an unchanged rescan rewrites the whole cache per file.
-        // The cache XML also carries the blacklist.
+        // The cache XML also carries the blacklist, which the out-of-process
+        // scanner grows as workers die; a file that killed one is persisted
+        // as skipped at once for the same reason.
         while (! threadShouldExit()
                && scanner.scanNextFile (/*dontRescanIfAlreadyInList*/ true, pluginBeingScanned))
         {
             const auto count = knownPlugins.getNumTypes();
+            const auto blacklisted = knownPlugins.getBlacklistedFiles().size();
             const bool listChanged = count != lastCount;
+            const bool blacklistChanged = blacklisted != lastBlacklisted;
             lastCount = count;
+            lastBlacklisted = blacklisted;
 
-            if (listChanged)
+            if (listChanged || blacklistChanged)
                 saveToSettings();
             if (pluginScannedCallback != nullptr)
                 pluginScannedCallback (listChanged);

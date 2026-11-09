@@ -104,6 +104,15 @@ public:
         PlectrifyEngine::standbyIsBlocked(). */
     virtual bool blocksAutoStandby() const = 0;
 
+    /** The executable to start as a plugin-scan worker — a process that loads
+        each plugin a scan finds so that one which crashes or hangs costs a
+        blacklist entry rather than this process (PluginScanWorker.h). The
+        standalone answers with its own executable, which doubles as the
+        worker. A DAW-hosted plugin has none to offer (the executable is the
+        DAW's) and inherits this default, under which PluginManager scans
+        in-process as it always did. */
+    virtual juce::File pluginScanWorkerExecutable() const { return {}; }
+
     /** MIDI input device names for the page's MIDI dialog. Empty where the
         host owns MIDI routing (a DAW). */
     virtual juce::StringArray midiDeviceNames() const { return {}; }

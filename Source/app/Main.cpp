@@ -4,12 +4,16 @@
 #include "AppReset.h"
 #include "CrashReporter.h"
 #include "MainComponent.h"
+#include "PluginScanWorker.h"
 #include "WindowLookAndFeel.h"
 #include "WindowPlacement.h"
 
 /**
     Standalone entry point for the Plectrify guitar-rig host. Creates a single
-    resizable window containing the whole app.
+    resizable window containing the whole app — or, launched by a running
+    Plectrify with the scan worker's command line, no window at all: that
+    process loads plugins on the app's behalf for as long as the app keeps it
+    connected (PluginScanWorker.h), and quits when it lets go.
 */
 class PlectrifyApplication : public juce::JUCEApplication
 {
@@ -18,14 +22,22 @@ public:
 
     const juce::String getApplicationName() override    { return "Plectrify"; }
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
-    // One instance, except for the one a reset relaunches: that process starts
-    // while the instance that scheduled the reset is still quitting, and the
-    // stock check would hand it that instance's window and exit. It waits for
-    // the other to be gone instead — see waitForResettingInstance().
-    bool moreThanOneInstanceAllowed() override          { return isRelaunchAfterReset(); }
+    // One instance, except for two kinds of process that are not the app:
+    // the one a reset relaunches — it starts while the instance that
+    // scheduled the reset is still quitting, and the stock check would hand
+    // it that instance's window and exit, so it waits for the other to be
+    // gone instead (waitForResettingInstance()) — and a plugin-scan worker,
+    // which exists precisely because the app is running.
+    bool moreThanOneInstanceAllowed() override          { return isRelaunchAfterReset() || isScanWorker(); }
 
-    void initialise (const juce::String&) override
+    void initialise (const juce::String& commandLine) override
     {
+        if (isScanWorker())
+        {
+            startScanWorker (commandLine);
+            return;
+        }
+
         // Log and crash handler first, so anything startup does wrong is on
         // record. One rotating file: a crashing launch loop must not fill the
         // user's disk with logs.
@@ -72,8 +84,10 @@ public:
     void shutdown() override
     {
         mainWindow = nullptr;
+        scanWorker = nullptr;
 
-        juce::Logger::writeToLog ("Plectrify shut down cleanly");
+        juce::Logger::writeToLog (isScanWorker() ? "Plectrify scan worker exiting"
+                                                 : "Plectrify shut down cleanly");
         juce::Logger::setCurrentLogger (nullptr);
         logger = nullptr;
     }
@@ -274,6 +288,35 @@ private:
         return getCommandLineParameterArray().contains (plectrify::reset::relaunchFlag);
     }
 
+    static bool isScanWorker()
+    {
+        return plectrify::scanworker::isWorkerCommandLine (getCommandLineParameters());
+    }
+
+    /** The whole of a worker's start-up. Its own log, plectrify-scan.log
+        beside the app's, so the app's keeps one header per launch of the
+        app — and because the last "Scanning …" line in here names the file
+        a worker that died was loading. No crash handler: the worker's deaths
+        are expected and handled by the app (PluginScanWorker.h), and a dump
+        per crashing plugin per scan would fill crashes/ with other people's
+        bugs. None of the app's own start-up either — no reset, no instance
+        lock, no window — since this process must never read or write the
+        data root as an app would. */
+    void startScanWorker (const juce::String& commandLine)
+    {
+        logger.reset (juce::FileLogger::createDefaultAppLogger (
+            "Plectrify", "plectrify-scan.log",
+            "Plectrify " + getApplicationVersion() + " scan worker starting"));
+        juce::Logger::setCurrentLogger (logger.get());
+
+        scanWorker = std::make_unique<PluginScanWorker>();
+
+        // No coordinator to talk to (it has gone already, or the command line
+        // was somebody's experiment): nothing to do here.
+        if (! scanWorker->start (commandLine))
+            quit();
+    }
+
     /** Blocks until the instance that scheduled the reset has exited, by taking
         the very lock JUCE's single-instance check holds for a running app
         ("juceAppLock_" + the app name, juce_ApplicationBase.cpp). That lock is
@@ -290,7 +333,9 @@ private:
     std::unique_ptr<juce::FileLogger> logger;
     // Only ever set on a relaunch after a reset; see waitForResettingInstance().
     std::unique_ptr<juce::InterProcessLock> instanceLock;
+    // Exactly one of these exists: the app has a window, a worker has this.
     std::unique_ptr<MainWindow> mainWindow;
+    std::unique_ptr<PluginScanWorker> scanWorker;
 };
 
 START_JUCE_APPLICATION (PlectrifyApplication)

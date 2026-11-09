@@ -12,13 +12,17 @@
     the build enables it (PLECTRIFY_HOST_LEGACY_PLUGINS; never named "VST" to
     the user, see AGENTS.md) — and a KnownPluginList that is
     cached to disk, so scanning is a one-off cost rather than a per-launch one.
-    Scanning instantiates each plugin in-process, so it runs on a background
-    thread — a slow or hanging plugin must never freeze the UI — protected by a
-    dead-man's-pedal file so a plugin that crashes the app is blacklisted and
-    skipped on the next run. KnownPluginList is internally locked, so the
-    message thread may read it (getTypes() returns a copy) while a scan runs.
-    Instantiation is asynchronous because some formats must be created on the
-    message thread.
+    Scanning instantiates each plugin, so it runs on a background thread — a
+    slow or hanging plugin must never freeze the UI — and, where the host can
+    provide a worker executable (setScanWorkerExecutable; the standalone can,
+    a DAW-hosted plugin cannot), in a process of its own: a plugin that
+    crashes or hangs while being looked at then costs a blacklist entry
+    rather than the app (PluginScanWorker.h). Scanning in-process keeps the
+    older protection, a dead-man's-pedal file naming the plugin being loaded,
+    so a plugin that takes the app down is blacklisted and skipped on the next
+    run. KnownPluginList is internally locked, so the message thread may read
+    it (getTypes() returns a copy) while a scan runs. Instantiation is
+    asynchronous because some formats must be created on the message thread.
 */
 class PluginManager : private juce::Thread
 {
@@ -27,6 +31,16 @@ public:
     ~PluginManager() override;
 
     juce::KnownPluginList& getKnownPluginList() noexcept { return knownPlugins; }
+
+    /** Makes every scan from now on load plugins in a worker process started
+        from `executable` (an OutOfProcessPluginScanner on the known list — see
+        PluginScanWorker.h), or back in this process for a File that does not
+        exist. The standalone passes its own executable, which doubles as the
+        worker; the VST3 build has none to pass (the executable is the DAW's)
+        and scans in-process, as everything did before the worker existed.
+        Message thread, never while a scan runs: PlectrifyEngine calls it once,
+        before the first scan. */
+    void setScanWorkerExecutable (const juce::File& executable);
 
     /** Where Plectrify installs plugins on the user's behalf (the plugin
         catalogue — see CatalogueInstaller): %PROGRAMDATA%\Plectrify\plugins on
@@ -246,4 +260,5 @@ private:
     std::function<void (bool listChanged)> pluginScannedCallback;
     std::function<void()> finishedCallback;
     std::atomic<bool> scanning { false };
+    bool scanOutOfProcess = false;  // set by setScanWorkerExecutable; read by run()
 };
