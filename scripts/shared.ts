@@ -213,6 +213,11 @@ export const JUCE_PATCHES = [
     file: 'modules/juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h',
     marker: 'PLECTRIFY_VST2_MIDI_KEY_NAME_STORAGE',
   },
+  {
+    patch: 'cmake/juce-linux-webkit-utf8-ipc.patch',
+    file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
+    marker: 'PLECTRIFY_WEBKIT_UTF8_IPC',
+  },
 ] as const;
 
 /** The commit CMakeLists.txt pins a FetchContent dependency to, read out of

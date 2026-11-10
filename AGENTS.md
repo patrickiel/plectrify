@@ -905,6 +905,17 @@ records the substitution it made.
     no other scale channel, so a plugin that does not declare it (LSP's
     VST2 build, most Windows freeware of that era) still opens at 1:1 and
     offers its own zoom, if any.
+  - `juce-linux-webkit-utf8-ipc.patch` — JUCE's WebKitGTK backend talks to
+    its forked view process over a pipe of JSON written as UTF-8 and read
+    back with `String (const char*, n)`, which takes each byte as one
+    character; the child read the page's script messages the same way. So
+    every non-ASCII character was re-encoded as Latin-1 once per crossing,
+    and text the page saved and read again grew a layer each time — a
+    TONE3000 tone named "5150III®" ended up as a screen of `ÃÂ` (issue #48).
+    Both ends now read UTF-8. What was already written stays damaged on disk,
+    so the page peels those layers off every document it reads
+    (`ui/src/lib/engine/mojibake.ts`, applied in `JuceEngine`'s `safeParse`);
+    the repaired text is written back with the document's next save.
 
   After changing the JUCE tag, regenerate them all against the new sources and
   delete `build*/_deps/juce-*` so FetchContent re-populates. Editing a

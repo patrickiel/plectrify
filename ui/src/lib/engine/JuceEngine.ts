@@ -107,6 +107,7 @@ import {
   remapSceneIds,
 } from './scenes';
 import { uid } from './ids';
+import { mojibakeReviver } from './mojibake';
 
 interface JuceBackend {
   emitEvent(id: string, payload: unknown): void;
@@ -260,9 +261,12 @@ const slug = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'rig';
 
+/** Every document the page reads from disk comes through here, so this is
+    also where text the unpatched Linux bridge garbled is read back as written
+    (see mojibake.ts). */
 function safeParse<T>(text: string): T | null {
   try {
-    return JSON.parse(text) as T;
+    return JSON.parse(text, mojibakeReviver) as T;
   } catch {
     return null;
   }
