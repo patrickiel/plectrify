@@ -22,8 +22,12 @@ export const MAX_ISSUE_URL_LENGTH = 6000;
 
 export interface IssueUrl {
   url: string;
-  /** True when the report did not fit and was left out — the caller has to put
-      it on the clipboard and say so, because the form field is required. */
+  /** True when a shorter version of the report went in because the full one
+      did not fit. The report says itself what it left out. */
+  abridged: boolean;
+  /** True when no version of the report fit and it was left out — the caller
+      has to put it on the clipboard and say so, because the form field is
+      required. */
   overflowed: boolean;
 }
 
@@ -40,17 +44,27 @@ function query(params: Record<string, string>): string {
     .join('&');
 }
 
-/** The bug form, with the environment report prefilled where it fits. */
-export function buildBugReportUrl(diagnostics: string): IssueUrl {
-  const withReport = `${NEW_ISSUE_BASE_URL}?${query({
-    template: BUG_TEMPLATE,
-    [DIAGNOSTICS_FIELD]: diagnostics,
-  })}`;
-  if (withReport.length <= MAX_ISSUE_URL_LENGTH) return { url: withReport, overflowed: false };
+/** The bug form, with the environment report prefilled where it fits.
+
+    `diagnostics` is the report, or several versions of it from fullest to
+    shortest (`abridgedDiagnostics`): the first whose URL fits goes in. */
+export function buildBugReportUrl(diagnostics: string | readonly string[]): IssueUrl {
+  const versions = typeof diagnostics === 'string' ? [diagnostics] : diagnostics;
+  for (const [index, report] of versions.entries()) {
+    const url = `${NEW_ISSUE_BASE_URL}?${query({
+      template: BUG_TEMPLATE,
+      [DIAGNOSTICS_FIELD]: report,
+    })}`;
+    if (url.length <= MAX_ISSUE_URL_LENGTH) return { url, abridged: index > 0, overflowed: false };
+  }
 
   // Still open the form — an issue with the diagnostics pasted by hand beats no
   // issue at all, and the caller tells the user where to find them.
-  return { url: `${NEW_ISSUE_BASE_URL}?${query({ template: BUG_TEMPLATE })}`, overflowed: true };
+  return {
+    url: `${NEW_ISSUE_BASE_URL}?${query({ template: BUG_TEMPLATE })}`,
+    abridged: false,
+    overflowed: true,
+  };
 }
 
 /** The idea form. No diagnostics, so nothing to overflow. */
