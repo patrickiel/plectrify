@@ -29,6 +29,8 @@
         { label: 'Source', href: REPO, external: true },
         { label: 'Report a bug', href: `${REPO}/issues/new/choose`, external: true },
         { label: 'Licence (AGPL-3.0)', href: `${REPO}/blob/main/LICENSE`, external: true },
+        { label: 'Privacy', href: '/docs/privacy' },
+        { label: 'Code signing policy', href: '/docs/code-signing' },
       ],
     },
   ];

@@ -2,6 +2,7 @@
   import type { Tone3000Provenance } from '../../lib/engine/tone3000';
   import { formatLabel, gearLabel } from '../../lib/engine/tone3000';
   import Tone3000Logo from './Tone3000Logo.svelte';
+  import { tone3000Artwork } from './artwork.svelte';
   import { tooltip } from '../../lib/components/tooltip.svelte';
 
   /**
@@ -38,6 +39,7 @@
 
   let { provenance, size = 'compact', missing = false, onOpen, onRepair }: Props = $props();
 
+  const artwork = $derived(tone3000Artwork(provenance));
   const gear = $derived(gearLabel(provenance.gear));
   const format = $derived(formatLabel(provenance.format));
   const credit = $derived(
@@ -48,11 +50,10 @@
 </script>
 
 <div class="flex min-w-0 items-center gap-1.5">
-  {#if size === 'full' && provenance.imageUrl}
-    <!-- No crossOrigin: this is a plain image load, and asking for CORS would
-         make it fail the moment a CDN response lacks the header. -->
+  {#if size === 'full' && artwork}
+    <!-- The engine's local copy, never the remote image. -->
     <img
-      src={provenance.imageUrl}
+      src={artwork}
       alt=""
       loading="lazy"
       decoding="async"

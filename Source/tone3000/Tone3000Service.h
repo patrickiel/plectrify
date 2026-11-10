@@ -184,6 +184,22 @@ private:
 
     juce::var describeDownloads() const;
 
+    /** Cover art is shown from disk and from nowhere else: the page is handed
+        no remote image to load, so having downloaded a tone never turns into a
+        request to TONE3000's image host on every later launch. These are the
+        tone ids whose picture is in images/, pushed with the state so the page
+        asks only for files that exist. */
+    juce::var describeArtwork() const;
+    /** Save a tone's picture beside its captures if it is not there yet, then
+        call `then` (message thread) whether or not that worked — a tone
+        without a photograph is still a tone. `then` is not called if the
+        download is cancelled before it starts. */
+    void cacheArtwork (juce::int64 toneId, const juce::String& imageUrl, std::function<void()> then);
+    /** Fetch the pictures of tones downloaded before they were kept on disk.
+        Run only when the user opens TONE3000 — a moment they asked for its
+        network — from the list of (toneId, imageUrl) the page states then. */
+    void backfillArtwork (const juce::var& wanted);
+
     Delegate delegate;
     Tone3000Client client;
 

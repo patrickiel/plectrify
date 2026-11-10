@@ -100,7 +100,53 @@ export interface Tone3000State {
   /** Everything on disk, read back after every install — the disk truth the
       page reconciles from rather than trusting the progress stream. */
   downloads: Tone3000Download[];
+  /** Where the engine serves cover art it saved at download time, and the
+      tones it has any for — see `tone3000ArtworkUrl`. Absent from the mock
+      and from an engine older than the cache. */
+  artworkRoot?: string;
+  artwork?: number[];
   error?: string;
+}
+
+/** What the page knows about cover art on disk (from `Tone3000State`). */
+export interface Tone3000ArtworkCache {
+  root: string;
+  cached: ReadonlySet<number>;
+}
+
+export const NO_TONE3000_ARTWORK: Tone3000ArtworkCache = { root: '', cached: new Set() };
+
+/** The address to show a tone's photograph from, or undefined to show none.
+ *
+ * Only ever the engine's local copy. `imageUrl` — the remote address TONE3000
+ * gave — is never returned, because an `<img>` on it is a request to their
+ * image host every time a tile or card renders, on every launch, that nobody
+ * asked for. It stays in the patch as the source the engine fetches the copy
+ * from (at download, or when TONE3000 is next opened for a tone saved before
+ * the cache existed). The one exception is a `data:` URL, which is the mock's
+ * artwork and touches no network. */
+export function tone3000ArtworkUrl(
+  provenance: Pick<Tone3000Provenance, 'toneId' | 'imageUrl'> | undefined,
+  cache: Tone3000ArtworkCache,
+): string | undefined {
+  if (!provenance) return undefined;
+  const toneId = Number(provenance.toneId);
+  if (cache.root && Number.isSafeInteger(toneId) && toneId > 0 && cache.cached.has(toneId))
+    return `${cache.root}${toneId}.jpg`;
+  return provenance.imageUrl?.startsWith('data:') ? provenance.imageUrl : undefined;
+}
+
+/** The (tone, remote picture) pairs the engine may need to catch up on, one
+    per tone, from every provenance the page holds. */
+export function tone3000ArtworkSources(
+  provenances: Iterable<Pick<Tone3000Provenance, 'toneId' | 'imageUrl'> | undefined>,
+): { toneId: number; imageUrl: string }[] {
+  const byTone = new Map<number, string>();
+  for (const p of provenances) {
+    if (!p?.imageUrl?.startsWith('https://') || byTone.has(p.toneId)) continue;
+    byTone.set(p.toneId, p.imageUrl);
+  }
+  return [...byTone].map(([toneId, imageUrl]) => ({ toneId, imageUrl }));
 }
 
 export interface Tone3000Creator {

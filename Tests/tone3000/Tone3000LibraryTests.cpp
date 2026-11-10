@@ -55,6 +55,40 @@ void testModelPaths()
     check (imageRelativePath (0).isEmpty(), "a zero tone id yields no image path");
 }
 
+void testCoverArt()
+{
+    check (toneIdFromImageRequest ("tone3000/images/42.jpg") == 42, "a cover-art request names its tone");
+    check (toneIdFromImageRequest ("/tone3000/images/42.jpg?v=1") == 42, "a slash and a query are tolerated");
+    check (toneIdFromImageRequest (imageRequestPrefix() + "7.jpg") == 7, "the prefix is the one requests use");
+    check (toneIdFromImageRequest ("tone3000/images/../../x.jpg") == 0, "a traversal names no tone");
+    check (toneIdFromImageRequest ("tone3000/images/42abc.jpg") == 0, "only digits are an id");
+    check (toneIdFromImageRequest ("tone3000/images/-3.jpg") == 0, "a negative id is refused");
+    check (toneIdFromImageRequest ("tone3000/images/0.jpg") == 0, "a zero id is refused");
+    check (toneIdFromImageRequest ("tone3000/images/42.png") == 0, "only the one extension is served");
+    check (toneIdFromImageRequest ("tone3000/nam/42-7.nam") == 0, "a capture is not cover art");
+    check (toneIdFromImageRequest ("tone3000/images/99999999999999999999.jpg") == 0, "an overlong id is refused");
+    check (toneIdFromImageRequest ("index.html") == 0, "the UI's own files are not cover art");
+
+    const unsigned char jpeg[] = { 0xFF, 0xD8, 0xFF, 0xE0, 0, 0 };
+    const unsigned char png[] = { 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0 };
+    const unsigned char webp[] = { 'R', 'I', 'F', 'F', 1, 2, 3, 4, 'W', 'E', 'B', 'P' };
+    const char html[] = "<!doctype html><script>";
+    const char svg[] = "<svg xmlns='http://www.w3.org/2000/svg'>";
+
+    check (imageMediaType (jpeg, sizeof (jpeg)) == "image/jpeg", "a JPEG is recognised");
+    check (imageMediaType (png, sizeof (png)) == "image/png", "a PNG is recognised");
+    check (imageMediaType (webp, sizeof (webp)) == "image/webp", "a WebP is recognised");
+    check (imageMediaType (html, sizeof (html)).isEmpty(), "an HTML page is not an image");
+    check (imageMediaType (svg, sizeof (svg)).isEmpty(), "an SVG is refused: it can carry script");
+    check (imageMediaType (jpeg, 2).isEmpty(), "a truncated header is refused");
+    check (imageMediaType (nullptr, 0).isEmpty(), "nothing is not an image");
+
+    check (isFetchableImageUrl ("https://cdn.example.invalid/a.jpg"), "an https image may be fetched");
+    check (! isFetchableImageUrl ("http://cdn.example.invalid/a.jpg"), "plain http is refused");
+    check (! isFetchableImageUrl ("file:///C:/secret.jpg"), "a file URL is refused");
+    check (! isFetchableImageUrl (""), "an empty URL is refused");
+}
+
 void testRelativePathSafety()
 {
     check (isSafeRelativePath ("nam/42-7.nam"), "a capture path is accepted");
@@ -293,6 +327,7 @@ int main()
 {
     testFormats();
     testModelPaths();
+    testCoverArt();
     testRelativePathSafety();
     testUrlExtensionAllowlist();
     testGarbageCollection();

@@ -381,6 +381,26 @@ empty rack says what is happening for the minutes it takes
 (`subscribeStarterInstall` → `Rack.svelte`); per-package progress stays where it
 already lived, in the Packages panel.
 
+**The installer can decline it, and the update check.** Both are network use
+nobody clicked, and SignPath's signing terms (issue #46) ask for exactly that to
+be stated during installation with a way to turn it off. So the Windows
+installer's tasks page carries the notice and two checkboxes, and writes the
+answer to `<content root>/installer-options.json`; the engine bakes the file
+into the page's initialisation data (`installerDefaults`, read once like
+`host`), and `applyInstallerDefaults` (`ui/src/lib/engine/installerDefaults.ts`,
+tested) lays it *under* settings.json — every JuceEngine path that turns a
+stored document into settings goes through `settingsFrom`, including the merge
+in `persistAppSettings`, or a fresh machine's first write would store the plain
+defaults over the installer's choice. Declining the starter marks it attempted,
+and only where no settings.json exists; the update check is taken from the
+installer wherever settings.json has no `checkForUpdates`, and Settings →
+Updates wins after that — which is why `settingsToStore` leaves the key out of
+every write until the user has flipped it: stored on the first unrelated write,
+the installer's answer would read as the user's, and a later reinstall with the
+box unticked would be ignored. The privacy page (`site/src/routes/docs/privacy`) is
+the user-facing list of every request — keep it, the installer text and this in
+step when the app learns a new one.
+
 **That one run ends with a full scan**, not the narrow one every other install
 gets: the page sets `rescanAll` on the `installPackages` event and
 `MainComponent::requestFullRescan` walks the whole search path. It is the same
@@ -1668,7 +1688,9 @@ recognise the account after Plectrify has forgotten it.
 
 ### Updating
 
-The page checks GitHub's API once per launch for the newest release
+The page checks GitHub's API once per launch for the newest release — unless
+`AppSettings.checkForUpdates` is off (Settings → Updates, or the installer's
+checkbox; the About panel's Check now still asks) —
 (`ui/src/features/info/updateCheck.ts`, `updateStore.svelte.ts`) and the
 start-up notice (`UpdateNotice.svelte`) says so. What the notice *does* about
 it is per platform. On Linux it points at Software Updater, since the .deb
@@ -2180,7 +2202,19 @@ shows the **tone's photograph** in place of the knob-layout preview every other
 patch draws: they are all the same plugin with the same six knobs in the same
 cells, so the layout distinguishes nothing, while the picture of the amp is what
 someone is actually choosing between (it falls back to the knob grid if the
-image will not load). The record is built natively
+image will not load). **That photograph is shown from disk, never from the
+network**: an `<img>` on the tone's remote `imageUrl` would be a request to
+TONE3000's image host every time a tile or card rendered, on every launch, and
+the privacy page says the app makes no such request. So the engine saves it to
+`<contentRoot>/tone3000/images/<toneId>.jpg` ahead of the model download
+(`Tone3000Service::cacheArtwork` — no bearer token goes with it, and only
+bytes that are a raster image are kept), serves it from the page's own local
+origin (`provideUiResource`, by tone id alone), and lists the tones that have
+one in `tone3000State.artwork`; `tone3000ArtworkUrl` in `tone3000.ts` is the
+one rule for what an `<img>` may point at, and it never returns `imageUrl`.
+Tones saved before the cache are caught up when the user next opens TONE3000
+(`backfillArtwork`, from the list the page states on `tone3000Connect`); until
+then they show the knob grid. The record is built natively
 (`describeProvenance`) because the page never sees a tone — its field names and
 the patch document's are one contract, written in one place. Logo discipline is
 theirs: the full TONE3000 wordmark at entry points (splash, drawer tile), the

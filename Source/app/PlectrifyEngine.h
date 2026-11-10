@@ -214,6 +214,14 @@ private:
     // buildAppInfoState because the same object is also baked into the web
     // view's initialisation data — see registerEventListeners.
     juce::var buildCapabilitiesState() const;
+
+    // The installer's choices about network use — whether to check for updates
+    // and whether a first launch fetches the starter plugins — as the JSON text
+    // of <content root>/installer-options.json, or "{}" when there is none (any
+    // installer that does not write it, every dev build). Machine-wide because
+    // the installer is; the page applies it only where the user's own
+    // settings.json has not answered (see installerDefaults.ts).
+    static juce::String readInstallerDefaults();
     void emitPluginScanChanged (const juce::String& status);
 
     // The plugin files the scanner skips (see PluginManager::unblacklistPlugins).

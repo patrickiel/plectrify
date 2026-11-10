@@ -47,6 +47,9 @@
     selfUpdate?: boolean;
     /** Starts the in-app install; progress arrives through the update store. */
     onInstallUpdate?: () => void;
+    /** AppSettings.checkForUpdates. Off, opening the panel asks GitHub nothing
+        and only "Check now" does — the request the user asked for. */
+    autoCheck?: boolean;
   }
 
   let {
@@ -57,6 +60,7 @@
     onRefresh,
     selfUpdate = false,
     onInstallUpdate,
+    autoCheck = true,
   }: Props = $props();
 
   onMount(() => onRefresh());
@@ -64,7 +68,7 @@
   // Shows whatever the start-up check already found, and runs one itself if
   // that has not landed yet or failed (offline at launch, online by now).
   onMount(() => {
-    void checkForUpdate();
+    if (autoCheck) void checkForUpdate();
   });
 
   // Measured once at mount — panel open is the old dialog open. The rest of
@@ -77,7 +81,11 @@
   );
 
   const latest = $derived(latestVersion());
-  const checking = $derived(updatePhase() === 'checking' || updatePhase() === 'idle');
+  // Idle reads as checking only while a check is on its way; with automatic
+  // checks off, idle is simply "not asked yet".
+  const checking = $derived(
+    updatePhase() === 'checking' || (updatePhase() === 'idle' && autoCheck),
+  );
   // Deliberately not gated on the user's dismissal: they asked, so they get the
   // answer even for a release they told the start-up notice to stop mentioning.
   const updateAvailable = $derived(updatePhase() === 'checked' && hasUpdate(info.version, latest));
@@ -91,6 +99,7 @@
     if (installing) return describeUpdateInstallPhase(install);
     if (install.phase === 'failed') return describeUpdateInstallError(install.error);
     if (checking) return 'Checking for updates…';
+    if (updatePhase() === 'idle') return 'Automatic update checks are off.';
     if (updatePhase() === 'failed') return "Couldn't reach GitHub. Check your connection.";
     if (updateAvailable) return `Plectrify ${latest} is available.`;
     // An unparseable version — the mock's 'dev', a hand-built binary — cannot

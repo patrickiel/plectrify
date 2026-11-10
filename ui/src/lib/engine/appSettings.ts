@@ -98,6 +98,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   looperSessionAutoCleanup: true,
   looperSessionAutoCleanupLimit: 20,
   updateDismissedVersion: '',
+  checkForUpdates: true,
   midiBindings: {},
   tone3000TemplateKnobs: namDefaultKnobs(),
   tone3000TemplateValues: [],
@@ -401,6 +402,7 @@ export function normalizeAppSettings(value: unknown): AppSettings {
     // matches no release, which fails safe by showing the notice.
     updateDismissedVersion:
       typeof candidate?.updateDismissedVersion === 'string' ? candidate.updateDismissedVersion : '',
+    checkForUpdates: bool(candidate?.checkForUpdates, DEFAULT_APP_SETTINGS.checkForUpdates),
     midiBindings: midiBindingsMap(candidate?.midiBindings),
     tone3000TemplateKnobs: templateKnobs(candidate?.tone3000TemplateKnobs),
     tone3000TemplateValues: templateValues(candidate?.tone3000TemplateValues),

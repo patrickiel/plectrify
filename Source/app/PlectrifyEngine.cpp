@@ -242,6 +242,13 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         // is right from the first frame in every host. JSON because
         // initialisation data carries strings.
         .withInitialisationData ("capabilities", juce::JSON::toString (buildCapabilitiesState(), true))
+        // What the person installing Plectrify chose about its unbidden network
+        // use (packaging/windows/Plectrify.iss writes the file; no other
+        // installer does yet). Baked in for the same one-shot reason: the
+        // first-run starter install and the launch's update check are both
+        // decided before any push could be relied on to have landed. The page
+        // validates it — this hands over whatever the file says, or "{}".
+        .withInitialisationData ("installerDefaults", readInstallerDefaults())
         // Not an activity event (the UI asks on startup), but it must not answer
         // while deep standby holds the rig parked: buildRackState() would report
         // an empty rack, which prunes every knob mapping and lane name and lets
@@ -657,6 +664,17 @@ juce::var PlectrifyEngine::buildCapabilitiesState() const
     capabilities->setProperty ("backup", caps.backup);
     capabilities->setProperty ("selfUpdate", caps.selfUpdate);
     return juce::var (capabilities);
+}
+
+juce::String PlectrifyEngine::readInstallerDefaults()
+{
+    const auto file = CatalogueInstaller::contentRootDirectory().getChildFile ("installer-options.json");
+    // A tiny file the installer wrote; anything larger is not that file.
+    if (! file.existsAsFile() || file.getSize() > 4096)
+        return "{}";
+
+    const auto parsed = juce::JSON::parse (file.loadFileAsString());
+    return parsed.isObject() ? juce::JSON::toString (parsed, true) : juce::String ("{}");
 }
 
 juce::var PlectrifyEngine::buildAppInfoState()

@@ -286,6 +286,71 @@ juce::var Tone3000Service::describeDownloads() const
     return downloads;
 }
 
+juce::var Tone3000Service::describeArtwork() const
+{
+    juce::Array<juce::var> ids;
+    const auto directory = downloadsDirectory().getChildFile ("images");
+
+    if (directory.isDirectory())
+        for (const auto& file : directory.findChildFiles (juce::File::findFiles, false, "*.jpg"))
+            if (const auto id = Tone3000Library::toneIdFromImageRequest (
+                    Tone3000Library::imageRequestPrefix() + file.getFileName());
+                id > 0 && file.getSize() > 0)
+                ids.add (id);
+
+    return ids;
+}
+
+void Tone3000Service::cacheArtwork (juce::int64 toneId, const juce::String& imageUrl, std::function<void()> then)
+{
+    const auto relative = Tone3000Library::imageRelativePath (toneId);
+    const auto destination = downloadsDirectory().getChildFile (relative);
+
+    if (relative.isEmpty() || ! Tone3000Library::isFetchableImageUrl (imageUrl)
+        || (destination.existsAsFile() && destination.getSize() > 0))
+    {
+        if (then)
+            then();
+
+        return;
+    }
+
+    // Same shared semantics as the captures beside it — see startDownload.
+    CatalogueInstaller::createSharedContentDirectory (destination.getParentDirectory());
+    client.downloadImage (imageUrl, destination, [then = std::move (then)] (bool) { if (then) then(); });
+}
+
+void Tone3000Service::backfillArtwork (const juce::var& wanted)
+{
+    const auto* entries = wanted.getArray();
+
+    if (entries == nullptr)
+        return;
+
+    // A drawer's worth, not an unbounded list from a document.
+    constexpr int maxBackfill = 200;
+    std::set<juce::int64> seen;
+
+    for (const auto& entry : *entries)
+    {
+        if ((int) seen.size() >= maxBackfill)
+            break;
+
+        const auto toneId = intProperty (entry, "toneId");
+        const auto relative = Tone3000Library::imageRelativePath (toneId);
+
+        if (relative.isEmpty() || ! seen.insert (toneId).second)
+            continue;
+
+        if (const auto file = downloadsDirectory().getChildFile (relative); file.existsAsFile() && file.getSize() > 0)
+            continue;
+
+        // One state push per picture that lands: the page shows a photograph
+        // only once the engine says it is on disk.
+        cacheArtwork (toneId, stringProperty (entry, "imageUrl"), [this] { pushState(); });
+    }
+}
+
 void Tone3000Service::pushState()
 {
     const auto credentials = client.getCredentials();
@@ -297,6 +362,12 @@ void Tone3000Service::pushState()
     o->setProperty ("apiAccess", apiAccess);
     o->setProperty ("splashSeen", splashSeen);
     o->setProperty ("downloads", describeDownloads());
+    // Where the page finds cover art (the engine's own resource provider, so
+    // an absolute URL that also works when the page is Vite's in the dev loop)
+    // and which tones have any.
+    o->setProperty ("artworkRoot",
+                    juce::WebBrowserComponent::getResourceProviderRoot() + Tone3000Library::imageRequestPrefix());
+    o->setProperty ("artwork", describeArtwork());
 
     if (credentials.isValid())
     {
@@ -341,6 +412,10 @@ void Tone3000Service::connect (const juce::var& payload)
     // The tone template's knob settings, for a tone built from the factory
     // state. Stated on every open like the two above; absent means none.
     browseTemplateValues = payload["templateValues"];
+
+    // Tones saved before their pictures were kept on disk. Opening TONE3000 is
+    // the user asking for its network, so this is where they are caught up.
+    backfillArtwork (payload["artwork"]);
 
     // A different generation is a different catalogue. The open window's flow
     // was authorized with the old filter, so it cannot simply be shown again —
@@ -1048,33 +1123,46 @@ void Tone3000Service::startDownload (const juce::var& tone, const juce::var& mod
         delegate.emit ("tone3000InstallProgress", out);
     };
 
-    // Already downloaded: the filename is derived from the ids alone, so a
-    // second patch from the same model costs no network at all.
-    if (run.destination.existsAsFile() && run.destination.getSize() > 0)
-        return buildPatchState (run, namPath, irPath);
+    // The photograph first, so it is on disk by the time the finished install
+    // puts a tile in the drawer: the page shows cover art from disk only. It
+    // never decides the outcome — the model follows whatever became of it —
+    // and a run cancelled or replaced meanwhile is left alone.
+    cacheArtwork (run.toneId, stringProperty (run.provenance, "imageUrl"),
+                  [this, runId = run.runId, modelUrl, namPath, irPath, progress]
+                  {
+                      if (run.runId != runId)
+                          return;
 
-    // The shared semantics have to be established, not inherited: on macOS a
-    // stock-umask directory here would be owned by whichever account downloaded
-    // first, and no second account could add a tone beside it.
-    CatalogueInstaller::createSharedContentDirectory (run.destination.getParentDirectory());
+                      // Already downloaded: the filename is derived from the
+                      // ids alone, so a second patch from the same model costs
+                      // no network at all.
+                      if (run.destination.existsAsFile() && run.destination.getSize() > 0)
+                          return buildPatchState (run, namPath, irPath);
 
-    {
-        juce::var out;
-        auto* o = object (out);
-        o->setProperty ("runId", run.runId);
-        o->setProperty ("stage", "downloading");
-        o->setProperty ("title", stringProperty (run.provenance, "title"));
-        delegate.emit ("tone3000InstallProgress", out);
-    }
+                      // The shared semantics have to be established, not
+                      // inherited: on macOS a stock-umask directory here would
+                      // be owned by whichever account downloaded first, and no
+                      // second account could add a tone beside it.
+                      CatalogueInstaller::createSharedContentDirectory (run.destination.getParentDirectory());
 
-    client.downloadModel (modelUrl, run.destination, progress,
-                          [this, namPath, irPath] (juce::String error)
-                          {
-                              if (error.isNotEmpty())
-                                  return failInstall (error);
+                      {
+                          juce::var out;
+                          auto* o = object (out);
+                          o->setProperty ("runId", run.runId);
+                          o->setProperty ("stage", "downloading");
+                          o->setProperty ("title", stringProperty (run.provenance, "title"));
+                          delegate.emit ("tone3000InstallProgress", out);
+                      }
 
-                              buildPatchState (run, namPath, irPath);
-                          });
+                      client.downloadModel (modelUrl, run.destination, progress,
+                                            [this, namPath, irPath] (juce::String error)
+                                            {
+                                                if (error.isNotEmpty())
+                                                    return failInstall (error);
+
+                                                buildPatchState (run, namPath, irPath);
+                                            });
+                  });
 }
 
 void Tone3000Service::buildPatchState (const InstallRun& current, juce::String namPath, juce::String irPath)

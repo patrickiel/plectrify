@@ -12,6 +12,10 @@ constexpr juce::int64 maxDownloadBytes = 256LL * 1024 * 1024;
     that the progress callback does not flood the message thread. */
 constexpr int downloadChunkBytes = 64 * 1024;
 
+/** Cover art is a thumbnail's worth of photograph. Anything past this is not
+    one, and it is read into memory before it is written. */
+constexpr juce::int64 maxImageBytes = 8LL * 1024 * 1024;
+
 juce::String trimmedBase (const juce::String& base)
 {
     return base.trimCharactersAtEnd ("/");
@@ -63,6 +67,71 @@ bool Tone3000Client::isConnected() const
 bool Tone3000Client::isBusy() const
 {
     return pool.getNumJobs() > 0;
+}
+
+void Tone3000Client::downloadImage (const juce::String& imageUrl,
+                                    const juce::File& destination,
+                                    std::function<void (bool)> onDone)
+{
+    pool.addJob (
+        [imageUrl, destination, onDone = std::move (onDone)]
+        {
+            const auto finish = [onDone] (bool stored)
+            { juce::MessageManager::callAsync ([onDone, stored] { if (onDone) onDone (stored); }); };
+
+            if (! Tone3000Library::isFetchableImageUrl (imageUrl))
+                return finish (false);
+
+            int status = 0;
+            auto stream = juce::URL (imageUrl).createInputStream (
+                juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                    .withConnectionTimeoutMs (connectionTimeoutMs)
+                    .withStatusCode (&status)
+                    .withNumRedirectsToFollow (5));
+
+            if (stream == nullptr || status < 200 || status >= 300 || stream->getTotalLength() > maxImageBytes)
+                return finish (false);
+
+            juce::MemoryBlock data;
+            juce::HeapBlock<char> buffer (downloadChunkBytes);
+
+            for (;;)
+            {
+                const auto read = stream->read (buffer, downloadChunkBytes);
+
+                if (read <= 0)
+                    break;
+
+                data.append (buffer, (size_t) read);
+
+                if ((juce::int64) data.getSize() > maxImageBytes)
+                    return finish (false);
+            }
+
+            // Whatever the URL claimed to be, only a photograph is kept.
+            if (Tone3000Library::imageMediaType (data.getData(), data.getSize()).isEmpty())
+                return finish (false);
+
+            const auto partial = destination.getSiblingFile (destination.getFileName() + ".part");
+            partial.deleteFile();
+            destination.getParentDirectory().createDirectory();
+
+            if (! partial.replaceWithData (data.getData(), data.getSize()))
+            {
+                partial.deleteFile();
+                return finish (false);
+            }
+
+            destination.deleteFile();
+
+            if (! partial.moveFileTo (destination))
+            {
+                partial.deleteFile();
+                return finish (false);
+            }
+
+            finish (true);
+        });
 }
 
 void Tone3000Client::cancel()

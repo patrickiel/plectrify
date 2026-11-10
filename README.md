@@ -124,6 +124,21 @@ Open an [issue](https://github.com/patrickiel/plectrify/issues) or say hi on
 app: **Report a bug** opens GitHub's form pre-filled with an environment report
 (build, machine, audio device, plugin chain, never rig names or file paths).
 
+## Privacy and code signing
+
+Plectrify collects no personal data and sends no telemetry. It goes online
+unasked only to check GitHub for updates, to load its plugin catalogue, and
+once, on a fresh install, to fetch the starter plugins. The update check can be
+switched off in Settings, and the Windows installer offers a checkbox for both
+the update check and the starter plugins. The full list is on the
+[privacy page](https://plectrify.com/docs/privacy).
+
+**Code signing policy:** free code signing provided by
+[SignPath.io](https://signpath.io), certificate by
+[SignPath Foundation](https://signpath.org). Who builds, reviews and approves
+signed releases is on the
+[code signing policy](https://plectrify.com/docs/code-signing) page.
+
 ## For developers
 
 Plectrify is a JUCE 8 (C++17) plugin host, with the entire UI a Svelte 5

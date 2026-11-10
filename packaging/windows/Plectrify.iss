@@ -41,11 +41,24 @@ ChangesAssociations=no
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Messages]
+; The tasks page is where the network notice lives: SignPath's terms (see
+; issue #46) ask for unbidden network use to be stated during installation
+; with a way to turn it off, and these two checkboxes are that way. Keep this
+; text in step with site/src/routes/docs/privacy/+page.md.
+SelectTasksLabel2=Select the additional tasks you would like Setup to perform while installing [name], then click Next.%n%nPlectrify collects no personal data and sends no telemetry. The two Internet options below are the only requests it makes without being asked, besides loading its signed plugin catalogue from cdn.plectrify.com. Installing packages and TONE3000 happen only when you ask. Details: plectrify.com/docs/privacy
+
 [Tasks]
 ; Checked by default: the plugin is inert in Common Files until a DAW scans
 ; it, and a checkbox nobody notices is how a feature stays undiscovered. A
 ; standalone-only user unchecks it here.
 Name: "vst3"; Description: "Install the Plectrify VST3 plug-in (run the same rig inside your DAW)"
+; The app's unbidden network use, each with its off switch. Neither does
+; anything here: the choices are written to installer-options.json (see
+; WriteInstallerOptions) and read by the app, and only where the user's own
+; settings have not answered — Settings → Updates overrides the first later.
+Name: "updatecheck"; Description: "Check GitHub for new versions when Plectrify starts"; GroupDescription: "Internet access:"
+Name: "starterplugins"; Description: "Download a few free starter plugins on first launch"; GroupDescription: "Internet access:"
 
 [InstallDelete]
 ; Vite filenames are content-hashed, so an upgrade must replace the UI tree
@@ -125,6 +138,8 @@ Type: filesandordirs; Name: "{app}\plugins"
 ; the user's own build — so it goes with the app. Only the bundle: the shared
 ; {commoncf64}\VST3 folder belongs to every vendor on the machine.
 Type: filesandordirs; Name: "{commoncf64}\VST3\Plectrify.vst3"
+; The installer's own answer file, not the user's data.
+Type: files; Name: "{commonappdata}\Plectrify\installer-options.json"
 
 [Code]
 { The in-app update (Source/update/UpdateInstaller.h). Plectrify downloads this
@@ -149,6 +164,32 @@ Type: filesandordirs; Name: "{commoncf64}\VST3\Plectrify.vst3"
   Setup's ordinary file-in-use handling is the fallback.
 
   An ordinary interactive install — no parameter — does none of this. }
+
+{ The tasks page's network choices, for the app to read at boot
+  (PlectrifyEngine::readInstallerDefaults, then ui/.../installerDefaults.ts).
+  In the content root because that is machine-wide like this install, and the
+  one folder outside the user's profile the app already reads. Rewritten by
+  every install, the in-app update's /SILENT one included — that run keeps the
+  previous answers (UsePreviousTasks). }
+procedure WriteInstallerOptions;
+var
+  Dir, Json: String;
+begin
+  Dir := ExpandConstant('{commonappdata}\Plectrify');
+  ForceDirectories(Dir);
+  Json := '{"checkForUpdates": ';
+  if WizardIsTaskSelected('updatecheck') then Json := Json + 'true' else Json := Json + 'false';
+  Json := Json + ', "starterInstall": ';
+  if WizardIsTaskSelected('starterplugins') then Json := Json + 'true' else Json := Json + 'false';
+  Json := Json + '}';
+  SaveStringToFile(Dir + '\installer-options.json', Json, False);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    WriteInstallerOptions;
+end;
 
 function LaunchedByApp: Boolean;
 begin

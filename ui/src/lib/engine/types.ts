@@ -582,6 +582,12 @@ export interface AppSettings {
       this one is installed the value is simply stale and inert. Silences only
       the unbidden notice — the About dialog's manual check ignores it. */
   updateDismissedVersion: string;
+  /** Whether the app asks GitHub for the newest release on its own — once per
+      launch, and when the About panel opens. The one network request the app
+      makes unbidden on every start, so it can be switched off (Settings →
+      Updates, or the installer's checkbox; see installerDefaults.ts). Off, the
+      About panel's "Check now" still works: that one the user asked for. */
+  checkForUpdates: boolean;
   /** Learned MIDI triggers, keyed by MidiActionId. Kept as a plain string
       record so normalization stays simple; the key shape is validated on
       load (see appSettings.midiBindingsMap). */

@@ -1,5 +1,7 @@
 #include "EngineWebView.h"
 #include "AppPaths.h"
+#include "CatalogueInstaller.h"
+#include "Tone3000Library.h"
 
 #include <cstring>
 
@@ -72,10 +74,41 @@ namespace
         if (ext == ".woff2") return "font/woff2";
         return "application/octet-stream";
     }
+
+    /** A downloaded TONE3000 tone's cover art, from the content root. The one
+        thing this provider serves that is not the UI's own build, so that the
+        page never loads a tone's photograph from the network. The request
+        names a tone id and nothing else, and the file is served only as the
+        raster type its own bytes say it is. */
+    std::optional<juce::WebBrowserComponent::Resource> provideToneArtwork (juce::int64 toneId)
+    {
+        const auto file = Tone3000Library::rootDirectory (CatalogueInstaller::contentRootDirectory())
+                              .getChildFile (Tone3000Library::imageRelativePath (toneId));
+
+        juce::MemoryBlock mb;
+
+        if (! file.existsAsFile() || file.getSize() > 8 * 1024 * 1024 || ! file.loadFileAsData (mb))
+            return std::nullopt;
+
+        const auto type = Tone3000Library::imageMediaType (mb.getData(), mb.getSize());
+
+        if (type.isEmpty())
+            return std::nullopt;
+
+        std::vector<std::byte> data (mb.getSize());
+        std::memcpy (data.data(), mb.getData(), mb.getSize());
+        return juce::WebBrowserComponent::Resource { std::move (data), type };
+    }
 }
 
 std::optional<juce::WebBrowserComponent::Resource> provideUiResource (const juce::String& path)
 {
+    if (path.trimCharactersAtStart ("/").startsWith (Tone3000Library::imageRequestPrefix()))
+    {
+        const auto toneId = Tone3000Library::toneIdFromImageRequest (path);
+        return toneId > 0 ? provideToneArtwork (toneId) : std::nullopt;
+    }
+
     auto dist = moduleResourceDir().getChildFile ("ui");
 
    #ifdef PLECTRIFY_UI_DIST_DIR

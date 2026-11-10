@@ -65,6 +65,28 @@ juce::String modelRelativePath (juce::int64 toneId, juce::int64 modelId, Format)
 /** Cover art for a tone: "images/<toneId>.jpg". Same id rule. */
 juce::String imageRelativePath (juce::int64 toneId);
 
+/** The path under the page's own local origin that serves a tone's cover art
+    (see provideUiResource): "tone3000/images/". The page appends
+    "<toneId>.jpg", and nothing but a plain positive id ever resolves. */
+juce::String imageRequestPrefix();
+
+/** The tone a request for cover art names, or 0 when the path is not exactly
+    "tone3000/images/<toneId>.jpg" (a leading slash and a query are tolerated).
+    The id is the only thing taken from the request, so the page — and
+    whatever else runs in that document — cannot name any other file. */
+juce::int64 toneIdFromImageRequest (const juce::String& requestPath);
+
+/** The media type of a raster image, read from its first bytes, or an empty
+    string for anything else. The gate on both sides of the cover-art cache:
+    what a TONE3000 image URL returned is stored only if this recognises it,
+    and served under the page's origin only as the type named here — so an
+    HTML or SVG document handed back in place of a photograph is never kept
+    and never rendered. */
+juce::String imageMediaType (const void* data, size_t size);
+
+/** May cover art be fetched from this URL? HTTPS only. */
+bool isFetchableImageUrl (const juce::String& url);
+
 /** Is this a relative path this module could have produced? The guard for
     anything arriving from the network or from a patch document — a `file`
     field is read back from a patch we did not necessarily write. */

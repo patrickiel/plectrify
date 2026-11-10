@@ -641,6 +641,23 @@
         {/if}
       </Card>
     {/if}
+    <!-- Updates. The one request the app makes on its own at every start, so
+         it can be switched off; the About panel's "Check now" still works.
+         Not capability-gated: the plugin build shows the notice too. -->
+    <Card>
+      <div>
+        <MenuCheckbox
+          checked={appSettings.checkForUpdates}
+          label="Check for updates"
+          onChange={(checked) => onSetAppSettings({ checkForUpdates: checked })}
+        />
+        <p
+          class="mt-[-.15rem] pt-0 pr-[.6rem] pb-[.4rem] pl-[1.95rem] text-[.7rem] leading-[1.35] text-[color-mix(in_srgb,var(--color-ink)_45%,transparent)]"
+        >
+          Asks GitHub for the newest release when Plectrify starts.
+        </p>
+      </div>
+    </Card>
     <!-- Backup. At the bottom, with Reset under it, because they are the
          cards nobody opens Settings to reach until the day they need them —
          and the only ones that can undo everything above them.

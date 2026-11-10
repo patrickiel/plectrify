@@ -27,9 +27,13 @@
     dismissedVersion: string;
     /** Persist the dismissal, scoped to the release being offered. */
     onDismiss: (version: string) => void;
+    /** Whether the start-up check may run: the stored settings have answered
+        and AppSettings.checkForUpdates is on. False until then, because the
+        defaults say "on" even where the user or the installer said no. */
+    checkEnabled: boolean;
   }
 
-  let { engine, capabilities, dismissedVersion, onDismiss }: Props = $props();
+  let { engine, capabilities, dismissedVersion, onDismiss, checkEnabled }: Props = $props();
 
   let installed = $state('');
   // Linux installs carry Plectrify's APT repository (scripts/aptRepository.ts),
@@ -46,11 +50,13 @@
     }),
   );
 
-  // The one check, at start-up. The app is left running for hours at a time; a
-  // release landing mid-session is not worth polling for, let alone
-  // interrupting a player over.
-  onMount(() => {
-    void checkForUpdate();
+  // The one check, at start-up — once the settings say it is wanted. The app is
+  // left running for hours at a time; a release landing mid-session is not
+  // worth polling for, let alone interrupting a player over. checkForUpdate
+  // runs at most once per launch, so switching the setting back on mid-session
+  // checks then and never again.
+  $effect(() => {
+    if (checkEnabled) void checkForUpdate();
   });
 
   // The in-app install's stream, owned here because this component is always

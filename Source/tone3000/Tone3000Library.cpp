@@ -1,5 +1,7 @@
 #include "Tone3000Library.h"
 
+#include <initializer_list>
+
 namespace Tone3000Library
 {
 namespace
@@ -56,6 +58,68 @@ juce::String imageRelativePath (juce::int64 toneId)
         return {};
 
     return "images/" + juce::String (toneId) + ".jpg";
+}
+
+juce::String imageRequestPrefix()
+{
+    return "tone3000/images/";
+}
+
+juce::int64 toneIdFromImageRequest (const juce::String& requestPath)
+{
+    const auto path = requestPath.upToFirstOccurrenceOf ("?", false, false)
+                          .upToFirstOccurrenceOf ("#", false, false)
+                          .trimCharactersAtStart ("/");
+
+    if (! path.startsWith (imageRequestPrefix()) || ! path.endsWith (".jpg"))
+        return 0;
+
+    const auto digits = path.substring (imageRequestPrefix().length(), path.length() - 4);
+
+    // Digits and nothing else, and few enough to fit: getLargeIntValue would
+    // read "12abc" as 12 and "-3" as a number.
+    if (digits.isEmpty() || digits.length() > 18 || ! digits.containsOnly ("0123456789"))
+        return 0;
+
+    const auto id = digits.getLargeIntValue();
+    return isUsableId (id) ? id : 0;
+}
+
+juce::String imageMediaType (const void* data, size_t size)
+{
+    const auto* bytes = static_cast<const unsigned char*> (data);
+    const auto startsWith = [bytes, size] (std::initializer_list<unsigned char> magic, size_t offset = 0)
+    {
+        if (bytes == nullptr || size < offset + magic.size())
+            return false;
+
+        size_t i = offset;
+
+        for (const auto expected : magic)
+            if (bytes[i++] != expected)
+                return false;
+
+        return true;
+    };
+
+    if (startsWith ({ 0xFF, 0xD8, 0xFF }))
+        return "image/jpeg";
+
+    if (startsWith ({ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A }))
+        return "image/png";
+
+    if (startsWith ({ 'R', 'I', 'F', 'F' }) && startsWith ({ 'W', 'E', 'B', 'P' }, 8))
+        return "image/webp";
+
+    if (startsWith ({ 'G', 'I', 'F', '8' }))
+        return "image/gif";
+
+    return {};
+}
+
+bool isFetchableImageUrl (const juce::String& url)
+{
+    return url.startsWithIgnoreCase ("https://") && url.length() > 8;
 }
 
 bool isSafeRelativePath (const juce::String& relativePath)

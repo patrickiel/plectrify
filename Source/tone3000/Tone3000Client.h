@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Tone3000Auth.h"
+#include "Tone3000Library.h"
 
 #include <JuceHeader.h>
 
@@ -96,6 +97,22 @@ public:
                         const juce::File& destination,
                         std::function<void (DownloadProgress)> onProgress,
                         std::function<void (juce::String)> onDone);
+
+    /** Fetch a tone's cover art to `destination`, best-effort.
+
+        Deliberately unlike downloadModel in three ways. No bearer token goes
+        with it: the URL is a public image on whatever host TONE3000 named, and
+        a credential has no business there. The payload is kept only if its
+        first bytes are a raster image (Tone3000Library::imageMediaType) and it
+        is small. And it ignores cancel's flag — that flag stays set until the
+        next model download clears it, and a picture queued ahead of one must
+        not be refused over a cancel from an earlier run; cancel still drops a
+        job that has not started, in which case `onDone` never fires.
+
+        `onDone` reports on the message thread whether the file is in place. */
+    void downloadImage (const juce::String& imageUrl,
+                        const juce::File& destination,
+                        std::function<void (bool)> onDone);
 
     /** Abandon anything in flight. Safe to call from the message thread at any
         time; a cancelled download leaves no partial file behind. */

@@ -578,6 +578,7 @@
               onRefresh={() => engine.refreshAppInfo()}
               selfUpdate={capabilities.selfUpdate}
               onInstallUpdate={() => engine.installUpdate()}
+              autoCheck={appSettings.checkForUpdates}
             />
           {/if}
         </div>

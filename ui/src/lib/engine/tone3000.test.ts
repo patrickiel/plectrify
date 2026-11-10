@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NO_TONE3000_ARTWORK,
+  tone3000ArtworkSources,
+  tone3000ArtworkUrl,
   findTone3000Patch,
   formatLabel,
   gearLabel,
@@ -136,5 +139,42 @@ describe('duplicate downloads', () => {
 
   it('never matches a patch that came from somewhere else', () => {
     expect(findTone3000Patch([{ id: 'patch-plain' }], { toneId: 42, modelId: 7 })).toBeUndefined();
+  });
+});
+
+describe('cover art', () => {
+  const remote = { toneId: 42, imageUrl: 'https://cdn.example.invalid/42.jpg' };
+  const onDisk = { root: 'https://juce.backend/tone3000/images/', cached: new Set([42]) };
+
+  it('is shown from the local copy once the engine has one', () => {
+    expect(tone3000ArtworkUrl(remote, onDisk)).toBe('https://juce.backend/tone3000/images/42.jpg');
+  });
+
+  it('never falls back to the remote image', () => {
+    expect(tone3000ArtworkUrl(remote, NO_TONE3000_ARTWORK)).toBeUndefined();
+    expect(tone3000ArtworkUrl({ ...remote, toneId: 7 }, onDisk)).toBeUndefined();
+    expect(tone3000ArtworkUrl(remote, { root: '', cached: new Set([42]) })).toBeUndefined();
+  });
+
+  it("keeps the mock's inline artwork, which touches no network", () => {
+    const inline = { toneId: 1, imageUrl: 'data:image/svg+xml;utf8,x' };
+    expect(tone3000ArtworkUrl(inline, NO_TONE3000_ARTWORK)).toBe(inline.imageUrl);
+  });
+
+  it('shows nothing for a module with no tone', () => {
+    expect(tone3000ArtworkUrl(undefined, onDisk)).toBeUndefined();
+  });
+
+  it('lists each tone once for the engine to catch up on, https only', () => {
+    expect(
+      tone3000ArtworkSources([
+        remote,
+        undefined,
+        { ...remote, imageUrl: 'https://cdn.example.invalid/other.jpg' },
+        { toneId: 5, imageUrl: 'http://cdn.example.invalid/5.jpg' },
+        { toneId: 6, imageUrl: 'data:image/png;base64,x' },
+        { toneId: 8 },
+      ]),
+    ).toEqual([remote]);
   });
 });

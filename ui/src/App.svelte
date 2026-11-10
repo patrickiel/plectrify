@@ -2,6 +2,7 @@
   import PartnershipSplash from './features/tone3000/PartnershipSplash.svelte';
   import Tone3000InstallStatus from './features/tone3000/Tone3000InstallStatus.svelte';
   import { isNamPlugin, type Tone3000State } from './lib/engine/tone3000';
+  import { setTone3000Artwork } from './features/tone3000/artwork.svelte';
   import type { ModuleMoveTarget } from './lib/engine/EngineBridge';
   import { onMount } from 'svelte';
   import { MockEngine } from './lib/engine/MockEngine';
@@ -256,7 +257,10 @@
       engine.subscribeRack((r) => (rack = r)),
       engine.subscribeScenes((s) => (sceneState = s)),
       engine.subscribePatches((a) => (patches = a)),
-      engine.subscribeTone3000((t) => (tone3000 = t)),
+      engine.subscribeTone3000((t) => {
+        tone3000 = t;
+        setTone3000Artwork(t);
+      }),
       engine.subscribeRigs((r) => (rigs = r)),
       engine.subscribePlugins((p) => (plugins = p)),
       engine.subscribeRouting((r) => (routing = r)),
@@ -541,6 +545,7 @@
   capabilities={caps}
   dismissedVersion={appSettings.updateDismissedVersion}
   onDismiss={(version) => engine.setAppSettings({ updateDismissedVersion: version })}
+  checkEnabled={settingsLoaded && appSettings.checkForUpdates}
 />
 
 <!-- Also capability-gated: the DAW owns the plugin window's frame. -->

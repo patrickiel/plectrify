@@ -58,6 +58,12 @@ import {
   type UpdateInstallState,
 } from './updateInstall';
 import { DEFAULT_APP_SETTINGS, normalizeAppSettings } from './appSettings';
+import {
+  applyInstallerDefaults,
+  parseInstallerDefaults,
+  settingsToStore,
+  type InstallerDefaults,
+} from './installerDefaults';
 import { firstFreePos, moveKnobToPos, normalizePositions } from './knobLayout';
 import { laneName, makeLane, nextLaneName, normalizeRoutingState } from './routing';
 import {
@@ -98,6 +104,7 @@ import {
   NAM_PLUGIN_NAME,
   patchesMissingCaptures,
   referencedFiles,
+  tone3000ArtworkSources,
 } from './tone3000';
 import {
   SCENE_VALUE_EPSILON,
@@ -353,6 +360,16 @@ function hostSeed(): Pick<AppInfo, 'host' | 'capabilities'> {
   };
 }
 
+/** The installer's choices about the app's unbidden network use, baked in
+    beside the host kind (see installerDefaults.ts). Empty on an engine older
+    than the field, and wherever no installer asked. */
+function bootInstallerDefaults(): InstallerDefaults {
+  const pushed = (
+    window as unknown as { __JUCE__?: { initialisationData?: { installerDefaults?: unknown[] } } }
+  ).__JUCE__?.initialisationData?.installerDefaults;
+  return parseInstallerDefaults(Array.isArray(pushed) ? pushed[0] : undefined);
+}
+
 /** True when running inside the JUCE WebBrowserComponent. */
 export function juceAvailable(): boolean {
   return backend() !== undefined;
@@ -433,7 +450,16 @@ export class JuceEngine implements EngineBridge {
   // Optimistic status writes awaiting their echo — see statusEcho.ts.
   private pendingStatus: PendingStatusWrites = new Map();
   private statusListeners = new Set<(status: StatusState) => void>();
-  private appSettings = { ...DEFAULT_APP_SETTINGS };
+  // Read once: the file is the installer's, and only an installer changes it.
+  private readonly installerDefaults = bootInstallerDefaults();
+  // The defaults stand until settings.json answers — and with no settings.json
+  // they are what this launch acts on, so the installer's choices must already
+  // be in them.
+  private appSettings = applyInstallerDefaults(
+    { ...DEFAULT_APP_SETTINGS },
+    null,
+    this.installerDefaults,
+  );
   private appSettingsListeners = new Set<(settings: AppSettings) => void>();
   // Seeded with the boot-baked host kind so isPluginHost() answers right from
   // the first frame — its other callers (the session autosave target, the DAW
@@ -1088,7 +1114,14 @@ export class JuceEngine implements EngineBridge {
     architecture?: string;
     templateValues?: TemplateParamValue[];
   }): void {
-    backend()?.emitEvent('tone3000Connect', { ...options });
+    // Tones saved before their photographs were kept on disk: the engine
+    // fetches what it is missing now, while the user is asking for TONE3000,
+    // rather than the page loading them from the network at every launch.
+    const artwork = tone3000ArtworkSources([
+      ...this.patches.map((patch) => patch.tone3000),
+      ...[...this.meta.values()].map((meta) => meta.tone3000),
+    ]);
+    backend()?.emitEvent('tone3000Connect', { ...options, artwork });
   }
 
   tone3000Disconnect(): void {
@@ -2445,7 +2478,7 @@ export class JuceEngine implements EngineBridge {
     // holding the settings from before the first one wrote the flag.
     const stored = await this.readFile(SETTINGS_FILE);
     const settings = stored.ok
-      ? normalizeAppSettings(safeParse<unknown>(stored.text))
+      ? this.settingsFrom(safeParse<unknown>(stored.text))
       : this.appSettings;
     if (this.starterChecked) return;
 
@@ -2634,15 +2667,24 @@ export class JuceEngine implements EngineBridge {
       .then(async () => {
         const { ok, text } = await this.readFile(SETTINGS_FILE);
         const stored = ok ? safeParse<unknown>(text) : null;
-        const merged = normalizeAppSettings({
-          ...(stored !== null && typeof stored === 'object' ? stored : {}),
-          ...changed,
-        });
+        const base = stored !== null && typeof stored === 'object' ? stored : {};
+        // Through the installer's defaults too, or the first write on a fresh
+        // machine would store the plain defaults over the choices it made.
+        const source = { ...base, ...changed };
+        // ...but an installer's answer is not stored as the user's own: see
+        // settingsToStore.
+        const merged = settingsToStore(this.settingsFrom(source), source);
         await this.writeFile(SETTINGS_FILE, JSON.stringify(merged, null, 2));
       })
       .catch((error: unknown) => {
         console.error('Failed to write the app settings', error);
       });
+  }
+
+  /** A stored settings document as this launch reads it: validated, with the
+      installer's choices under whatever the user has not answered. */
+  private settingsFrom(stored: unknown): AppSettings {
+    return applyInstallerDefaults(normalizeAppSettings(stored), stored, this.installerDefaults);
   }
 
   settingsReady(): Promise<void> {
@@ -3587,8 +3629,7 @@ export class JuceEngine implements EngineBridge {
     const { ok, text } = await this.readFile(SETTINGS_FILE);
     if (!ok || revision !== this.appSettingsRevision) return;
 
-    const parsed = safeParse<unknown>(text);
-    this.appSettings = normalizeAppSettings(parsed);
+    this.appSettings = this.settingsFrom(safeParse<unknown>(text));
     this.pushStandbyConfig();
     this.pushWindowTheme();
     this.emitAppSettings();

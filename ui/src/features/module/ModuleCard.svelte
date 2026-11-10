@@ -41,6 +41,7 @@
   import { tooltip } from '../../lib/components/tooltip.svelte';
   import PatchBar from './PatchBar.svelte';
   import Tone3000Logo from '../tone3000/Tone3000Logo.svelte';
+  import { tone3000Artwork } from '../tone3000/artwork.svelte';
   import { cellOf, knobSignature, normalizePositions, ROWS } from '../../lib/engine/knobLayout';
 
   interface Props {
@@ -355,11 +356,12 @@
   // others; new knobs fill top-then-bottom of each column in turn.
   const positioned = $derived(normalizePositions(module.params));
 
-  /** The tone's artwork, and the one flag that turns it off: it is a remote
-      image on TONE3000's CDN, so it can simply not arrive — offline, or a tone
-      taken down — and the card goes back to being an ordinary card. */
+  /** The tone's artwork — the engine's local copy of its photograph, never the
+      remote image (see artwork.svelte.ts) — and the one flag that turns it off
+      when that copy will not load, so the card goes back to being an ordinary
+      card. */
   let artworkFailed = $state(false);
-  const artwork = $derived(artworkFailed ? undefined : module.tone3000?.imageUrl);
+  const artwork = $derived(artworkFailed ? undefined : tone3000Artwork(module.tone3000));
 
   /** The attribution line, written once and worn by both ways into the tone —
       the mark in the header and the photograph in the body. Only the picture

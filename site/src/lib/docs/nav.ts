@@ -77,6 +77,16 @@ export const DOC_NAV: DocSection[] = [
         label: 'Troubleshooting',
         blurb: 'No sound, a plugin that will not scan, and other common walls.',
       },
+      {
+        href: '/docs/privacy',
+        label: 'Privacy',
+        blurb: 'Everything Plectrify sends over the network, and how to turn it off.',
+      },
+      {
+        href: '/docs/code-signing',
+        label: 'Code signing policy',
+        blurb: 'Who builds and signs the Windows releases, and what gets signed.',
+      },
     ],
   },
 ];

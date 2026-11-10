@@ -7,6 +7,7 @@
   import InlineRenameInput from '../../lib/components/InlineRenameInput.svelte';
   import { tooltip } from '../../lib/components/tooltip.svelte';
   import Tone3000Badge from '../tone3000/Tone3000Badge.svelte';
+  import { tone3000Artwork } from '../tone3000/artwork.svelte';
 
   /**
    * One patch in the module drawer, drawn as a miniature of the module card
@@ -102,12 +103,13 @@
   function freezeSize() {
     editSize = tileEl ? { width: tileEl.offsetWidth, height: tileEl.offsetHeight } : null;
   }
-  /** The artwork is a remote image on TONE3000's CDN, so it can simply not
-      arrive — offline, or a tone taken down. One flag, and the tile goes back
-      to being an ordinary patch tile. */
+  /** The artwork is the engine's local copy of the tone's photograph (see
+      artwork.svelte.ts), which may not exist — saved offline, or a tone with no
+      picture. One flag for a copy that will not load, and the tile goes back to
+      being an ordinary patch tile. */
   let artworkFailed = $state(false);
 
-  const artwork = $derived(artworkFailed ? undefined : patch.tone3000?.imageUrl);
+  const artwork = $derived(artworkFailed ? undefined : tone3000Artwork(patch.tone3000));
 
   /** Draggable for either gesture: the plain drag needs an installed plugin
       (dropping it could otherwise create nothing), while a reorder is about
@@ -368,9 +370,7 @@
         onCancel={closeCategory}
       />
     {:else if artwork}
-      <!-- No crossOrigin, same reasoning as Tone3000Badge: a plain image load
-           succeeds where a CORS request would fail on any CDN response that
-           happens to lack the header. -->
+      <!-- The engine's local copy, never the remote image. -->
       <img
         src={artwork}
         alt=""
