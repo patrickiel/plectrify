@@ -1048,7 +1048,7 @@ if (BUILD_TESTING)
     # Neural Amp Modeler into the process to prove the plugin accepts a state
     # whose model path we rewrote. `ctest` stays offline and plugin-free —
     # scanning is user-triggered in Plectrify and must be here too. Run it by hand
-    # after bumping NAM (see the release procedure in AGENTS.md):
+    # after bumping NAM (see the release procedure in packaging/AGENTS.md):
     #   PlectrifyNamStateProbe <NeuralAmpModeler.vst3> <capture.nam> [fixture dir]
     juce_add_console_app(PlectrifyNamStateProbe PRODUCT_NAME "Plectrify NAM State Probe")
     juce_generate_juce_header(PlectrifyNamStateProbe)
