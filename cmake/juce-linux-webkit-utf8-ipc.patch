@@ -1,0 +1,40 @@
+Read the Linux web view's pipe as UTF-8, in both directions.
+
+JUCE's WebKitGTK backend runs the view in a forked child and talks to it over a
+pipe of JSON commands. The writer encodes the JSON as UTF-8 (toRawUTF8), but the
+reader rebuilt it with String (const char*, size_t), which takes each byte as
+one 8-bit character. In the child, the string a script message handler hands
+over (jsc_value_to_string, UTF-8) went through var (const char*), the same
+8-bit reading. So every non-ASCII character was re-encoded as Latin-1 once per
+crossing, and text that crossed repeatedly grew: a TONE3000 tone named
+"EVH 5150III(R) 100S" came back from the page as "EVH 5150IIIÃ..Â(R)", and
+every save and reload of the patch added more layers (issue #48).
+
+Both now read UTF-8 (String::fromUTF8). ASCII is unchanged, and so are Windows
+and macOS, which never use this pipe.
+
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+@@ -683,7 +683,11 @@
+         if (responder == nullptr)
+             return;
+ 
+-        const auto object = JSON::fromString (String (buffer.getData(), lengthsBuffer.getJsonLength()));
++        // PLECTRIFY_WEBKIT_UTF8_IPC: the JSON was written as UTF-8 (sendCommand
++        // uses toRawUTF8), so it must be read as UTF-8. String (const char*, n)
++        // reads bytes as 8-bit characters, which turned every non-ASCII
++        // character into mojibake once per crossing of the pipe.
++        const auto object = JSON::fromString (String::fromUTF8 (buffer.getData(), (int) lengthsBuffer.getJsonLength()));
+ 
+         if (object.isVoid())
+             return;
+@@ -1014,7 +1018,8 @@
+         auto& wk = *WebKitSymbols::getInstance();
+ 
+         auto s = wk.juce_jsc_value_to_string (wk.juce_webkit_javascript_result_get_js_value (r));
+-        CommandReceiver::sendCommand (outChannel, "invokeCallback", var (s));
++        // PLECTRIFY_WEBKIT_UTF8_IPC: jsc_value_to_string returns UTF-8.
++        CommandReceiver::sendCommand (outChannel, "invokeCallback", var (String::fromUTF8 (s)));
+         wk.juce_g_free (s);
+     }
+ 

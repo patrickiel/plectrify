@@ -8,6 +8,19 @@
 
 namespace
 {
+    // The page's name for the OS this binary was built for: AppInfo.platform,
+    // and the same word baked into the web view's initialisation data.
+    const char* platformName()
+    {
+       #if JUCE_MAC
+        return "macos";
+       #elif JUCE_LINUX
+        return "linux";
+       #else
+        return "windows";
+       #endif
+    }
+
     // The page's name for a description's format: 'vst3', or 'legacy' for the
     // VST2-era .dll/.vst/.so format (JUCE calls that one "VST"). The page keys
     // patches on name + format and badges a legacy plugin with its file
@@ -242,6 +255,12 @@ juce::WebBrowserComponent::Options PlectrifyEngine::registerEventListeners (juce
         // is right from the first frame in every host. JSON because
         // initialisation data carries strings.
         .withInitialisationData ("capabilities", juce::JSON::toString (buildCapabilitiesState(), true))
+        // And the platform, for a decision that cannot wait for appInfo either:
+        // the Linux bridge once garbled every non-ASCII character it carried
+        // (issue #48), and the page repairs what that left on disk before it
+        // reads any of it — on Linux alone, since the repair is a heuristic no
+        // other platform has a use for.
+        .withInitialisationData ("platform", juce::String (platformName()))
         // Not an activity event (the UI asks on startup), but it must not answer
         // while deep standby holds the rig parked: buildRackState() would report
         // an empty rack, which prunes every knob mapping and lane name and lets
@@ -674,13 +693,7 @@ juce::var PlectrifyEngine::buildAppInfoState()
     // A stable discriminator alongside the free-text `os`, so UI wording
     // (Explorer vs Finder, WebView2 vs WebKit, whether ASIO is even a fact
     // worth stating) can branch without parsing a display string.
-   #if JUCE_MAC
-    info->setProperty ("platform", "macos");
-   #elif JUCE_LINUX
-    info->setProperty ("platform", "linux");
-   #else
-    info->setProperty ("platform", "windows");
-   #endif
+    info->setProperty ("platform", platformName());
     // Which binary this engine is, and which host-owned facilities exist
     // around it — what the page gates its standalone-only surfaces on (the
     // setup wizard, device settings, window chrome, Auto Standby).

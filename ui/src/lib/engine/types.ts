@@ -514,6 +514,14 @@ export interface AppSettings {
       altogether — where normalization is never reached and the default stands
       — is a first run. */
   setupCompleted: boolean;
+  /** True once the text the Linux bridge garbled before it was fixed (issue
+      #48) has been repaired across the stored documents — see
+      `repairStoredText` in JuceEngine.ts. The repair is a heuristic, so it runs
+      once and this is what says it has. It lives here rather than in a marker
+      file because it describes the documents beside it: a backup carries its
+      own answer, and restoring one an older build wrote is repaired in turn.
+      Never set off Linux, where nothing was ever garbled. */
+  storedTextRepaired: boolean;
   /** Id of the saved rig the working rack was last loaded from or saved as
       (empty when none). Remembered so a restart restores the rig selection
       alongside the restored session. */
