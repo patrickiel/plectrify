@@ -409,13 +409,6 @@ private:
     // flat and each of its subfolders installs under its own name.
     static std::map<juce::String, juce::File> sharedPatchSources();
     static juce::File sharedPatchSourceDir (const juce::String& patchId);
-    // The ids those folders offer, for listing the shared root.
-    static juce::StringArray sharedPatchSourceIds();
-    // Whether the listing also names packs the repo carries but this machine
-    // has not installed. Off unless PLECTRIFY_LIST_UNINSTALLED_PACKS=1 is in
-    // the launch environment: such a pack's plugin and assets are usually not
-    // here, so by default the sources only shadow packs that are installed.
-    static bool listUninstalledPackSources();
     // The one writable path in this build, and it deliberately does not point
     // where resolveSharedFile reads from: a write lands in the repo's sources
     // for the pack, never in the installed copy. Refuses a pack the repo does

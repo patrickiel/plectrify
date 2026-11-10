@@ -2824,21 +2824,6 @@ juce::File PlectrifyEngine::sharedPatchSourceDir (const juce::String& patchId)
     return found != sources.end() ? found->second : juce::File();
 }
 
-juce::StringArray PlectrifyEngine::sharedPatchSourceIds()
-{
-    juce::StringArray ids;
-    for (const auto& [id, dir] : sharedPatchSources())
-        ids.add (id);
-
-    return ids;
-}
-
-bool PlectrifyEngine::listUninstalledPackSources()
-{
-    return juce::SystemStats::getEnvironmentVariable ("PLECTRIFY_LIST_UNINSTALLED_PACKS", {})
-               .trim() == "1";
-}
-
 bool PlectrifyEngine::resolveSharedSourceFile (const juce::String& rel, juce::File& out)
 {
     const auto relative = rel.replaceCharacter ('\\', '/');
@@ -3045,32 +3030,17 @@ void PlectrifyEngine::handleListFiles (const juce::var& payload)
     }
 
    #if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
-    // Debug-only. The listing above is what is installed, and that stays the
-    // answer: the repo's sources shadow an installed pack's files (see
-    // resolveSharedFile) but do not add packs, because a pack listed without
-    // its package installed offers a tile whose plugin, and usually whose
-    // assets, are not on this machine — every fresh Debug checkout showed the
-    // repo's whole collection in the drawer with nothing installed (#43).
-    // Authoring a brand-new pack before its first publish is the one case that
-    // wants it listed anyway, so that is an explicit opt-in for the session.
+    // Debug-only: which listed packs the repo carries sources for, so the
+    // page can offer to write one back. Only installed packs are listed — the
+    // sources shadow a pack's files (resolveSharedFile), they never add one.
     juce::Array<juce::var> writable;
     if (payload["root"].toString() == "shared" && payload["dir"].toString().isEmpty())
-        for (const auto& id : sharedPatchSourceIds())
-        {
-            if (! dirs.contains (juce::var (id)))
-            {
-                if (! listUninstalledPackSources())
-                    continue;
-
-                dirs.add (id);
-            }
-
-            // Reported so the page can offer to write one back. Named rather
-            // than implied by a build flag: a pack the repo does not carry is
-            // read-only even here, so "which are editable" is a fact about
-            // this machine's source tree and only this side knows it.
-            writable.add (id);
-        }
+    {
+        const auto sources = sharedPatchSources();
+        for (const auto& id : dirs)
+            if (sources.count (id.toString()) > 0)
+                writable.add (id);
+    }
    #endif
 
     auto* r = new juce::DynamicObject();

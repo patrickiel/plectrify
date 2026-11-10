@@ -1861,15 +1861,11 @@ the repo says it is — no `host`, no publish, no install. The override is keyed
 folder a patch occupies in `patches/` and applies file by file
 (`MainComponent::sharedPatchSources`), so it reads both shapes `host` ships —
 the wrapped single patch and a pack of several, whose subfolders install under
-their own names. It **shadows packs, it does not add them**: the drawer lists
-only what is installed, because a pack listed without its package offers a tile
-whose plugin and assets are not on this machine — which is what a fresh Debug
-checkout used to show, the repo's whole collection with nothing installed
-(issue #43). Authoring a brand-new pack before its first publish is the one
-case that wants it listed anyway, so that is an explicit opt-in:
-`PLECTRIFY_LIST_UNINSTALLED_PACKS=1` in the launch environment
-(`listUninstalledPackSources`). Only this platform's folder is read; the
-OS-neutral `content/<id>/` shape counts only if it holds a `patch.json`.
+their own names. It **shadows installed packs and never adds one**: the drawer
+lists only what is installed, since a pack without its package has no plugin to
+load (issue #43), so a new pack is installed once before it is edited here.
+Only this platform's folder is read; the OS-neutral `content/<id>/` shape
+counts only if it holds a `patch.json`.
 
 **And a Debug build can write those sources back.** A pack patch loaded on a
 module offers *Update pack source "…"* in the patch menu wherever the repo has
@@ -1888,11 +1884,9 @@ Assets are the one thing it cannot shadow, and for the reason the whole folder
 layout exists: a patch's plugin state names its capture by *absolute installed
 path*, which nothing here can rewrite. So the edited document is read beside
 the installed assets — which is the case that matters, since the document is
-what is being iterated on — and a pack whose assets have never been installed
-loads a patch pointing at files that are not there. Install it once and edit
-freely after that. Like the catalogue's bypass this is a compile-time symbol
-absent outside Debug, never a setting, and it is read-only exactly like the
-root it shadows.
+what is being iterated on. Like the catalogue's bypass this is a compile-time
+symbol absent outside Debug, never a setting, and it is read-only exactly like
+the root it shadows.
 
 A folder holding a `patch.json` at its top level *is* a patch, and `host`
 ships it wrapped in a folder named for the package id — so the repo layout is
