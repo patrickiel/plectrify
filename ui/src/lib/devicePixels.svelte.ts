@@ -1,5 +1,7 @@
+import { createSubscriber } from 'svelte/reactivity';
+
 /**
- * `window.devicePixelRatio` as reactive state.
+ * `window.devicePixelRatio` as a reactive read.
  *
  * Windows applies a per-monitor scale factor (100%, 125%, 150%…), so dragging
  * the window to another display changes how many physical pixels a CSS pixel
@@ -8,68 +10,49 @@
  * the whole reason this exists.
  *
  * ```svelte
- * $effect(() => trackDevicePixelRatio());
  * const scale = $derived(devicePixelRatio() * zoom);
  * ```
+ *
+ * Reading it inside an effect or a derived subscribes; the listeners are
+ * shared between every reader and torn down with the last one
+ * (`createSubscriber`), so a consumer needs no effect of its own. Read
+ * anywhere else, it is just the current value.
  */
-
-/** SSR-safe seed; `trackDevicePixelRatio` corrects it on the first run. */
-let ratio = $state(typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1);
-let trackers = 0;
-let stop: (() => void) | undefined;
-
-/** The current ratio. Reading this inside an effect or a derived subscribes. */
 export function devicePixelRatio(): number {
-  return ratio;
+  if (typeof window === 'undefined') return 1;
+  subscribe();
+  return window.devicePixelRatio || 1;
 }
 
-/**
- * Start watching, and return the matching teardown. Safe to call from several
- * places at once — the underlying listener is shared and torn down with the
- * last caller.
- */
-export function trackDevicePixelRatio(): () => void {
-  if (typeof window === 'undefined') return () => {};
-  trackers += 1;
-  if (trackers === 1) stop = watch();
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    trackers -= 1;
-    if (trackers === 0) {
-      stop?.();
-      stop = undefined;
-    }
-  };
-}
-
-function watch(): () => void {
+const subscribe = createSubscriber((update) => {
   let query: MediaQueryList | undefined;
-  let disposed = false;
+  let ratio = 0;
 
   // A resolution media query only reports when the value it was built with
   // stops matching, so each change has to re-arm the listener against the new
   // ratio. The `resize` fallback covers the case where a DPI change arrives as
   // a window resize instead — cheap, and it only ever re-reads one number.
   const rearm = () => {
-    if (disposed) return;
     ratio = window.devicePixelRatio || 1;
-    query?.removeEventListener('change', rearm);
+    query?.removeEventListener('change', onChange);
     query = window.matchMedia(`(resolution: ${ratio}dppx)`);
-    query.addEventListener('change', rearm);
+    query.addEventListener('change', onChange);
+  };
+
+  const onChange = () => {
+    rearm();
+    update();
   };
 
   const onResize = () => {
-    if (!disposed && window.devicePixelRatio !== ratio) rearm();
+    if (window.devicePixelRatio !== ratio) onChange();
   };
 
   rearm();
   window.addEventListener('resize', onResize);
 
   return () => {
-    disposed = true;
-    query?.removeEventListener('change', rearm);
+    query?.removeEventListener('change', onChange);
     window.removeEventListener('resize', onResize);
   };
-}
+});

@@ -15,27 +15,24 @@
 
   const on = $derived(value >= 0.5);
 
-  let toggleText = $state<HTMLElement>();
   let twoLines = $state(false);
 
   // CSS cannot transition between an intrinsic one-line height and a wrapped
   // two-line height. Measure the rendered text and switch between explicit
-  // heights so both expansion and contraction animate.
-  function updateTextHeight() {
-    if (!toggleText) return;
-    const lineHeight = Number.parseFloat(getComputedStyle(toggleText).lineHeight);
-    twoLines = toggleText.scrollHeight > lineHeight + 1;
-  }
-
-  $effect(() => {
-    text;
-    on;
-    // A frame late, so the new text has been laid out before it is measured;
-    // cancelled on teardown so a re-run or an unmount cannot measure a stale
-    // (or detached) element.
-    const frame = requestAnimationFrame(updateTextHeight);
+  // heights so both expansion and contraction animate. Attached to the text
+  // span, and re-attached whenever the text or the state changes (both are read
+  // here): a frame late, so the new text has been laid out before it is
+  // measured, and cancelled on teardown so a re-run or an unmount cannot
+  // measure a stale (or detached) element.
+  function measureLines(node: HTMLElement) {
+    void text;
+    void on;
+    const frame = requestAnimationFrame(() => {
+      const lineHeight = Number.parseFloat(getComputedStyle(node).lineHeight);
+      twoLines = node.scrollHeight > lineHeight + 1;
+    });
     return () => cancelAnimationFrame(frame);
-  });
+  }
 </script>
 
 <div class="flex w-16 flex-col items-center gap-2 text-center select-none">
@@ -55,7 +52,7 @@
       )}
     >
       <span
-        bind:this={toggleText}
+        {@attach measureLines}
         class="line-clamp-2 max-w-full overflow-hidden leading-[1.15] [overflow-wrap:anywhere]"
         >{text ?? (on ? 'ON' : 'OFF')}</span
       >

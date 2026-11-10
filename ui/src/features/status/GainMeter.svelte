@@ -172,6 +172,7 @@
 
   // Reads peakDb, not the `clipping` edge: every clipping sample re-arms the
   // hold, so the marker stays lit for 2s past the *last* clip, not the first.
+  // Effect: the peak is a stream with no event of its own, and the hold is a timer.
   $effect(() => {
     if (peakDb < -0.1) return;
     clip = true;

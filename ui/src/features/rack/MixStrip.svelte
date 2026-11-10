@@ -145,15 +145,12 @@
      it is reachable only for as long as the pointer stays within the expanded
      box. A menu stays open because it was asked for. -->
 <div
-  class="mix-strip-anchor"
-  class:menu-visible={menuOpen || midiLearning}
+  class={['mix-strip-anchor', { 'menu-visible': menuOpen || midiLearning }]}
   style:width={tagWidth}
   style:font-size={tagFontSize}
 >
   <section
-    class="mix-strip"
-    class:mix-muted={lane.muted}
-    class:mix-live={audible}
+    class={['mix-strip', { 'mix-muted': lane.muted, 'mix-live': audible }]}
     aria-label="Lane {label} mixer"
     oncontextmenu={openMenu}
   >
@@ -198,9 +195,10 @@
         <button
           {...props}
           bind:this={menuBtnEl}
-          class="lane-menu-btn"
-          class:lane-menu-bound={!!lane.midi}
-          class:lane-menu-armed={midiLearning}
+          class={[
+            'lane-menu-btn',
+            { 'lane-menu-bound': !!lane.midi, 'lane-menu-armed': midiLearning },
+          ]}
           aria-label="Lane {label} mixer and options"
           {@attach tooltip('Lane mixer')}
         >

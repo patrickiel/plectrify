@@ -126,9 +126,10 @@
 <div class="flex w-16 flex-col items-center gap-2 text-center select-none">
   <button
     type="button"
-    class="knob-container relative grid size-11 cursor-ns-resize place-items-center transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)] hover:scale-[1.08] focus:outline-none focus-visible:scale-[1.08] focus-visible:outline-none"
-    class:dragging
-    class:fine
+    class={[
+      'knob-container relative grid size-11 cursor-ns-resize place-items-center transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)] hover:scale-[1.08] focus:outline-none focus-visible:scale-[1.08] focus-visible:outline-none',
+      { dragging, fine },
+    ]}
     onkeyup={syncModifier}
     onblur={() => (shiftHeld = false)}
     onpointerdown={down}
@@ -150,12 +151,11 @@
     {#if text}
       <span class="knob-tooltip" role="tooltip">{text}</span>
     {/if}
-    <span class="knob-ring" class:discrete={isDiscrete}>
+    <span class={['knob-ring', { discrete: isDiscrete }]}>
       {#if isDiscrete}
         {#each logicalSteps as stepValue, index (index)}
           <span
-            class="detent"
-            class:active={index === activeDetent()}
+            class={['detent', { active: index === activeDetent() }]}
             style="--detent-angle: {-135 + stepValue * 270}deg"
             {@attach tooltip(valueStrings?.[index])}
           ></span>

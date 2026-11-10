@@ -271,7 +271,7 @@
         <!-- The label stays in the layout while pending — hidden, with the
              spinner overlaid — so the segment (and the group) keeps its
              width instead of jumping around the spinner. -->
-        <span class="max-w-36 truncate" class:invisible={pendingId === item.id}>{item.name}</span>
+        <span class={['max-w-36 truncate', { invisible: pendingId === item.id }]}>{item.name}</span>
         {#if pendingId === item.id}
           <span class="absolute inset-0 grid place-items-center">
             <CircleNotchIcon class="animate-spin" size={14} weight="bold" />

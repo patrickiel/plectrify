@@ -122,6 +122,8 @@
     if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
   });
 
+  // Effect: readings are a stream with no event of its own; holding and fading
+  // them out is timer work.
   $effect(() => {
     const current = reading;
     if (!active) {
@@ -169,8 +171,7 @@
          position only here, so the smoothing constant keeps one meaning at
          every magnification. -->
     <span
-      class="tuner-scale"
-      class:close={tuner.close}
+      class={['tuner-scale', { close: tuner.close }]}
       role="img"
       aria-label={tuner.ready ? `${tuner.cents} cents` : 'No note detected'}
       style:--tick-lo={`${needleTicks.lo}%`}

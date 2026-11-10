@@ -1,6 +1,6 @@
 <script lang="ts">
   import { CaretDownIcon } from 'phosphor-svelte';
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
   import Popover from './Popover.svelte';
   import TextField from './TextField.svelte';
@@ -92,12 +92,20 @@
   let input: HTMLInputElement | undefined = $state();
   let list: HTMLUListElement | undefined = $state();
 
-  // Report the state, and always report closed on teardown, so a consumer that
-  // conditionally renders this Select can never be left thinking a menu of a
-  // component it just destroyed is still open.
-  $effect(() => {
-    onOpenChange?.(open);
-    return () => onOpenChange?.(false);
+  /** Every open and close goes through here — the trigger and Popover's own
+      dismissals reach it through the function binding below — so the
+      consumer hears each change as it happens. */
+  function setOpen(next: boolean) {
+    if (next === open) return;
+    open = next;
+    onOpenChange?.(next);
+  }
+
+  // Always report closed on teardown, so a consumer that conditionally renders
+  // this Select can never be left thinking a menu of a component it just
+  // destroyed is still open.
+  onMount(() => () => {
+    if (open) onOpenChange?.(false);
   });
 
   const selectedLabel = $derived(options.find((o) => o.value === value)?.label ?? '');
@@ -129,7 +137,7 @@
 
   function choose(v: string) {
     onSelect(v);
-    open = false;
+    setOpen(false);
   }
 
   /** Shared by the filter box and, when there is none, the list itself. */
@@ -175,7 +183,12 @@
   };
 </script>
 
-<Popover bind:open maxHeight={MENU_MAX_HEIGHT} matchTriggerWidth onOpen={resetOnOpen}>
+<Popover
+  bind:open={() => open, setOpen}
+  maxHeight={MENU_MAX_HEIGHT}
+  matchTriggerWidth
+  onOpen={resetOnOpen}
+>
   {#snippet trigger(props)}
     {#if triggerContent}
       <button {...props} class={className} {disabled} aria-label={ariaLabel}>
@@ -240,7 +253,7 @@
   </ul>
   {#if footer}
     <div class="flex-none border-t border-control-edge-hair px-1 py-1">
-      {@render footer(() => (open = false))}
+      {@render footer(() => setOpen(false))}
     </div>
   {/if}
 </Popover>

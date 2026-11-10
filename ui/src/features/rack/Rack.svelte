@@ -8,7 +8,7 @@
   import { fade, slide } from 'svelte/transition';
   import { deviceScale, snapThickness } from '../../lib/pixelSnap';
   import type { PluginPlatform } from '../../lib/engine/legacyPlugins';
-  import { devicePixelRatio, trackDevicePixelRatio } from '../../lib/devicePixels.svelte';
+  import { devicePixelRatio } from '../../lib/devicePixels.svelte';
   import {
     FAN_COLUMN_PX,
     ROUTE_THICKNESS,
@@ -295,7 +295,8 @@
 
   // An armed learn must not outlive its target or edit mode: leaving edit
   // hides every learn button, and the module/lane can be deleted mid-learn.
-  // UI-state sync (not an engine subscription), so an effect is the right tool.
+  // Effect: the disarm has to reach App through the bound `rackMidiLearning`,
+  // and the target can vanish on an engine push no handler here sees.
   $effect(() => {
     const learn = contentLearn;
     if (learn === null) return;
@@ -604,8 +605,11 @@
   }
 
   // Coming back to switch mode should land on the lane you were last using
-  // rather than snapping to the first one.
-  let lastActiveLane = $state<Record<string, string>>({});
+  // rather than snapping to the first one. A plain record, not $state: only
+  // the switch handler below reads it.
+  const lastActiveLane: Record<string, string> = {};
+  // Effect: remembers a history of engine pushes — a scene recall or a rig
+  // load can change the active lane without any handler here running.
   $effect(() => {
     for (const group of groups)
       if (group.activeLaneId) lastActiveLane[group.id] = group.activeLaneId;
@@ -753,6 +757,8 @@
       // change moves the pixel grid under it, a taller group elsewhere in the
       // chain re-centres it without changing its height, and scrolling or
       // resizing the viewport shifts where the whole rack lands on the screen.
+      // Effect: re-measures the DOM when the pixel grid or the flow moves, without
+      // re-attaching (and so re-creating) the observer above.
       $effect(() => {
         routeGrid;
         flow;
@@ -1077,8 +1083,8 @@
   // pixels, and the rack sits behind two multipliers: the Windows display scale
   // and its own CSS zoom. Track both, and let every route derive its weight and
   // its position from the combined grid instead of hard-coding 2px — which is
-  // 2.5 device pixels at 125% scaling, and can never land clean.
-  $effect(() => trackDevicePixelRatio());
+  // 2.5 device pixels at 125% scaling, and can never land clean. Reading
+  // devicePixelRatio() in the derived is what subscribes to monitor changes.
   const routeScale = $derived(deviceScale(devicePixelRatio(), rackZoom));
   const routeGrid = $derived<RouteGrid>({
     scale: routeScale,
@@ -1180,6 +1186,8 @@
     }, 3000);
   }
 
+  // Effect: latches the first convergence of the engine's echoes. Not $derived:
+  // an edit made after the switch settled must not bring the spinner back.
   $effect(() => {
     if (
       pendingSceneId !== null &&
@@ -1201,6 +1209,7 @@
   // does go quiescent and the wait always terminates.
   const BASELINE_SETTLE_MS = 350;
 
+  // Effect: a debounce timer over the rack signature, restarted by every change.
   $effect(() => {
     const settled = sig; // any rack change restarts the settle window
     if (!pendingBaseline || busy.isBusy || pendingSceneId !== null) return;
@@ -1491,8 +1500,10 @@
 
 <div class="rack-shell relative h-full min-h-0 overflow-hidden" style:--tools-w="{toolsWidth}px">
   <div
-    class="relative flex h-full min-h-0 flex-col overflow-hidden"
-    class:pointer-events-none={busy.isBusy}
+    class={[
+      'relative flex h-full min-h-0 flex-col overflow-hidden',
+      { 'pointer-events-none': busy.isBusy },
+    ]}
     aria-busy={busy.isBusy}
     inert={busy.isBusy}
   >
@@ -1565,8 +1576,10 @@
               {@const over = allowed && cardTargetId === m.id}
               {@const swapping = rackDrag?.kind === 'move'}
               <div
-                class="module-slot relative flex flex-none"
-                class:module-slot-replacing={over && !swapping}
+                class={[
+                  'module-slot relative flex flex-none',
+                  { 'module-slot-replacing': over && !swapping },
+                ]}
               >
                 {@render moduleCard(m)}
                 {#if rackDrag !== null}
@@ -1719,10 +1732,14 @@
             {#snippet dropZone(target: ModuleMoveTarget, inert: boolean)}
               {@const key = targetKey(target)}
               <div
-                class="module-drop-zone"
-                class:drop-zone-idle={rackDrag === null}
-                class:drop-zone-inert={inert}
-                class:drop-zone-over={!inert && dragOverTargetKey === key}
+                class={[
+                  'module-drop-zone',
+                  {
+                    'drop-zone-idle': rackDrag === null,
+                    'drop-zone-inert': inert,
+                    'drop-zone-over': !inert && dragOverTargetKey === key,
+                  },
+                ]}
                 role="presentation"
                 ondragenter={() => {
                   if (!inert && rackDrag !== null) dragOverTargetKey = key;
@@ -1747,9 +1764,13 @@
                      which of two things the drop does to the module already
                      sitting in it. -->
                 <span
-                  class="drop-zone-plus"
-                  class:drop-zone-plus-turns={rackDrag?.kind !== 'move'}
-                  class:drop-zone-plus-flips={rackDrag?.kind === 'move'}
+                  class={[
+                    'drop-zone-plus',
+                    {
+                      'drop-zone-plus-turns': rackDrag?.kind !== 'move',
+                      'drop-zone-plus-flips': rackDrag?.kind === 'move',
+                    },
+                  ]}
                   aria-hidden="true"
                 >
                   {#if rackDrag?.kind === 'move'}
@@ -1806,8 +1827,7 @@
               style:zoom={rackZoom}
             >
               <div
-                class="rack-flow"
-                class:rack-flow-empty={rackIsEmpty}
+                class={['rack-flow', { 'rack-flow-empty': rackIsEmpty }]}
                 style:--route-thickness="{routeGrid.thickness}px"
                 style:--route-trunk-top={trunkTop(flow, routeGrid)}
                 style:--trunk-mask={trunkMask}
@@ -1875,8 +1895,10 @@
                          never appears goes stale (see reveal.ts). -->
                     <button
                       type="button"
-                      class="empty-drop-zone relative z-2 mx-auto max-w-[27rem] min-w-[22rem] flex-[1_1_24rem] cursor-pointer"
-                      class:drop-zone-over={dragOverTargetKey === emptyKey}
+                      class={[
+                        'empty-drop-zone relative z-2 mx-auto max-w-[27rem] min-w-[22rem] flex-[1_1_24rem] cursor-pointer',
+                        { 'drop-zone-over': dragOverTargetKey === emptyKey },
+                      ]}
                       onclick={() => {
                         setEditMode(true);
                         revealBrowseInDrawer();
@@ -2004,8 +2026,7 @@
                     {/if}
 
                     <div
-                      class="split-routes"
-                      class:split-routes-editing={editMode}
+                      class={['split-routes', { 'split-routes-editing': editMode }]}
                       {@attach measureRoutes(group.id)}
                     >
                       {#if geometry}
@@ -2016,7 +2037,7 @@
                         <svg class="route-fan route-fan-in" aria-hidden="true">
                           {#each fanOrder(group) as { lane, index } (lane.id || index)}
                             <path
-                              class:route-inactive={!laneIsAudible(group.id, lane.id)}
+                              class={{ 'route-inactive': !laneIsAudible(group.id, lane.id) }}
                               d={splitPath(
                                 geometry,
                                 geometry.laneCenters[index] ?? geometry.center,
@@ -2028,7 +2049,7 @@
                         <svg class="route-fan route-fan-out" aria-hidden="true">
                           {#each fanOrder(group) as { lane, index } (lane.id || index)}
                             <path
-                              class:route-inactive={!laneIsAudible(group.id, lane.id)}
+                              class={{ 'route-inactive': !laneIsAudible(group.id, lane.id) }}
                               d={mergePath(
                                 geometry,
                                 geometry.laneCenters[index] ?? geometry.center,
@@ -2047,8 +2068,10 @@
                           <div class="lane-connector lane-connector-in" aria-hidden="true"></div>
 
                           <div
-                            class="lane-row"
-                            class:route-inactive={!laneIsAudible(group.id, lane.id)}
+                            class={[
+                              'lane-row',
+                              { 'route-inactive': !laneIsAudible(group.id, lane.id) },
+                            ]}
                             style:--lane-line-top={laneLineTop(geometry, li)}
                           >
                             {#if editMode}
@@ -2208,8 +2231,10 @@
                  dragenter, one drop, in the component that owns that state. -->
             {#if draggingModuleId}
               <div
-                class="drawer-remove-drop rounded-t-xl"
-                class:drop-zone-over={dragOverTargetKey === DELETE_TARGET_KEY}
+                class={[
+                  'drawer-remove-drop rounded-t-xl',
+                  { 'drop-zone-over': dragOverTargetKey === DELETE_TARGET_KEY },
+                ]}
                 role="presentation"
                 transition:fade={{ duration: prefersReducedMotion.current ? 0 : 120 }}
                 ondragenter={() => (dragOverTargetKey = DELETE_TARGET_KEY)}

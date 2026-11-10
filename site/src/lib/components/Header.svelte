@@ -32,19 +32,19 @@
   const lifted = $derived(scrollY > 8);
 
   // Each time the bar gains or loses its chrome, the logo coin takes another
-  // half turn. Only toggles count: comparing against the previous value
-  // keeps the mount from spending a spin on first paint. Hover is not added
-  // here: it is one more half turn in the CSS, so it can unwind on leave
-  // while these accumulate forward.
+  // half turn. Counted where the scroll position arrives (the binding's
+  // setter), and only on a toggle, so a scroll that stays on one side of the
+  // threshold spends nothing. Hover is not added here: it is one more half
+  // turn in the CSS, so it can unwind on leave while these accumulate forward.
   let spins = $state(0);
-  let prevLifted: boolean | undefined;
-  $effect(() => {
-    if (prevLifted !== undefined && lifted !== prevLifted) spins++;
-    prevLifted = lifted;
-  });
+  function setScrollY(y: number) {
+    const wasLifted = lifted;
+    scrollY = y;
+    if (lifted !== wasLifted) spins++;
+  }
 </script>
 
-<svelte:window bind:scrollY />
+<svelte:window bind:scrollY={() => scrollY, setScrollY} />
 
 <header
   class="sticky top-0 z-50 border-b transition-[background-color,border-color,backdrop-filter] duration-200

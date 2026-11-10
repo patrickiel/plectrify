@@ -38,9 +38,7 @@
 
 <div
   {...rest}
-  class="drop-overlay"
-  class:drop-overlay-over={over}
-  class:drop-overlay-blocked={blocked}
+  class={['drop-overlay', { 'drop-overlay-over': over, 'drop-overlay-blocked': blocked }]}
   role="presentation"
 >
   <span class="drop-overlay-badge" aria-hidden="true">{@render children()}</span>
