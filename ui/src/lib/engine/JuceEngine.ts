@@ -107,7 +107,7 @@ import {
   remapSceneIds,
 } from './scenes';
 import { uid } from './ids';
-import { mojibakeReviver } from './mojibake';
+import { repairJsonDocument } from './mojibake';
 
 interface JuceBackend {
   emitEvent(id: string, payload: unknown): void;
@@ -244,6 +244,11 @@ interface StoredRack {
       Which scene is *active* is deliberately not stored here — that's
       workspace state, remembered per rig in the app settings. */
   scenes?: Scene[];
+  /** Stamped on every session document the plugin build writes (see
+      capturePluginSession): its text went through a bridge that carries
+      non-ASCII characters intact, so it is never a candidate for the repair in
+      parseHostSession. */
+  textIntact?: true;
 }
 
 /** A live parameter value keyed by paramIndex (two knobs on one param share it). */
@@ -261,12 +266,9 @@ const slug = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'rig';
 
-/** Every document the page reads from disk comes through here, so this is
-    also where text the unpatched Linux bridge garbled is read back as written
-    (see mojibake.ts). */
 function safeParse<T>(text: string): T | null {
   try {
-    return JSON.parse(text, mojibakeReviver) as T;
+    return JSON.parse(text) as T;
   } catch {
     return null;
   }
@@ -316,6 +318,31 @@ function bootHostKind(): 'standalone' | 'plugin' | undefined {
     .__JUCE__?.initialisationData?.host;
   const kind = Array.isArray(pushed) ? pushed[0] : undefined;
   return kind === 'standalone' || kind === 'plugin' ? kind : undefined;
+}
+
+/** Whether this page's bridge is the one that garbled non-ASCII text before it
+    was fixed (issue #48, mojibake.ts) — the Linux one, by the platform the
+    engine baked in beside the host kind. Asked before the first document is
+    read, which is before any appInfo push. The repair is a heuristic, and on
+    every other platform its only possible effect is to change text that was
+    never damaged, so nothing there runs it. False on an engine older than the
+    field. */
+function bridgeGarbledText(): boolean {
+  const pushed = (
+    window as unknown as { __JUCE__?: { initialisationData?: { platform?: unknown[] } } }
+  ).__JUCE__?.initialisationData?.platform;
+  return Array.isArray(pushed) && pushed[0] === 'linux';
+}
+
+/** A session document off a DAW project. Those cannot be repaired in one pass
+    the way the data root is (repairStoredText): each lives in a project file
+    that may not be opened for years. So one is repaired as it is read, on
+    Linux, unless it carries the stamp saying an intact bridge wrote it — and
+    the session the page saves next carries the stamp. */
+function parseHostSession(text: string): unknown {
+  const parsed = safeParse<{ textIntact?: unknown } | null>(text);
+  if (!bridgeGarbledText() || parsed === null || parsed.textIntact === true) return parsed;
+  return safeParse<unknown>(repairJsonDocument(text) ?? text);
 }
 
 /** The capabilities the engine baked in beside the host kind, for the same
@@ -808,11 +835,24 @@ export class JuceEngine implements EngineBridge {
     // Load small metadata files and restore the working session. Large session
     // reads are compressed and chunked by the native bridge. Session restore
     // waits for the settings (they hold the remembered per-rig scene).
-    void this.refreshPatches();
+    const loadStored = (): Promise<void> => {
+      void this.refreshPatches();
+      void this.refreshRigs();
+      void this.refreshLooperSessions();
+      return this.refreshAppSettings();
+    };
     void this.refreshShippedPatches();
-    void this.refreshRigs();
-    void this.refreshLooperSessions();
-    this.appSettingsLoaded = this.refreshAppSettings();
+    if (bridgeGarbledText()) {
+      // Everything that reads or rewrites a stored document waits for the
+      // repair: text read before it would be held damaged in memory and laid
+      // back over the repaired file by the next save.
+      const repaired = this.repairStoredText();
+      this.appSettingsChain = repaired;
+      this.rigIndexChain = repaired;
+      this.appSettingsLoaded = repaired.then(loadStored);
+    } else {
+      this.appSettingsLoaded = loadStored();
+    }
     void this.restorePreviousSession();
   }
 
@@ -3586,6 +3626,52 @@ export class JuceEngine implements EngineBridge {
     this.emitStatus();
   }
 
+  /** The one-time repair of the text the Linux bridge garbled before it was
+      fixed (issue #48, mojibake.ts): every document the page keeps under the
+      data root is read, and rewritten if a string or a key in it carries the
+      damage.
+
+      Once, and on Linux only, because the repair is a heuristic: text that was
+      never damaged can pass for a layer of it. So it runs before this page
+      reads anything (see the constructor), rewrites the files themselves, and
+      records that it has in `AppSettings.storedTextRepaired`. A pass cut short
+      — a reply that never came, a write that was refused — records nothing and
+      is run again by the next launch.
+
+      So is one that found no settings.json: writing one for the flag alone
+      would make a new installation read as one that has been through first run
+      (see normalizeAppSettings). Never rejects. */
+  private async repairStoredText(): Promise<void> {
+    // request() rather than readFile(): a missing file is skipped, a reply that
+    // never comes ends the pass.
+    const read = async (path: string): Promise<string | null> => {
+      const reply = await this.request('readFile', { path });
+      return reply.ok ? ((reply.text as string) ?? '') : null;
+    };
+    try {
+      const settings = await read(SETTINGS_FILE);
+      const stored = safeParse<{ storedTextRepaired?: unknown } | null>(settings ?? '');
+      if (stored?.storedTextRepaired === true) return;
+
+      // The looper's index alone: everything else in its folder is a recording.
+      const paths = [SETTINGS_FILE, WORKING_FILE, LOOPER_SESSION_INDEX];
+      for (const dir of [RIG_DIR, PATCH_DIR]) {
+        const { names } = await this.request('listFiles', { dir });
+        if (Array.isArray(names)) paths.push(...names.map((name) => `${dir}/${String(name)}`));
+      }
+      // One at a time, so each read has the whole reply deadline to itself — a
+      // rig is megabytes of plugin state.
+      for (const path of paths) {
+        const text = await read(path);
+        const repaired = text === null ? null : repairJsonDocument(text);
+        if (repaired !== null && !(await this.writeFile(path, repaired))) return;
+      }
+      if (settings !== null) this.persistAppSettings({ storedTextRepaired: true });
+    } catch (error: unknown) {
+      console.error('Failed to repair the stored text; it will be tried again', error);
+    }
+  }
+
   private async refreshAppSettings(): Promise<void> {
     const revision = this.appSettingsRevision;
     const { ok, text } = await this.readFile(SETTINGS_FILE);
@@ -3687,7 +3773,7 @@ export class JuceEngine implements EngineBridge {
     try {
       const stored = await this.request('readSession', {});
       if (stored.ok) {
-        const parsed = safeParse<unknown>((stored.text as string) ?? '');
+        const parsed = parseHostSession((stored.text as string) ?? '');
         if (isStoredRack(parsed)) this.adoptStoredMetadata(parsed);
       }
     } catch (error: unknown) {
@@ -3702,7 +3788,7 @@ export class JuceEngine implements EngineBridge {
   private async finishSessionAdoption(): Promise<void> {
     try {
       const stored = await this.request('readSession', {});
-      const parsed = stored.ok ? safeParse<unknown>((stored.text as string) ?? '') : null;
+      const parsed = stored.ok ? parseHostSession((stored.text as string) ?? '') : null;
       if (isStoredRack(parsed)) this.adoptStoredMetadata(parsed);
     } catch (error: unknown) {
       console.error('Failed to adopt the reloaded session', error);
@@ -3918,6 +4004,7 @@ export class JuceEngine implements EngineBridge {
       }),
       routing: structuredClone(this.routing),
       scenes: structuredClone(this.scenes),
+      textIntact: true,
     };
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mojibakeReviver, repairMojibake } from './mojibake';
+import { mojibakeReviver, repairJsonDocument, repairMojibake } from './mojibake';
 
 /** What one crossing of the unpatched Linux pipe did to a string. */
 function damage(text: string): string {
@@ -40,9 +40,46 @@ describe('repairMojibake', () => {
       '½ gain ±3 dB · 90°',
       'Ακουστική',
       '🎸',
+      // Nothing but an unfinished sequence: how these words are spelled.
+      'IRMÃ',
+      'Città',
+      'Café olé',
+      // A sequence by its bytes, in a string that is not one throughout.
+      '« ARRIVÉ\u00a0»',
     ]) {
       expect(repairMojibake(text)).toBe(text);
     }
+  });
+
+  it('repairs a note the page clamped mid-sequence', () => {
+    // songs.ts cuts notes to 240 characters on every load, which lands inside
+    // the expansion of the "é" once enough layers have piled up.
+    const clamped = damageTimes('Señor Café solo, capo 2', 7).slice(0, 240);
+    const repaired = repairMojibake(clamped);
+    expect(repaired.startsWith('Señor Caf')).toBe(true);
+    expect(repaired.length).toBeLessThanOrEqual('Señor Café'.length);
+    expect(repaired).not.toMatch(/[\u0080-\u009f]/);
+  });
+
+  it('leaves at most one stray character wherever a clamp falls', () => {
+    const name = 'Niño ®';
+    const damaged = damageTimes(name, 4);
+    for (let length = 1; length < damaged.length; length++) {
+      const repaired = repairMojibake(damaged.slice(0, length));
+      expect(repaired).not.toMatch(/[\u0080-\u009f]/);
+      expect(name.startsWith(repaired.slice(0, -1))).toBe(true);
+    }
+  });
+
+  it('gives back the "à" a trim took the last byte of', () => {
+    // U+00A0 is whitespace to trim() and the second byte of "à".
+    for (const name of ['Città', 'Più città', 'déjà']) {
+      for (let layers = 2; layers <= 6; layers++) {
+        expect(repairMojibake(damageTimes(name, layers).trim())).toBe(name);
+      }
+    }
+    expect(repairMojibake(damage('Più città').trim())).toBe('Più città');
+    expect(repairMojibake(damageTimes(damageTimes('Città', 2).trim(), 3))).toBe('Città');
   });
 });
 
@@ -60,5 +97,43 @@ describe('mojibakeReviver', () => {
       knobs: [{ label: 'Gain °' }],
       bypassed: false,
     });
+  });
+
+  it('repairs object keys, which the drawer order takes from patch categories', () => {
+    const stored = {
+      drawerPatchOrder: { [`patches:${damageTimes('Verstärker', 2)}`]: ['a', 'b'] },
+    };
+    expect(JSON.parse(JSON.stringify(stored), mojibakeReviver)).toEqual({
+      drawerPatchOrder: { 'patches:Verstärker': ['a', 'b'] },
+    });
+  });
+
+  it('folds a damaged twin into the key it repairs to', () => {
+    const twins = { [damage('Verstärker')]: 'old', Verstärker: 'new', __proto__x: 1 };
+    expect(JSON.parse(JSON.stringify(twins), mojibakeReviver)).toEqual({
+      Verstärker: 'new',
+      __proto__x: 1,
+    });
+  });
+});
+
+describe('repairJsonDocument', () => {
+  it('rewrites a document that carries damage', () => {
+    const text = JSON.stringify({ name: damageTimes('5150III®', 3), state: 'QUJD' });
+    expect(JSON.parse(repairJsonDocument(text)!)).toEqual({ name: '5150III®', state: 'QUJD' });
+  });
+
+  it('answers null for a document with nothing to repair', () => {
+    for (const doc of [
+      { name: 'Plain', state: 'QUJD' },
+      { name: 'Café crème ®' },
+      { name: 'ギター' },
+    ]) {
+      expect(repairJsonDocument(JSON.stringify(doc))).toBeNull();
+    }
+  });
+
+  it('answers null for text that is not JSON', () => {
+    expect(repairJsonDocument('RIFFÃ©')).toBeNull();
   });
 });

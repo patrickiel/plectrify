@@ -80,6 +80,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   catalogueHintDismissed: false,
   starterInstallAttempted: false,
   setupCompleted: false,
+  storedTextRepaired: false,
   activeRigId: '',
   lastSceneByRig: {},
   theme: 'dark',
@@ -352,6 +353,9 @@ export function normalizeAppSettings(value: unknown): AppSettings {
     // existing user through "plug your guitar in" is not a welcome, it is an
     // interruption. Only a machine with no settings.json is new.
     setupCompleted: bool(candidate?.setupCompleted, isSettingsObject(value)),
+    // The opposite reading from the two above: a settings object without the
+    // field is exactly the one that predates the repair, so it is still owed.
+    storedTextRepaired: candidate?.storedTextRepaired === true,
     activeRigId: typeof candidate?.activeRigId === 'string' ? candidate.activeRigId : '',
     lastSceneByRig: sceneMap(candidate?.lastSceneByRig),
     theme: themeName(candidate?.theme),

@@ -48,6 +48,14 @@ describe('normalizeAppSettings', () => {
     expect(DEFAULT_APP_SETTINGS.setupCompleted).toBe(false);
   });
 
+  it('reads a settings object without the text-repair flag as still owed one', () => {
+    // The opposite of the two above: the file that lacks the field is the one
+    // an older build wrote, which is the one that may carry the damage.
+    expect(normalizeAppSettings({}).storedTextRepaired).toBe(false);
+    expect(normalizeAppSettings({ storedTextRepaired: 'yes' }).storedTextRepaired).toBe(false);
+    expect(normalizeAppSettings({ storedTextRepaired: true }).storedTextRepaired).toBe(true);
+  });
+
   it('clamps zoom into the supported range', () => {
     expect(normalizeAppSettings({ rackZoom: 0.01 }).rackZoom).toBe(MIN_RACK_ZOOM);
     expect(normalizeAppSettings({ rackZoom: 99 }).rackZoom).toBe(MAX_RACK_ZOOM);

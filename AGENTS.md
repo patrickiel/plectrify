@@ -913,9 +913,20 @@ records the substitution it made.
     and text the page saved and read again grew a layer each time — a
     TONE3000 tone named "5150III®" ended up as a screen of `ÃÂ` (issue #48).
     Both ends now read UTF-8. What was already written stays damaged on disk,
-    so the page peels those layers off every document it reads
-    (`ui/src/lib/engine/mojibake.ts`, applied in `JuceEngine`'s `safeParse`);
-    the repaired text is written back with the document's next save.
+    so the page repairs it — **once, and on Linux only**, because the repair
+    (`ui/src/lib/engine/mojibake.ts`) is a heuristic: text that was never
+    damaged can pass for a layer of it ("É" before a no-break space is a
+    well-formed sequence), so it must not run on every read for the life of
+    the app, nor at all where nothing was garbled. `JuceEngine`'s
+    `repairStoredText` goes through every document the page keeps under the
+    data root before the page reads any of them, rewrites the ones carrying
+    the damage, and records it in `AppSettings.storedTextRepaired`; the flag
+    is in settings.json so that a backup carries its own answer. The platform
+    is baked into the web view's initialisation data beside `host`, since the
+    decision precedes any `appInfo` push. A DAW project's session document
+    cannot be reached by a pass, so the plugin's page repairs one as it reads
+    it (`parseHostSession`) unless it carries the `textIntact` stamp every
+    session written since carries.
 
   After changing the JUCE tag, regenerate them all against the new sources and
   delete `build*/_deps/juce-*` so FetchContent re-populates. Editing a
