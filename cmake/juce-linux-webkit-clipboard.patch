@@ -1,0 +1,37 @@
+Let the app's own page write the clipboard in the Linux web view.
+
+WebKit rejects navigator.clipboard.writeText and execCommand("copy") with
+NotAllowedError unless the document has transient user activation. A click
+delivered to the view inside JUCE's XEmbed window never grants it: the handler
+runs with navigator.userActivation.isActive false, on a secure context with
+focus, so every Copy button in the UI reported "Copy failed". A stock
+WebKitGTK window on the same juce:// scheme copies fine from a click.
+
+webkit_settings_set_javascript_can_access_clipboard is WebKit's own bypass of
+that check (JUCE already binds the symbol but never calls it). It is set only
+when native integrations are enabled, i.e. for a page the app serves itself; a
+browser showing a third-party site keeps JUCE's default, which also keeps that
+site from reading the clipboard.
+
+--- a/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
++++ b/modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp
+@@ -932,6 +932,19 @@
+         wk.juce_webkit_settings_set_enable_developer_extras (settings, true);
+        #endif
+ 
++        // PLECTRIFY_WEBKIT_CLIPBOARD: let the app's own page write the
++        // clipboard. WebKit rejects navigator.clipboard.writeText (and
++        // execCommand("copy")) with NotAllowedError unless the document has
++        // transient user activation, and a click delivered to this view inside
++        // JUCE's XEmbed window never grants it: navigator.userActivation stays
++        // inactive in the click handler itself. So every Copy button failed.
++        // This setting is WebKit's own bypass of that check. Only for a view
++        // with native integrations, i.e. a page the app serves itself: a
++        // browser showing a third-party site keeps JUCE's default, which also
++        // keeps that site from reading the clipboard.
++        if (initialisationData->nativeIntegrationsEnabled)
++            wk.juce_webkit_settings_set_javascript_can_access_clipboard (settings, true);
++
+         auto* webviewWidget = WebKitSymbols::getInstance()->juce_webkit_web_view_new_with_settings (settings);
+         webview = (WebKitWebView*) webviewWidget;
+ 

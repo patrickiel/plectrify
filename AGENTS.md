@@ -567,12 +567,13 @@ changing the tooling itself. Two rules hold wherever the catalogue is touched:
   the entry before touching a patch and write one with every patch added. What
   is there, by area:
   - **Web view** — `juce-disable-webview2-zoom` (Windows),
-    `juce-no-double-escape-url` (macOS), and five for WebKitGTK:
+    `juce-no-double-escape-url` (macOS), and six for WebKitGTK:
     `juce-linux-webkit-gpu` and `-render-device` (a pair; GPU compositing, with
     `PLECTRIFY_WEBKIT_SOFTWARE_RENDERING=1` as the way back),
-    `-persistent-cookies`, `-versioned-sonames` (issue #12) and `-utf8-ipc`
+    `-persistent-cookies`, `-versioned-sonames` (issue #12), `-utf8-ipc`
     (issue #48, whose entry also covers the page's one-time stored-text repair,
-    `mojibake.ts`).
+    `mojibake.ts`) and `-clipboard` (issue #55; the app's own page may write
+    the clipboard, since a click into the embedded view grants no activation).
   - **Hosted plugins** — `juce-vst3-no-mac-content-scale`,
     `juce-vst3-scale-before-attach` and `juce-graph-host-owned-bypass` (a
     host-requested bypass is enforced by the graph, pinned by
