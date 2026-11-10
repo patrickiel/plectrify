@@ -64,6 +64,14 @@
      * menu once it has done its work.
      */
     footer?: Snippet<[() => void]>;
+    /**
+     * Which end of a label gives way when it does not fit. `end` is the usual
+     * trailing ellipsis. `start` drops the beginning instead, for lists whose
+     * entries share a prefix and differ at the end — a tone's captures are
+     * "EVH 5150III® 100S … (mid gain)" and "… (high gain)", and a trailing
+     * ellipsis cut off the only part that told them apart.
+     */
+    truncate?: 'end' | 'start';
     'aria-label'?: string;
   }
 
@@ -81,6 +89,7 @@
     filterable = true,
     filterPlaceholder = 'Filter…',
     footer,
+    truncate = 'end',
     'aria-label': ariaLabel,
   }: Props = $props();
 
@@ -183,6 +192,19 @@
   };
 </script>
 
+<!-- A start-truncated label is the rtl-ellipsis trick: the box runs right to
+     left, so it overflows — and draws its ellipsis — on the left, while the
+     `<bdi>` keeps the text itself laid out left to right, so a trailing
+     "(mid gain)" keeps its parentheses where they belong. `text-left` puts a
+     label that does fit back where every other one sits. -->
+{#snippet label(text: string)}
+  {#if truncate === 'start'}
+    <span class="block truncate text-left [direction:rtl]"><bdi>{text}</bdi></span>
+  {:else}
+    <span class="truncate">{text}</span>
+  {/if}
+{/snippet}
+
 <Popover
   bind:open={() => open, setOpen}
   maxHeight={MENU_MAX_HEIGHT}
@@ -206,7 +228,7 @@
         {disabled}
         aria-label={ariaLabel}
       >
-        <span class="truncate">{selectedLabel || placeholder}</span>
+        {@render label(selectedLabel || placeholder)}
         <CaretDownIcon size={14} class="shrink-0" />
       </button>
     {/if}
@@ -244,7 +266,7 @@
           onmouseenter={() => (highlight = i)}
           onclick={() => choose(o.value)}
         >
-          {o.label}
+          {#if truncate === 'start'}{@render label(o.label)}{:else}{o.label}{/if}
         </button>
       </li>
     {:else}

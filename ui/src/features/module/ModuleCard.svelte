@@ -841,7 +841,10 @@
         </div>
       </div>
 
-      {#if module.params.length > 0 || expanded}
+      <!-- A TONE3000 module keeps its body with no knobs at all: the
+           photograph and the capture selector are what the module *is*, not
+           decoration on its controls (#6). -->
+      {#if module.params.length > 0 || expanded || artwork || variants.length > 1}
         <div class="module-body flex flex-1 items-start gap-3 px-3 py-3">
           {#if artwork}
             <!-- The tone's own photograph, on the card rather than in the hover
@@ -888,7 +891,16 @@
               </span>
             {/if}
           {/if}
-          <div class="flex min-w-0 flex-1 flex-col" {@attach measureControls}>
+          <!-- `min-w-52` when there is a capture selector: the row below takes
+               the knob grid's width, and a grid of one column (4rem) left the
+               trigger a sliver beside its two arrows — no name at all (#6). 13rem
+               is the three-column grid of the template's six knobs, so a sparse
+               card is exactly as wide as an ordinary TONE3000 one and the grid
+               centres inside it. -->
+          <div
+            class={['flex flex-1 flex-col', variants.length > 1 ? 'min-w-52' : 'min-w-0']}
+            {@attach measureControls}
+          >
             {#if variants.length > 1}
               <!-- A tone is usually several captures of one amp — two channels at
                  three gain settings, say — and choosing between them is playing,
@@ -899,7 +911,9 @@
               <!-- `w-0 min-w-full`: the row takes the width the knob grid decided
                  and never asks for more. A capture name is long — that is what
                  they are like — and a card sized to one would not line up with
-                 anything else in the rack; the trigger truncates instead. -->
+                 anything else in the rack; the trigger truncates instead — from the
+                 start, since captures of one tone share their opening words and
+                 differ in the last ones ("… (mid gain)", "… (high gain)"). -->
               <!-- No visible label: the selector sits alone above the knobs on a
                  card that is already a TONE3000 tone, and the names in it read
                  as captures on sight. The name it needs is on the control
@@ -924,6 +938,7 @@
                   value={String(module.tone3000?.modelId ?? '')}
                   onSelect={(v) => onSelectTone3000Model?.(Number(v))}
                   disabled={!editing}
+                  truncate="start"
                   aria-label="Capture"
                 />
                 {#if editing}
