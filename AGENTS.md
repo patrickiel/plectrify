@@ -1762,7 +1762,7 @@ An installed patch is an ordinary `kind: "content"` package with
 plugin opens — patches are Plectrify's own format, so the app has to read them:
 
 - **A read-only second root.** `readFile`/`listFiles` take an optional
-  `root: "shared"` resolved by `MainComponent::resolveSharedFile` against
+  `root: "shared"` resolved by `PlectrifyEngine::resolveSharedFile` against
   `%PROGRAMDATA%/Plectrify/patches` alone. `writeFile` and `deleteFile` have no
   `root` parameter at all, so the page still cannot write outside `%APPDATA%`;
   scoping to `patches/` rather than the package root also keeps a read-only
@@ -1859,12 +1859,13 @@ loop `PLECTRIFY_CATALOGUE_FILE` gives the catalogue: edit
 `packaging/content/<id>.<platform>/patch.json`, restart, and the pack is what
 the repo says it is — no `host`, no publish, no install. The override is keyed by the
 folder a patch occupies in `patches/` and applies file by file
-(`MainComponent::sharedPatchSources`), so it reads both shapes `host` ships —
+(`PlectrifyEngine::sharedPatchSources`), so it reads both shapes `host` ships —
 the wrapped single patch and a pack of several, whose subfolders install under
 their own names. It **shadows installed packs and never adds one**: the drawer
 lists only what is installed, since a pack without its package has no plugin to
-load (issue #43), so a new pack is installed once before it is edited here.
-Only this platform's folder is read; the OS-neutral `content/<id>/` shape
+load (issue #43). So a new pack, or a new patch in an installed pack, shows up
+here after one `host` and one install from the Packages panel — no publish,
+since a Debug build reads the repo's catalogue. Only this platform's folder is read; the OS-neutral `content/<id>/` shape
 counts only if it holds a `patch.json`.
 
 **And a Debug build can write those sources back.** A pack patch loaded on a
