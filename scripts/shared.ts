@@ -218,6 +218,11 @@ export const JUCE_PATCHES = [
     file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
     marker: 'PLECTRIFY_WEBKIT_UTF8_IPC',
   },
+  {
+    patch: 'cmake/juce-linux-webkit-clipboard.patch',
+    file: 'modules/juce_gui_extra/native/juce_WebBrowserComponent_linux.cpp',
+    marker: 'PLECTRIFY_WEBKIT_CLIPBOARD',
+  },
 ] as const;
 
 /** The commit CMakeLists.txt pins a FetchContent dependency to, read out of

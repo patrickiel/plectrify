@@ -206,3 +206,18 @@ the entry before touching a patch, and write one with every patch added.
   cannot be reached by a pass, so the plugin's page repairs one as it reads
   it (`parseHostSession`) unless it carries the `textIntact` stamp every
   session written since carries.
+- `juce-linux-webkit-clipboard.patch` — every Copy button on Linux said
+  "Copy failed" (issue #55): WebKit refuses `navigator.clipboard.writeText`
+  and `execCommand("copy")` with `NotAllowedError` unless the document has
+  transient user activation, and a click delivered to the view inside JUCE's
+  XEmbed window never grants it — instrumented in the app, the Copy handler
+  ran with `navigator.userActivation.isActive` false on a secure, focused
+  page. A stock WebKitGTK 2.52 window serving the same `juce://` scheme
+  copies fine from a click, so the cause is the embedding, not the scheme.
+  The patch turns on `javascript-can-access-clipboard`, WebKit's own bypass
+  of that check (JUCE binds the symbol and never calls it), and only for a
+  view with native integrations — the page the app serves itself. The
+  TONE3000 window shows a third-party site and keeps the default, which is
+  also what keeps that site from reading the clipboard. A JUCE bump should
+  check whether clicks into the plug grant activation by now; if they do,
+  the patch can go.
