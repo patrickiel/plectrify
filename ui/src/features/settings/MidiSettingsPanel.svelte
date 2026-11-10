@@ -11,6 +11,7 @@
     triggerOf,
   } from '../../lib/engine/midi';
   import Button from '../../lib/components/Button.svelte';
+  import { tooltip } from '../../lib/components/tooltip.svelte';
   import { RIG_SHORTCUT_KEYS, SCENE_SHORTCUT_KEYS } from '../rack/shortcutKeys';
 
   interface Props {
@@ -359,15 +360,20 @@
         aria-labelledby="midi-inputs-label"
       >
         {#if devices.length > 0}
+          <!-- A pill never outgrows the list (min-w-0 max-w-full) and ellipsizes
+               its name instead: whitespace-nowrap alone let a long name such
+               as Linux's "Midi Through Port-0" spill out under Refresh in a
+               narrow sidebar (issue #28). The tooltip carries the full name. -->
           {#each devices as device (device)}
             <span
-              class="inline-flex items-center gap-[.35rem] rounded-full border border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-[.55rem] py-[.1rem] text-[.7rem] whitespace-nowrap text-[color-mix(in_srgb,var(--color-ink)_85%,transparent)]"
+              class="inline-flex max-w-full min-w-0 items-center gap-[.35rem] rounded-full border border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-[.55rem] py-[.1rem] text-[.7rem] whitespace-nowrap text-[color-mix(in_srgb,var(--color-ink)_85%,transparent)]"
+              {@attach tooltip(device)}
             >
               <span
-                class="size-1.5 rounded-full bg-accent shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
+                class="size-1.5 shrink-0 rounded-full bg-accent shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
                 aria-hidden="true"
               ></span>
-              {device}
+              <span class="truncate">{device}</span>
             </span>
           {/each}
         {:else}
