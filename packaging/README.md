@@ -117,6 +117,8 @@ pinned to last week's. Add `--dry-run` to see what it would do, or
 
 Adding a new patch is a new folder plus a catalogue entry, and a first release
 keeps the version you wrote (`sha256` of all zeroes means "never published").
+A Debug build's drawer lists only installed packs, so run `host` and install
+the package once from the Packages panel before iterating on it there.
 
 Give the entry a **`dependsOn`** naming the plugin the patch was built for —
 one package id, not a list. Installing the patch then installs that plugin

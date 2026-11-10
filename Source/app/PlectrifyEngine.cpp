@@ -2824,15 +2824,6 @@ juce::File PlectrifyEngine::sharedPatchSourceDir (const juce::String& patchId)
     return found != sources.end() ? found->second : juce::File();
 }
 
-juce::StringArray PlectrifyEngine::sharedPatchSourceIds()
-{
-    juce::StringArray ids;
-    for (const auto& [id, dir] : sharedPatchSources())
-        ids.add (id);
-
-    return ids;
-}
-
 bool PlectrifyEngine::resolveSharedSourceFile (const juce::String& rel, juce::File& out)
 {
     const auto relative = rel.replaceCharacter ('\\', '/');
@@ -3039,23 +3030,17 @@ void PlectrifyEngine::handleListFiles (const juce::var& payload)
     }
 
    #if defined(PLECTRIFY_CONTENT_SOURCE_DIR)
-    // Debug-only: a pack the repo carries is listed whether it is installed or
-    // not, so a new one shows up in the drawer without a publish. Outside that
-    // block (the installed root may not exist at all on a dev machine) and
-    // deduplicated against it, since an installed pack is already named.
+    // Debug-only: which listed packs the repo carries sources for, so the
+    // page can offer to write one back. Only installed packs are listed — the
+    // sources shadow a pack's files (resolveSharedFile), they never add one.
     juce::Array<juce::var> writable;
     if (payload["root"].toString() == "shared" && payload["dir"].toString().isEmpty())
-        for (const auto& id : sharedPatchSourceIds())
-        {
-            if (! dirs.contains (juce::var (id)))
-                dirs.add (id);
-
-            // Reported so the page can offer to write one back. Named rather
-            // than implied by a build flag: a pack the repo does not carry is
-            // read-only even here, so "which are editable" is a fact about
-            // this machine's source tree and only this side knows it.
-            writable.add (id);
-        }
+    {
+        const auto sources = sharedPatchSources();
+        for (const auto& id : dirs)
+            if (sources.count (id.toString()) > 0)
+                writable.add (id);
+    }
    #endif
 
     auto* r = new juce::DynamicObject();

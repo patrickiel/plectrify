@@ -43,6 +43,7 @@
   } from '../../lib/engine/catalogue';
   import Button from '../../lib/components/Button.svelte';
   import Card from '../../lib/components/Card.svelte';
+  import InlineConfirmRow from '../../lib/components/InlineConfirmRow.svelte';
   import IconButton from '../../lib/components/IconButton.svelte';
   import Popover from '../../lib/components/Popover.svelte';
   import RowButton from '../../lib/components/RowButton.svelte';
@@ -341,6 +342,16 @@
     confirmingRemoveId = null;
     openMenuId = null;
     engine.uninstallPackages([id]);
+  }
+
+  /** Whether "Uninstall all" is waiting on its confirm. */
+  let confirmingRemoveAll = $state(false);
+
+  function removeAll(): void {
+    confirmingRemoveAll = false;
+    engine.uninstallPackages(
+      catalogue.items.filter((item) => item.installed).map((item) => item.id),
+    );
   }
 
   /** The bundle button's one line: the verb, then what it costs. Three cases —
@@ -1132,6 +1143,31 @@
       {@render linkSection(group, 0)}
     </Card>
   {/each}
+
+  <!-- Expert only: emptying the machine in one go is a clean-slate errand, not
+       something Simple's list of offers needs. -->
+  {#if expert && installedCount > 0}
+    {#if confirmingRemoveAll}
+      <InlineConfirmRow
+        message={`Uninstall all ${installedCount} packages?`}
+        confirmLabel="Uninstall all"
+        onConfirm={removeAll}
+        onCancel={() => (confirmingRemoveAll = false)}
+      />
+    {:else}
+      <Button
+        variant="ghost"
+        size="sm"
+        tone="warn"
+        class="self-start"
+        disabled={catalogue.busy}
+        onclick={() => (confirmingRemoveAll = true)}
+      >
+        <TrashIcon size={13} aria-hidden="true" />
+        Uninstall all
+      </Button>
+    {/if}
+  {/if}
 
   <!-- Licence disclosure comes from the catalogue, not from a file in the
        installer: change the offered plugins and their notices change with them,
