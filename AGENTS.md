@@ -1861,10 +1861,15 @@ the repo says it is — no `host`, no publish, no install. The override is keyed
 folder a patch occupies in `patches/` and applies file by file
 (`MainComponent::sharedPatchSources`), so it reads both shapes `host` ships —
 the wrapped single patch and a pack of several, whose subfolders install under
-their own names. A pack the repo carries is listed whether it is installed or
-not, so a brand-new one shows up in the drawer. Only this platform's folder is
-read; the OS-neutral `content/<id>/` shape counts only if it holds a
-`patch.json`.
+their own names. It **shadows packs, it does not add them**: the drawer lists
+only what is installed, because a pack listed without its package offers a tile
+whose plugin and assets are not on this machine — which is what a fresh Debug
+checkout used to show, the repo's whole collection with nothing installed
+(issue #43). Authoring a brand-new pack before its first publish is the one
+case that wants it listed anyway, so that is an explicit opt-in:
+`PLECTRIFY_LIST_UNINSTALLED_PACKS=1` in the launch environment
+(`listUninstalledPackSources`). Only this platform's folder is read; the
+OS-neutral `content/<id>/` shape counts only if it holds a `patch.json`.
 
 **And a Debug build can write those sources back.** A pack patch loaded on a
 module offers *Update pack source "…"* in the patch menu wherever the repo has
