@@ -43,6 +43,28 @@ describe('buildBugReportUrl', () => {
     expect(url.length).toBe(MAX_ISSUE_URL_LENGTH);
   });
 
+  it('takes the fullest version of the report that fits', () => {
+    const tooLong = 'x'.repeat(MAX_ISSUE_URL_LENGTH);
+    const { url, abridged, overflowed } = buildBugReportUrl([tooLong, 'shorter', 'short']);
+
+    expect(new URL(url).searchParams.get('diagnostics')).toBe('shorter');
+    expect(abridged).toBe(true);
+    expect(overflowed).toBe(false);
+  });
+
+  it('does not call the full report abridged', () => {
+    expect(buildBugReportUrl(['full', 'short']).abridged).toBe(false);
+  });
+
+  it('drops the report only when no version fits', () => {
+    const tooLong = 'x'.repeat(MAX_ISSUE_URL_LENGTH);
+    const { url, abridged, overflowed } = buildBugReportUrl([tooLong, tooLong]);
+
+    expect(overflowed).toBe(true);
+    expect(abridged).toBe(false);
+    expect(new URL(url).searchParams.get('diagnostics')).toBeNull();
+  });
+
   it('carries a realistic report without overflowing', () => {
     // A busy rig is ~1.6 KB raw and ~3.6 KB encoded — well inside the cap. This
     // guards against someone lowering MAX_ISSUE_URL_LENGTH below the real range.

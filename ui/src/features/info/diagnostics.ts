@@ -34,6 +34,12 @@ import type { BrowserFacts } from './browserFacts';
 export interface DiagRow {
   label: string;
   value: string;
+  /** Shorter stand-ins for `value`, one per abridging level and each shorter
+      than the last, for the one place the report has to fit a size limit: the
+      bug form's URL (see `abridgedDiagnostics`). Only the rows that can grow
+      with the size of someone's library carry them — everything else is a
+      handful of words at most and is never worth cutting. */
+  shorter?: string[];
 }
 
 export interface DiagSection {
@@ -364,6 +370,31 @@ function formatPluginLibrary(plugins: PluginInfo[]): string {
     .join(' · ');
 }
 
+/** Said wherever names were dropped, so the report itself admits the cut and
+    nobody reads a vendor count as a library of one plugin per vendor. */
+const NAMES_LEFT_OUT = '(names left out to fit the issue form)';
+
+/** The library without its names: `LSP VST3: 198 · Plectrify: 3 · 2 more`.
+    One count per vendor, largest first, because that is what still identifies
+    the machine — 198 plugins from one vendor is a fact about the bug report;
+    their 198 names, which on Linux is what a plugin bundle like LSP installs,
+    are what pushed the report out of the form. */
+function formatPluginVendors(plugins: PluginInfo[]): string {
+  const byVendor = new Map<string, number>();
+  for (const plugin of plugins) {
+    const vendor = (plugin.manufacturer ?? '').trim();
+    byVendor.set(vendor, (byVendor.get(vendor) ?? 0) + 1);
+  }
+  const unnamed = byVendor.get('') ?? 0;
+  byVendor.delete('');
+
+  const vendors = [...byVendor]
+    .sort(([a, an], [b, bn]) => bn - an || a.localeCompare(b))
+    .map(([vendor, n]) => `${vendor}: ${n}`);
+  if (unnamed > 0) vendors.push(`${unnamed} with no vendor`);
+  return `${vendors.join(' · ')} ${NAMES_LEFT_OUT}`;
+}
+
 /** What the host knows about, and what it will not load. Its own section
     because the list is long enough to bury the rig rows it used to sit among —
     and because "which plugins are installed" is the first question a crash
@@ -373,6 +404,13 @@ function pluginsSection(input: DiagnosticsInput): DiagSection {
   // The list the section prints wins over the engine's count when it has
   // entries, so the number can never contradict the names right below it.
   const skipped = blacklisted.length > 0 ? blacklisted.length : (info.plugins?.blacklisted ?? 0);
+  const skippedNames =
+    blacklisted.length === 0
+      ? 'none'
+      : blacklisted
+          .map((entry) => dash(entry.name))
+          .sort((a, b) => a.localeCompare(b))
+          .join(' · ');
 
   return {
     title: 'Plugins',
@@ -386,18 +424,30 @@ function pluginsSection(input: DiagnosticsInput): DiagSection {
           `scan ${scan.status}`,
         ),
       },
-      { label: 'Installed', value: formatPluginLibrary(plugins) },
+      {
+        label: 'Installed',
+        value: formatPluginLibrary(plugins),
+        // Vendors first, then the bare total: the list is the one row that
+        // grows without bound, and hundreds of names do not fit a URL.
+        shorter:
+          plugins.length === 0
+            ? undefined
+            : [
+                formatPluginVendors(plugins),
+                `${count(plugins.length, 'plugin')} ${NAMES_LEFT_OUT}`,
+              ],
+      },
       {
         label: 'Skipped',
         // File names, not the paths they came from: the path is under the
         // user's account and this report is written for a public issue.
-        value:
+        value: skippedNames,
+        // Kept whole at the first level — a skipped file is a crash suspect
+        // and worth more than the names of the plugins that load fine.
+        shorter:
           blacklisted.length === 0
-            ? 'none'
-            : blacklisted
-                .map((entry) => dash(entry.name))
-                .sort((a, b) => a.localeCompare(b))
-                .join(' · '),
+            ? undefined
+            : [skippedNames, `${count(blacklisted.length, 'file')} ${NAMES_LEFT_OUT}`],
       },
     ],
   };
@@ -506,4 +556,33 @@ export function formatDiagnostics(report: DiagReport): string {
       ].join('\n'),
     )
     .join('\n\n');
+}
+
+/** The report at every level of abridging, the full one first and each after
+    it shorter: level *n* swaps every row's value for its *n*th `shorter`
+    stand-in (or its last one, once it has run out). Stops at the deepest level
+    any row offers, so a report with nothing to shorten is a list of one.
+
+    For the bug form's URL, which takes the first that fits: dropping the plugin
+    names is a much smaller loss than dropping the whole report, which is what a
+    machine with a few hundred plugins used to get (issue #35). */
+export function abridgedDiagnostics(report: DiagReport): DiagReport[] {
+  const depth = Math.max(
+    0,
+    ...report.sections.flatMap((section) => section.rows.map((row) => row.shorter?.length ?? 0)),
+  );
+  const levels: DiagReport[] = [report];
+  for (let level = 1; level <= depth; level += 1) {
+    levels.push({
+      sections: report.sections.map((section) => ({
+        ...section,
+        rows: section.rows.map((row) =>
+          row.shorter && row.shorter.length > 0
+            ? { ...row, value: row.shorter[Math.min(level, row.shorter.length) - 1] }
+            : row,
+        ),
+      })),
+    });
+  }
+  return levels;
 }

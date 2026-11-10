@@ -15,7 +15,7 @@
   import Card from '../../lib/components/Card.svelte';
   import EngineStats from '../status/EngineStats.svelte';
   import { collectBrowserFacts, type BrowserFacts } from './browserFacts';
-  import { formatDiagnostics, type DiagReport } from './diagnostics';
+  import { abridgedDiagnostics, formatDiagnostics, type DiagReport } from './diagnostics';
   import { buildBugReportUrl, buildIdeaUrl } from './issueReport';
   import {
     describeUpdateInstallError,
@@ -107,15 +107,20 @@
   ];
 
   // The bug form's Diagnostics field is required, so on the rare report too long
-  // to ride along in the URL the user has to paste it by hand. Put it on their
-  // clipboard and say so — they are about to leave this panel for the browser,
-  // and telling them afterwards to come back and find Copy is no help.
+  // to ride along in the URL even abridged, the user has to paste it by hand.
+  // Put it on their clipboard and say so — they are about to leave this panel
+  // for the browser, and telling them afterwards to come back and find Copy is
+  // no help.
   let reportNote = $state('');
   let reportNoteTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function reportBug() {
     const diagnostics = formatDiagnostics(report);
-    const { url, overflowed } = buildBugReportUrl(diagnostics);
+    // Fullest version that fits the URL: a large plugin library is cut down to
+    // vendor counts before the report is given up on.
+    const { url, overflowed } = buildBugReportUrl(
+      abridgedDiagnostics(report).map(formatDiagnostics),
+    );
     if (overflowed) {
       clearTimeout(reportNoteTimer);
       try {

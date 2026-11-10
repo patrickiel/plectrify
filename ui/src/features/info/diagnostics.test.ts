@@ -3,7 +3,13 @@ import { DEFAULT_APP_SETTINGS } from '../../lib/engine/appSettings';
 import { DEFAULT_APP_INFO, DEFAULT_STATUS_STATE } from '../../lib/engine/types';
 import type { AppInfo, RackModule, RoutingState, StatusState } from '../../lib/engine/types';
 import type { BrowserFacts } from './browserFacts';
-import { buildDiagnostics, formatDiagnostics, type DiagnosticsInput } from './diagnostics';
+import { buildBugReportUrl } from './issueReport';
+import {
+  abridgedDiagnostics,
+  buildDiagnostics,
+  formatDiagnostics,
+  type DiagnosticsInput,
+} from './diagnostics';
 
 const info: AppInfo = {
   version: '0.1.0',
@@ -378,5 +384,79 @@ describe('formatDiagnostics', () => {
     expect(text.split('\n').filter((line) => line.startsWith('  ')).length).toBe(
       report.sections.reduce((total, section) => total + section.rows.length, 0),
     );
+  });
+});
+
+describe('abridgedDiagnostics', () => {
+  /** A library shaped like a Linux machine with the LSP bundle installed: one
+      vendor, a couple of hundred long names. */
+  const bigLibrary = [
+    ...Array.from({ length: 198 }, (_, index) => ({
+      id: `lsp${index}`,
+      name: `LSP Parametric Equalizer x${index} Mid-Side`,
+      manufacturer: 'LSP VST3',
+    })),
+    { id: 'n1', name: 'NeuralAmpModeler', manufacturer: 'Plectrify' },
+    { id: 'n2', name: 'PlectrifyNam', manufacturer: 'Plectrify' },
+    { id: 'n3', name: 'Nameless Verb' },
+  ];
+
+  const levelRow = (level: ReturnType<typeof buildDiagnostics>, label: string) =>
+    row(level, 'Plugins', label);
+
+  it('cuts the plugin names to vendor counts first, then to a total', () => {
+    const levels = abridgedDiagnostics(buildDiagnostics(input({ plugins: bigLibrary })));
+
+    expect(levels).toHaveLength(3);
+    expect(levelRow(levels[0], 'Installed')).toContain('LSP Parametric Equalizer x0 Mid-Side');
+    // Largest vendor first; the vendorless plugin is counted, not named.
+    expect(levelRow(levels[1], 'Installed')).toBe(
+      'LSP VST3: 198 · Plectrify: 2 · 1 with no vendor (names left out to fit the issue form)',
+    );
+    expect(levelRow(levels[2], 'Installed')).toBe(
+      '201 plugins (names left out to fit the issue form)',
+    );
+  });
+
+  it('keeps the skipped files named until the last level', () => {
+    const levels = abridgedDiagnostics(buildDiagnostics(input({ plugins: bigLibrary })));
+
+    expect(levelRow(levels[1], 'Skipped')).toBe('Crasher');
+    expect(levelRow(levels[2], 'Skipped')).toBe('1 file (names left out to fit the issue form)');
+  });
+
+  it('leaves every other row alone', () => {
+    const [full, ...shorter] = abridgedDiagnostics(
+      buildDiagnostics(input({ plugins: bigLibrary })),
+    );
+    const others = (level: typeof full) =>
+      level.sections.flatMap((section) =>
+        section.rows
+          .filter((r) => r.label !== 'Installed' && r.label !== 'Skipped')
+          .map((r) => r.value),
+      );
+    for (const level of shorter) expect(others(level)).toEqual(others(full));
+  });
+
+  it('has nothing to cut when no plugins are installed or skipped', () => {
+    expect(
+      abridgedDiagnostics(buildDiagnostics(input({ plugins: [], blacklisted: [] }))),
+    ).toHaveLength(1);
+  });
+
+  it('gets a large library into the bug form instead of dropping the report (#35)', () => {
+    const report = buildDiagnostics(input({ plugins: bigLibrary }));
+    // The full report alone is too long for the URL — the case that used to
+    // open the form with the Diagnostics field empty.
+    expect(buildBugReportUrl(formatDiagnostics(report)).overflowed).toBe(true);
+
+    const { url, abridged, overflowed } = buildBugReportUrl(
+      abridgedDiagnostics(report).map(formatDiagnostics),
+    );
+    expect(overflowed).toBe(false);
+    expect(abridged).toBe(true);
+    const prefilled = new URL(url).searchParams.get('diagnostics') ?? '';
+    expect(prefilled).toContain('LSP VST3: 198');
+    expect(prefilled).toContain('Ryzen 9 5900X');
   });
 });
