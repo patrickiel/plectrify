@@ -11,7 +11,6 @@
     triggerOf,
   } from '../../lib/engine/midi';
   import Button from '../../lib/components/Button.svelte';
-  import { tooltip } from '../../lib/components/tooltip.svelte';
   import { RIG_SHORTCUT_KEYS, SCENE_SHORTCUT_KEYS } from '../rack/shortcutKeys';
 
   interface Props {
@@ -347,33 +346,44 @@
       MIDI arrives from your DAW's track routing.
     </p>
   {:else}
+    <!-- Header row (label + Refresh) above the list rather than beside it, so
+         the device names get the strip's whole width: squeezed between the
+         two, a name like Linux's "Midi Through Port-0" either ran under
+         Refresh or had to be cut short (issue #28). A name too long even for
+         the full width wraps inside its pill instead of being clipped. -->
     <div
-      class="mt-[.9rem] flex flex-wrap items-center gap-[.6rem] rounded-lg border border-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-ink)_4%,transparent)] py-[.4rem] pr-[.4rem] pl-[.65rem]"
+      class="mt-[.9rem] flex flex-col gap-[.4rem] rounded-lg border border-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-ink)_4%,transparent)] py-[.4rem] pr-[.4rem] pl-[.65rem]"
     >
-      <span
-        class="text-[.625rem] font-semibold tracking-[.14em] whitespace-nowrap text-muted uppercase"
-        id="midi-inputs-label">Inputs</span
-      >
+      <div class="flex items-center justify-between gap-[.6rem]">
+        <span
+          class="text-[.625rem] font-semibold tracking-[.14em] whitespace-nowrap text-muted uppercase"
+          id="midi-inputs-label">Inputs</span
+        >
+        <Button
+          size="sm"
+          onclick={() => engine.refreshMidiDevices()}
+          tip="Re-scan the connected MIDI inputs"
+        >
+          Refresh
+        </Button>
+      </div>
       <div
-        class="flex min-w-0 flex-1 flex-wrap items-center gap-[.35rem]"
+        class="flex min-w-0 flex-wrap items-center gap-[.35rem] pb-[.15rem]"
         role="status"
         aria-labelledby="midi-inputs-label"
       >
         {#if devices.length > 0}
-          <!-- A pill never outgrows the list (min-w-0 max-w-full) and ellipsizes
-               its name instead: whitespace-nowrap alone let a long name such
-               as Linux's "Midi Through Port-0" spill out under Refresh in a
-               narrow sidebar (issue #28). The tooltip carries the full name. -->
           {#each devices as device (device)}
+            <!-- rounded-xl is a full pill at one line's height and stays a
+                 rounded box if the name wraps to two. -->
             <span
-              class="inline-flex max-w-full min-w-0 items-center gap-[.35rem] rounded-full border border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-[.55rem] py-[.1rem] text-[.7rem] whitespace-nowrap text-[color-mix(in_srgb,var(--color-ink)_85%,transparent)]"
-              {@attach tooltip(device)}
+              class="inline-flex max-w-full min-w-0 items-center gap-[.35rem] rounded-xl border border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-[.55rem] py-[.1rem] text-[.7rem] text-[color-mix(in_srgb,var(--color-ink)_85%,transparent)]"
             >
               <span
                 class="size-1.5 shrink-0 rounded-full bg-accent shadow-[0_0_6px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
                 aria-hidden="true"
               ></span>
-              <span class="truncate">{device}</span>
+              <span class="min-w-0 break-words">{device}</span>
             </span>
           {/each}
         {:else}
@@ -382,13 +392,6 @@
           >
         {/if}
       </div>
-      <Button
-        size="sm"
-        onclick={() => engine.refreshMidiDevices()}
-        tip="Re-scan the connected MIDI inputs"
-      >
-        Refresh
-      </Button>
     </div>
   {/if}
 
