@@ -63,8 +63,10 @@
          card keeps one size instead of resizing under the user's eyes. -->
     <h2
       id="task-dialog-title"
-      class="flex min-h-14 items-center justify-center text-lg font-semibold text-balance text-ink"
-      class:mt-5={state === 'complete'}
+      class={[
+        'flex min-h-14 items-center justify-center text-lg font-semibold text-balance text-ink',
+        { 'mt-5': state === 'complete' },
+      ]}
     >
       <span class="line-clamp-2" {title}>{title}</span>
     </h2>

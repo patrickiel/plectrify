@@ -111,6 +111,8 @@
 
   // A hidden learner must hand the active flag back: App uses it to pause live
   // MIDI dispatch while a press is being captured.
+  // Effect: writes back through the binding, and what hides the switch (a host's
+  // view mode, stage mode, an emptied library) is a prop with no handler here.
   $effect(() => {
     if (!showControl && active) active = false;
   });

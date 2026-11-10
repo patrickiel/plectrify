@@ -124,12 +124,13 @@
 
   // Metering is a second tap of the raw device input and costs a scan of every
   // channel per block, so it is armed for exactly as long as something is
-  // showing it — and dropped when the wizard closes, whichever way it closes.
-  $effect(() => {
-    const listening = step === 'input';
-    engine.watchInputLevels(listening);
+  // showing it: attached to the input step's meter list, it is armed when that
+  // list mounts and dropped when it goes — on leaving the step, or when the
+  // wizard closes, whichever way it closes.
+  function armMetering() {
+    engine.watchInputLevels(true);
     return () => engine.watchInputLevels(false);
-  });
+  }
 
   function onInputLevels(peaks: number[]) {
     maxima = accumulatePeaks(maxima, peaks);
@@ -306,7 +307,7 @@
           Play a few notes. The meter that moves is your jack.
         </p>
 
-        <div class="mt-4 flex flex-col gap-[.3rem]">
+        <div class="mt-4 flex flex-col gap-[.3rem]" {@attach armMetering}>
           {#each devices.inputChannels as name, channel (channel)}
             {@const level = meterFill(maxima[channel] ?? 0)}
             <button

@@ -33,10 +33,10 @@ export function latestVersion(): string {
  * case, and by the time the user opens About the network may well be back. */
 export async function checkForUpdate(force = false): Promise<void> {
   // Untracked, and this must stay the only read of `phase` in this function:
-  // both callers run it from an `$effect`, so a tracked read would make that
-  // effect depend on the phase this function immediately sets. The effect
-  // re-runs, calls in again — and because 'failed' is not a terminal phase,
-  // a failing check would retry forever instead of once.
+  // both callers run it from `onMount`, which tracks nothing, but a caller in a
+  // reactive context would otherwise come to depend on the phase this function
+  // immediately sets. It would re-run, call in again — and because 'failed' is
+  // not a terminal phase, a failing check would retry forever instead of once.
   const current = untrack(() => phase);
   if (current === 'checking' || (current === 'checked' && !force)) return;
   phase = 'checking';

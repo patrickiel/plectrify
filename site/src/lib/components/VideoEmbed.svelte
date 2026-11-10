@@ -32,8 +32,10 @@
 </script>
 
 <div
-  class="surface relative w-full overflow-hidden shadow-[var(--shadow-panel)]"
-  class:aspect-video={id !== null}
+  class={[
+    'surface relative w-full overflow-hidden shadow-[var(--shadow-panel)]',
+    { 'aspect-video': id !== null },
+  ]}
 >
   {#if playing && id}
     <iframe

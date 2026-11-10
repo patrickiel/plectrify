@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import PartnershipSplash from './features/tone3000/PartnershipSplash.svelte';
   import Tone3000InstallStatus from './features/tone3000/Tone3000InstallStatus.svelte';
   import { isNamPlugin, type Tone3000State } from './lib/engine/tone3000';
@@ -91,7 +91,7 @@
   let appSettings = $state<AppSettings>({ ...DEFAULT_APP_SETTINGS, theme: bootTheme() });
   let sceneState = $state<SceneState>({ scenes: [], activeSceneId: null });
   // Plugin-internal drift: a plugin changed its own state (native editor edit,
-  // program switch) â€” invisible to the rack signature but part of a rig save.
+  // program switch) — invisible to the rack signature but part of a rig save.
   let toneDirty = $state(false);
   // Host version, plugin-scan state and the scanner's blacklist are owned here
   // because the Info panel's diagnostics report needs all three; the rack's
@@ -121,7 +121,7 @@
   let starterInstalling = $state(false);
   // True while the tuner's MIDI learn (in the status bar's slideout) is armed.
   // Owned here because two siblings need it: the status bar arms it, and the
-  // rack pauses live MIDI dispatch while it is armed â€” and disarms it when
+  // rack pauses live MIDI dispatch while it is armed — and disarms it when
   // the MIDI settings dialog opens (one armed learn app-wide).
   let tunerMidiLearning = $state(false);
   // Same shape for the mute's learn, armed from the mute pill's own slideout.
@@ -139,13 +139,13 @@
   let settingsMidiLearning = $state(false);
   // The tool staged across the full workspace, or null. Session-only (like
   // the stage tuner): raised by a panel's maximize button or by a looper
-  // action arriving from a MIDI pedal â€” a foot on the looper switch means
+  // action arriving from a MIDI pedal — a foot on the looper switch means
   // the player's eyes are about to look for the looper's state.
   let stagedTool = $state<ToolId | null>(null);
   // Mirror in the other direction: true while the rack has a knob/module/lane
   // learn armed, so the tuner's Learn button refuses to arm a second one.
   let rackMidiLearning = $state(false);
-  // For rack.disarmContentLearn() â€” the one disarm that flows downward.
+  // For rack.disarmContentLearn() — the one disarm that flows downward.
   let rackComponent = $state<ReturnType<typeof Rack>>();
   /** True once the engine's stored preferences have actually been read. The
       first-run wizard hangs off `setupCompleted`, whose *default* claims this
@@ -182,6 +182,8 @@
   // Re-checked whenever the patch list or the download folder changes — a
   // patch can arrive from a rig, an import or a fresh install, and the answer
   // is only ever true of a moment.
+  // Effect: an engine request whose answer depends on two engine streams; the
+  // cleanup is what drops a superseded answer.
   $effect(() => {
     void patches;
     void tone3000.downloads;
@@ -301,7 +303,7 @@
   });
   /** The Info panel's diagnostics report, built from the live state above.
       Plugin and audio-device identities are in (they are what breaks); nothing
-      the user typed is â€” no rig, scene, lane or module names â€” because the
+      the user typed is — no rig, scene, lane or module names — because the
       report is written to be pasted into a public issue. See diagnostics.ts.
       The panel supplies the browser facts it measured once at mount, so the
       15 Hz status stream doesn't re-measure the DOM. */
@@ -322,7 +324,7 @@
     });
   }
 
-  /** Open the sidebar's Info panel â€” the home of the diagnostics report and
+  /** Open the sidebar's Info panel — the home of the diagnostics report and
       the issue links. Un-stages first so the panel is actually visible rather
       than hidden behind a staged tool. */
   function openInfoPanel() {
@@ -334,11 +336,12 @@
   // this keeps <html> in step once the engine's stored value lands and on every
   // later change. <html> rather than the app's own root div because <body>
   // paints the page and the resize handles and tooltips render outside it.
+  // Effect: writes the document root and localStorage, outside this tree.
   $effect(() => applyTheme(appSettings.theme));
 
   // Auto Standby's activity ping. The engine can only see the guitar input, so
-  // silent interaction â€” editing a rig, reading the manual with the window
-  // focused â€” has to be reported from here or standby would engage mid-session.
+  // silent interaction — editing a rig, reading the manual with the window
+  // focused — has to be reported from here or standby would engage mid-session.
   // Throttled hard: this fires on raw pointer/key/wheel traffic, and the engine
   // only needs to know the user is present, not how busy they are.
   const ACTIVITY_PING_MS = 5000;
@@ -383,7 +386,7 @@
 />
 
 <!-- Owned here (state, learn bindings) but rendered inside the rack shell,
-     beside the viewport and *below* the toolbar â€” the toolbar keeps the full
+     beside the viewport and *below* the toolbar — the toolbar keeps the full
      window width. Still a flex sibling of the viewport, never an overlay:
      expanding pushes the rack narrower instead of covering modules. -->
 {#snippet toolsSidebar()}
@@ -423,7 +426,7 @@
 {/snippet}
 
 <!-- --ui-scale drives the CSS zoom each chrome piece (toolbar, sidebar,
-     status bar) applies to its own root â€” one setting, three consumers.
+     status bar) applies to its own root — one setting, three consumers.
      Set here rather than on <html> because everything it governs lives in
      this layout column. -->
 <div class="flex h-screen min-h-0 flex-col overflow-hidden" style:--ui-scale={appSettings.uiScale}>

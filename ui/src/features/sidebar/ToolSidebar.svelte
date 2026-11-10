@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ArrowClockwiseIcon, CaretRightIcon, CornersOutIcon, XIcon } from 'phosphor-svelte';
+  import { fromAction } from 'svelte/attachments';
   import { cubicOut } from 'svelte/easing';
   import { prefersReducedMotion } from 'svelte/motion';
   import type { EngineBridge } from '../../lib/engine/EngineBridge';
@@ -360,7 +361,10 @@
       style:--tool-panel-w={shownDef?.width}
       transition:panelTransition
     >
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col" use:animateToolChange={shownTool}>
+      <div
+        class="flex min-h-0 min-w-0 flex-1 flex-col"
+        {@attach fromAction(animateToolChange, () => shownTool)}
+      >
         <!-- The header is the panel's title bar, so it is sized to be read and
              hit from standing distance rather than tucked away: the tool name
              takes real type, and every control in it — the view switch, the

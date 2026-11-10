@@ -90,7 +90,7 @@
       onclick={() => onSelect(option.value)}
       {@attach tooltip(option.tip, { placement: tipPlacement })}
     >
-      <span class:invisible={option.busy}>{option.label}</span>
+      <span class={{ invisible: option.busy }}>{option.label}</span>
       {#if option.busy}
         <span class="absolute inset-0 grid place-items-center" aria-hidden="true">
           <CircleNotchIcon class="animate-spin" size={12} weight="bold" />

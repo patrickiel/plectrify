@@ -192,7 +192,12 @@
   ];
 
   // True while the title is being edited inline (edit mode + name clicked).
-  let renamingName = $state(false);
+  // A writable derived: set by the title's click, and reset whenever edit mode
+  // toggles — leaving edit mode cancels an inline rename.
+  let renamingName = $derived.by(() => {
+    void editing;
+    return false;
+  });
   // The title no longer says which plugin this is. Renaming to the plugin's own
   // name counts as unrenamed — the title already carries it.
   const renamed = $derived(!!module.displayName && module.displayName !== module.name);
@@ -220,25 +225,50 @@
       it was two separate controls in two places (a header button and a swatch
       in the dock); each move has been the same one, towards every module-level
       action being in one row and the header being a title and a switch. Also
-      opened by right-clicking the card — see `openMenuFromCard`. */
-  let menuOpen = $state(false);
+      opened by right-clicking the card — see `openMenuFromCard`. Writable
+      derived, like `renamingName`: leaving edit mode closes it. */
+  let menuOpen = $derived.by(() => {
+    void editing;
+    return false;
+  });
   /** Which page of the options menu is showing. The look pickers (colour,
       style, icon, texture) are a page of their own reached from the Appearance
       row and left by a back button, rather than a fold that pushed the panel
       past its own height — see the markup. Reset to the list when the menu
       closes: a page is somewhere you navigated to, and the kebab should always
       open on the same thing. */
-  let menuPage = $state<'main' | 'appearance'>('main');
+  let menuPage = $derived.by((): 'main' | 'appearance' => {
+    void menuOpen;
+    return 'main';
+  });
   // The kebab itself, so the card's right-click can open the menu through it.
   let moreBtnEl = $state<HTMLButtonElement>();
   // Option currently hovered/focused in that popover, one slot per dimension.
   // The card wears it while it's set, so a choice can be judged on the real
   // module before committing; `''` previews the cleared state, hence null
   // (not '') as the "no preview".
-  let previewColor = $state<string | null>(null);
-  let previewVariant = $state<ModuleStyleVariant | '' | null>(null);
-  let previewIcon = $state<ModuleIcon | '' | null>(null);
-  let previewTexture = $state<ModuleTexture | '' | null>(null);
+  //
+  // Closing has to drop the previews with it — the option unmounts under the
+  // pointer, so its own pointerleave never arrives. The panel can close from
+  // inside Popover (Escape, outside click), so the previews are tied to the
+  // open state rather than to any one close path: writable deriveds, reset
+  // whenever the menu opens or closes. `menuPage` above goes back the same way.
+  let previewColor = $derived.by((): string | null => {
+    void menuOpen;
+    return null;
+  });
+  let previewVariant = $derived.by((): ModuleStyleVariant | '' | null => {
+    void menuOpen;
+    return null;
+  });
+  let previewIcon = $derived.by((): ModuleIcon | '' | null => {
+    void menuOpen;
+    return null;
+  });
+  let previewTexture = $derived.by((): ModuleTexture | '' | null => {
+    void menuOpen;
+    return null;
+  });
   // What the card actually renders: the preview wins over the saved look.
   const shownColor = $derived(previewColor ?? module.color);
   const shownVariant = $derived((previewVariant ?? module.styleVariant ?? 'subtle') || 'subtle');
@@ -270,29 +300,6 @@
   // currently under it. Declared here because `expanded` reads them.
   let draggingKnobId = $state<string | null>(null);
   let dragOverPos = $state<number | null>(null);
-
-  // Leaving edit mode also cancels any inline rename / open palette.
-  $effect(() => {
-    if (!editing) {
-      renamingName = false;
-      menuOpen = false;
-    }
-  });
-
-  // Closing has to drop the previews with it — the option unmounts under the
-  // pointer, so its own pointerleave never arrives. The panel can close
-  // from inside Popover (Escape, outside click), so the previews are tied to
-  // the open state rather than to any one close path. The page goes back with
-  // them: the kebab always opens on the list.
-  $effect(() => {
-    if (!menuOpen) {
-      previewColor = null;
-      previewVariant = null;
-      previewIcon = null;
-      previewTexture = null;
-      menuPage = 'main';
-    }
-  });
 
   // Picks leave the panel open: the look has four dimensions, and setting one
   // is usually the start of setting another. Escape / outside click closes.
@@ -527,8 +534,8 @@
       // Firefox requires data to be set for a drag to start.
       e.dataTransfer.setData('text/plain', module.id);
       // The whole card follows the cursor, not the tiny handle.
-      if (panelEl)
-        e.dataTransfer.setDragImage(panelEl, panelEl.offsetWidth / 2, panelEl.offsetHeight / 2);
+      const panel = (e.currentTarget as HTMLElement | null)?.closest<HTMLElement>('.module-panel');
+      if (panel) e.dataTransfer.setDragImage(panel, panel.offsetWidth / 2, panel.offsetHeight / 2);
     }
     onModuleDragStart?.();
   }
@@ -542,19 +549,17 @@
   // between intrinsic sizes reliably. Instead we FLIP: remember the last size,
   // and after the DOM reflows to the new one, animate width/height from old to
   // new with the Web Animations API (siblings reflow along with it).
-  let panelEl = $state<HTMLElement>();
-  let clipEl = $state<HTMLElement>();
   let prevSize: { w: number; h: number } | null = null;
   let resizeAnim: Animation | null = null;
 
   /** Attached to the panel. The card also resizes for reasons the tween
-      effect never sees — the tone art arrives a frame after mount (`artSize`
+      tween never sees — the tone art arrives a frame after mount (`artSize`
       is measured), a knob label wraps, a capture selector mounts. `prevSize`
       has to follow those, or the next toggle the effect *does* see animates
       from a size the card left long ago: the first rename on a TONE3000 card
       snapped it back to its pre-art width and grew it from there. The
       observer keeps `prevSize` current whenever no tween is in flight; the
-      effect below still reads it before the observer can see the toggle's
+      tween below still reads it before the observer can see the toggle's
       own reflow, so an intended tween keeps its true "from" size. */
   function trackRestingSize(el: HTMLElement) {
     const observer = new ResizeObserver(() => {
@@ -565,12 +570,13 @@
     return () => observer.disconnect();
   }
 
-  $effect(() => {
-    editing; // re-run whenever edit mode toggles…
-    expanded; // …and whenever the hovered card folds or unfolds
-    renamingName; // …and when the rename input's minimum width grows the card
-    if (!panelEl) return;
-    const el = panelEl;
+  /** Attached to the panel, after `trackRestingSize`. An attachment re-runs
+      (tearing down first) whenever what it reads changes, so the three reads
+      at the top are what trigger a tween. */
+  function tweenSize(el: HTMLElement) {
+    void editing; // re-run whenever edit mode toggles…
+    void expanded; // …and whenever the hovered card folds or unfolds
+    void renamingName; // …and when the rename input's minimum width grows the card
     // A tween still in flight overrides width/height, so it has to be cancelled
     // before measuring — otherwise we'd read the animated size rather than the
     // new natural one, and the next tween would run between the wrong bounds.
@@ -584,8 +590,9 @@
       // is the panel's inner box, i.e. exactly what .module-clip occupies.
       // Written on the clip, not the panel — the panel's style attribute is
       // Svelte's (the module tint), and a re-render would drop these.
-      clipEl?.style.setProperty('--clip-w', `${el.clientWidth}px`);
-      clipEl?.style.setProperty('--clip-h', `${el.clientHeight}px`);
+      const clip = el.querySelector<HTMLElement>(':scope > .module-clip');
+      clip?.style.setProperty('--clip-w', `${el.clientWidth}px`);
+      clip?.style.setProperty('--clip-h', `${el.clientHeight}px`);
       const anim = el.animate(
         [
           { width: `${prevSize.w}px`, height: `${prevSize.h}px` },
@@ -615,7 +622,7 @@
       resizeAnim?.cancel();
       resizeAnim = null;
     };
-  });
+  }
 </script>
 
 <!-- The "+" trigger content for an empty knob slot (fills the whole cell). -->
@@ -638,18 +645,20 @@
   />
 {/snippet}
 
+<!-- class: directives here, not the class array the rest of the file uses:
+     `tweenSize` adds `module-resizing` with classList, and a class array is
+     written back whole (`className`) whenever any entry flips — a hover tint or
+     an opened menu mid-tween would strip it. Directives toggle one class each
+     and leave the rest alone. -->
 <div
-  bind:this={panelEl}
   {@attach trackRestingSize}
+  {@attach tweenSize}
   class="module-panel flex w-fit shrink-0 flex-col overflow-hidden rounded-2xl border border-ink/20 bg-panel backdrop-blur-2xl"
   class:module-editing={editing}
   class:module-expanded={expanded}
   class:module-drag-source={moduleDragging}
   class:module-menu-open={menuOpen || patchMenuOpen}
   class:module-learning={moduleMidiLearning}
-  oncontextmenu={openMenuFromCard}
-  role="group"
-  aria-label={module.displayName ?? module.name}
   class:module-tinted={shownColor}
   class:variant-bold={shownVariant === 'bold'}
   class:variant-outline={shownVariant === 'outline'}
@@ -658,6 +667,9 @@
   class:texture-carbon={shownTexture === 'carbon'}
   class:module-bypassed={module.bypassed}
   class:module-missing={module.missing}
+  oncontextmenu={openMenuFromCard}
+  role="group"
+  aria-label={module.displayName ?? module.name}
   style={shownColor ? `--module-color:${shownColor}` : undefined}
 >
   <!-- Edit-mode controls dock outside the card: the two labelled actions above,
@@ -668,7 +680,7 @@
        one clips to the card's animating edge (so the docks, which live outside
        it, are never clipped), the inner one holds the header and knob grid at
        the size the card is animating *to*. -->
-  <div bind:this={clipEl} class="module-clip">
+  <div class="module-clip">
     <div class="module-clip-inner">
       <!-- In edit mode the header doubles as the move handle, like a window's
            title bar: drag it to any insert gap — or onto the Remove pill that
@@ -678,9 +690,10 @@
            bar. Never draggable while renaming: selecting text in the input
            is the same gesture as a drag. -->
       <div
-        class="module-header relative flex items-center justify-between gap-2 px-3 py-1.5"
-        class:module-header-editing={editing}
-        class:module-header-grab={editing && !renamingName}
+        class={[
+          'module-header relative flex items-center justify-between gap-2 px-3 py-1.5',
+          { 'module-header-editing': editing, 'module-header-grab': editing && !renamingName },
+        ]}
         draggable={editing && !renamingName}
         ondragstart={editing ? startModuleDrag : undefined}
         ondragend={editing ? endModuleDrag : undefined}
@@ -808,7 +821,7 @@
           <!-- No tooltip: a power symbol on a card that is visibly on or off
                needs no caption, and this one sat over the card above it. The
                aria-label below still names the action. -->
-          <label class="bypass-wrap" class:bypass-pending={bypassPending}>
+          <label class={['bypass-wrap', { 'bypass-pending': bypassPending }]}>
             <input
               type="checkbox"
               checked={!module.bypassed}
@@ -939,9 +952,10 @@
          "+" placeholders that open the param picker in place to add a knob. -->
               {#each emptyCells as pos (pos)}
                 <div
-                  class="knob-slot"
-                  class:knob-slot-active={!!draggingKnobId}
-                  class:knob-slot-over={dragOverPos === pos}
+                  class={[
+                    'knob-slot',
+                    { 'knob-slot-active': !!draggingKnobId, 'knob-slot-over': dragOverPos === pos },
+                  ]}
                   style={cellStyle(pos)}
                   role="presentation"
                   ondragenter={() => (dragOverPos = pos)}
@@ -964,9 +978,13 @@
 
               {#each positioned as p (p.knobId)}
                 <div
-                  class="group relative flex flex-col items-center gap-2 hover:z-50"
-                  class:knob-dragging={draggingKnobId === p.knobId}
-                  class:knob-reorderable={editingKnobs}
+                  class={[
+                    'group relative flex flex-col items-center gap-2 hover:z-50',
+                    {
+                      'knob-dragging': draggingKnobId === p.knobId,
+                      'knob-reorderable': editingKnobs,
+                    },
+                  ]}
                   style={cellStyle(p.pos!)}
                   role="presentation"
                   ondragenter={() => (dragOverPos = p.pos!)}
@@ -1032,8 +1050,10 @@
                handle: the meter toggle, and — only once it is a meter — the
                centred-meter toggle directly below it. -->
                     <button
-                      class="knob-hover-control knob-option-btn knob-option-mid absolute -right-7 z-50"
-                      class:knob-option-active={p.isMeter}
+                      class={[
+                        'knob-hover-control knob-option-btn knob-option-mid absolute -right-7 z-50',
+                        { 'knob-option-active': p.isMeter },
+                      ]}
                       onclick={() => onSetKnobMeter(p.knobId, !p.isMeter)}
                       aria-pressed={p.isMeter}
                       aria-label="Toggle {p.label} meter display"
@@ -1045,8 +1065,10 @@
                     </button>
                     {#if p.isMeter}
                       <button
-                        class="knob-hover-control knob-option-btn knob-option-below absolute -right-7 z-50"
-                        class:knob-option-active={p.meterBipolar}
+                        class={[
+                          'knob-hover-control knob-option-btn knob-option-below absolute -right-7 z-50',
+                          { 'knob-option-active': p.meterBipolar },
+                        ]}
                         onclick={() => onSetKnobMeterBipolar(p.knobId, !p.meterBipolar)}
                         aria-pressed={p.meterBipolar}
                         aria-label="Toggle {p.label} centre meter"
@@ -1072,9 +1094,13 @@
                unbound, clear when bound. Meters are read-only and get none. -->
                     {#if !p.isMeter}
                       <button
-                        class="knob-hover-control knob-option-btn knob-option-mid midi-learn-btn absolute -left-7 z-50"
-                        class:knob-option-active={!!p.midi}
-                        class:midi-listening={knobMidiLearningId === p.knobId}
+                        class={[
+                          'knob-hover-control knob-option-btn knob-option-mid midi-learn-btn absolute -left-7 z-50',
+                          {
+                            'knob-option-active': !!p.midi,
+                            'midi-listening': knobMidiLearningId === p.knobId,
+                          },
+                        ]}
                         aria-pressed={knobMidiLearningId === p.knobId}
                         onclick={() =>
                           p.midi
@@ -1171,9 +1197,10 @@
             <button
               {...props}
               bind:this={moreBtnEl}
-              class="module-more-btn"
-              class:module-more-bound={!!module.midi}
-              class:midi-listening={moduleMidiLearning}
+              class={[
+                'module-more-btn',
+                { 'module-more-bound': !!module.midi, 'midi-listening': moduleMidiLearning },
+              ]}
               aria-label="Module options"
               {@attach tooltip('Module options')}
             >
@@ -1235,8 +1262,7 @@
                      cannot offer it (a missing plugin), the same way the
                      affordances themselves are simply not there. -->
                   <button
-                    class="menu-row"
-                    class:menu-row-active={knobEditing}
+                    class={['menu-row', { 'menu-row-active': knobEditing }]}
                     aria-pressed={knobEditing}
                     onclick={() => {
                       onToggleKnobEditing?.();
@@ -1254,8 +1280,7 @@
                    and once bound it is replaced by the trigger, which names
                    the protocol in its own first word (`CC 64 · ch 1`). -->
                 <button
-                  class="menu-row"
-                  class:menu-row-active={!!module.midi}
+                  class={['menu-row', { 'menu-row-active': !!module.midi }]}
                   aria-pressed={moduleMidiLearning}
                   onclick={toggleModuleMidi}
                   aria-label={module.midi
@@ -1289,8 +1314,7 @@
                   <PaletteIcon size={15} weight="regular" aria-hidden="true" />
                   <span class="menu-row-label">Appearance</span>
                   <span
-                    class="menu-row-dot"
-                    class:menu-row-dot-none={!module.color}
+                    class={['menu-row-dot', { 'menu-row-dot-none': !module.color }]}
                     style={module.color ? `--swatch:${module.color}` : undefined}
                     aria-hidden="true"
                   ></span>
@@ -1325,8 +1349,7 @@
                   <div class="color-palette" role="radiogroup" aria-label="Module colour">
                     {#each PALETTE as c (c.value)}
                       <button
-                        class="swatch"
-                        class:swatch-selected={module.color === c.value}
+                        class={['swatch', { 'swatch-selected': module.color === c.value }]}
                         style={`--swatch:${c.value}`}
                         onclick={() => pickColor(c.value)}
                         onpointerenter={() => (previewColor = c.value)}
@@ -1344,8 +1367,7 @@
                      so a drag around the wheel is one persisted edit. -->
                     <input
                       type="color"
-                      class="swatch swatch-custom"
-                      class:swatch-selected={customColorActive}
+                      class={['swatch swatch-custom', { 'swatch-selected': customColorActive }]}
                       value={module.color ?? '#14b8a6'}
                       oninput={(e) => (previewColor = e.currentTarget.value)}
                       onchange={(e) => {
@@ -1356,8 +1378,7 @@
                       {@attach tooltip('Custom colour')}
                     />
                     <button
-                      class="swatch swatch-none"
-                      class:swatch-selected={!module.color}
+                      class={['swatch swatch-none', { 'swatch-selected': !module.color }]}
                       onclick={() => pickColor('')}
                       onpointerenter={() => (previewColor = '')}
                       onpointerleave={() => (previewColor = null)}
@@ -1375,8 +1396,7 @@
                   <div class="option-row" role="radiogroup" aria-label="Card style">
                     {#each MODULE_STYLE_VARIANTS as v (v)}
                       <button
-                        class="option-pill"
-                        class:option-selected={currentVariant === v}
+                        class={['option-pill', { 'option-selected': currentVariant === v }]}
                         onclick={() => pickVariant(v)}
                         onpointerenter={() => (previewVariant = v === 'subtle' ? '' : v)}
                         onpointerleave={() => (previewVariant = null)}
@@ -1393,8 +1413,7 @@
                   <div class="icon-grid" role="radiogroup" aria-label="Module icon">
                     {#each MODULE_ICONS as ic (ic)}
                       <button
-                        class="icon-cell"
-                        class:option-selected={module.icon === ic}
+                        class={['icon-cell', { 'option-selected': module.icon === ic }]}
                         onclick={() => pickIcon(ic)}
                         onpointerenter={() => (previewIcon = ic)}
                         onpointerleave={() => (previewIcon = null)}
@@ -1409,8 +1428,7 @@
                       </button>
                     {/each}
                     <button
-                      class="icon-cell option-none"
-                      class:option-selected={!module.icon}
+                      class={['icon-cell option-none', { 'option-selected': !module.icon }]}
                       onclick={() => pickIcon(null)}
                       onpointerenter={() => (previewIcon = '')}
                       onpointerleave={() => (previewIcon = null)}
@@ -1428,8 +1446,10 @@
                   <div class="option-row" role="radiogroup" aria-label="Card texture">
                     {#each MODULE_TEXTURES as t (t)}
                       <button
-                        class={`texture-chip texture-${t}`}
-                        class:option-selected={module.texture === t}
+                        class={[
+                          `texture-chip texture-${t}`,
+                          { 'option-selected': module.texture === t },
+                        ]}
                         onclick={() => pickTexture(t)}
                         onpointerenter={() => (previewTexture = t)}
                         onpointerleave={() => (previewTexture = null)}
@@ -1442,8 +1462,7 @@
                       ></button>
                     {/each}
                     <button
-                      class="texture-chip option-none"
-                      class:option-selected={!module.texture}
+                      class={['texture-chip option-none', { 'option-selected': !module.texture }]}
                       onclick={() => pickTexture(null)}
                       onpointerenter={() => (previewTexture = '')}
                       onpointerleave={() => (previewTexture = null)}

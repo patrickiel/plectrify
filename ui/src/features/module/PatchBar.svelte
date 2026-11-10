@@ -250,11 +250,10 @@
           {:else}
             <button
               type="button"
-              class="flex flex-1 items-center gap-1.5 truncate px-3 py-1.5 text-left text-xs {p.id ===
-              activeId
-                ? 'text-accent'
-                : 'text-ink/80'} hover:bg-ink/10"
-              class:previewing={p.id === previewingId}
+              class={[
+                `flex flex-1 items-center gap-1.5 truncate px-3 py-1.5 text-left text-xs ${p.id === activeId ? 'text-accent' : 'text-ink/80'} hover:bg-ink/10`,
+                { previewing: p.id === previewingId },
+              ]}
               onclick={() => load(p.id)}
               onpointerenter={() => preview(p.id)}
               onfocus={() => preview(p.id)}

@@ -537,8 +537,11 @@
      catalogue too, and lives in the panel's title bar — see ToolSidebar. -->
 {#snippet statusLine(layout: string)}
   <span
-    class={['text-[.7rem] text-muted', layout]}
-    class:text-accent={refreshPhase() === 'checked' && !stale && updatableCount > 0}
+    class={[
+      'text-[.7rem] text-muted',
+      layout,
+      { 'text-accent': refreshPhase() === 'checked' && !stale && updatableCount > 0 },
+    ]}
     role="status"
     aria-live="polite"
   >

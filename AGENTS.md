@@ -1959,6 +1959,20 @@ as are AU and CLAP hosting.
   `import type` for types), Tailwind utility classes for styling, interfaces
   documented with JSDoc-style comments. Features are plain callback props, not
   global stores.
+- **`$effect` is the last resort.** State that follows other state is
+  `$derived` (a *writable* `$derived` when it is set locally and resets when
+  its input changes); a reaction to something the user did goes in that
+  handler, or in a function binding's setter (`bind:x={() => x, setX}`); DOM
+  wiring and measurement is an `{@attach}`; an external value that changes on
+  its own is `createSubscriber` (see `lib/devicePixels.svelte.ts`). What is
+  left — timers, writes to the document or localStorage, engine requests,
+  latching an engine stream — carries a `// Effect: …` line in the comment
+  directly above it saying why, which `src/lib/effectGuard.test.ts` enforces
+  for `ui/` and `site/`. Check any Svelte file you touch with the Svelte MCP's
+  `svelte-autofixer` (or `npx @sveltejs/mcp svelte-autofixer <file>`) until
+  it reports no issues. Prefer the class array/object form to `class:`
+  directives, except on an element whose classes are also toggled with
+  `classList` — a class array rewrites `className` whole.
 - **Formatting**: don't hand-format UI files. Run `pnpm format` in `ui/`;
   Prettier formats Svelte/TypeScript/CSS at 100 columns and the Tailwind plugin
   applies the canonical utility-class order.

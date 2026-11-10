@@ -183,6 +183,9 @@
     frame = undefined;
   }
 
+  // Effect: feeds the animation loop's plain locals (kept out of reactivity on
+  // purpose, see above) and wakes the loop — a requestAnimationFrame timer.
+  // Not $derived: the loop needs the last reference after the reading drops.
   $effect(() => {
     const current = reading;
     hasReading = current !== undefined && visible;

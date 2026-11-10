@@ -157,6 +157,8 @@
     close: () => close(),
   };
 
+  // Effect: `open` is bindable, so a host can close the panel without passing
+  // through this component; the module-level stack follows the flag itself.
   $effect(() => {
     if (!open) return;
     openStack.push(stackEntry);

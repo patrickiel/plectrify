@@ -36,7 +36,7 @@
 <div class="wrap">
   <div class="row">
     {#each DOWNLOADS as dl (dl.os)}
-      <a href={dl.url} class="dl" class:compact={size === 'compact'} data-platform={dl.platform}>
+      <a href={dl.url} class={['dl', { compact: size === 'compact' }]} data-platform={dl.platform}>
         {#if dl.platform === 'windows'}
           <svg class="glyph" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path
