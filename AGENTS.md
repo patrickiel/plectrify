@@ -518,180 +518,12 @@ cached copy until updated. `Catalogue.cpp` says so by name rather than failing a
 field at a time.
 
 [`packaging/README.md`](packaging/README.md) is the short human runbook — the
-commands to run for a version bump or a publish. What follows here is the
-reasoning behind them: read it before changing the tooling itself.
-
-Tooling is TypeScript run through `tsx` (not PowerShell) so the shared parts
-work on macOS and Linux as well as Windows — the same rule the root dev/release
-scripts now follow; PowerShell survives only as a subprocess utility for the
-few Windows-native queries (WMI, Event Log, Authenticode, elevation) in
-`scripts/windows.ts`:
-
-```sh
-pnpm --dir packaging install
-pnpm --dir packaging validate                  # schema + licence rules
-pnpm --dir packaging validate -- --verify-assets   # also re-download and re-hash (all platforms)
-pnpm --dir packaging test                      # node:test suites (archive determinism)
-pnpm --dir packaging setup-r2                  # create/repair the bucket (idempotent)
-pnpm --dir packaging keygen                    # once, ever
-pnpm --dir packaging publish-catalogue         # key: ~/.plectrify/catalogue-signing.key
-pnpm --dir packaging check-updates             # are any pins behind upstream? (per platform)
-pnpm --dir packaging verify-live               # does the shipped key accept what is live?
-# One command each, whichever machine you are at: it builds this platform and
-# writes this platform's assets[<slug>] entry. Run both machines per release.
-pnpm --dir packaging host-plugin -- --id <id> --version <v> --url <upstream> --sha256 <hash>
-pnpm --dir packaging build-plugin -- --id <id> --repo <git url> --tag <tag> --vst3-sdk <sha>
-# ...plus what xcodebuild needs, when build-plugin is run on a Mac:
-#   --project <path.xcodeproj> --scheme <scheme> --bundle <Name.vst3>
-```
-
-`check-updates` answers "is this pin outdated?" with evidence, independently
-per platform a package declares. A newer *tag* is not a newer pin: several of
-these projects cut source-only releases, and one publishes to a rolling tag
-whose asset is replaced in place. It reports the newest release that actually
-carries that platform's asset, and compares by asset URL so a rolling tag is
-not always "behind" — a project can ship a new Windows build and no mac build,
-or vice versa. The exception is a package marked `builtFromSource`, where a
-source-only tag *is* a valid upgrade target for every platform we build —
-without that flag the per-OS asset filter would hide the newest buildable
-release and name an older one as "newer", advising a downgrade.
-
-`host-content` builds the cabinet-IR pack (a `kind: "content"` package). It
-selects impulses by reading each WAV's sample rate from its header rather than
-by filename, because these packs ship the same impulses at two rates in folders
-named for them — matching on the path would silently pick the wrong set if a
-folder were ever renamed.
-
-`host-plugin` is for a plugin whose release cannot be unzipped to a `.vst3`.
-Every catalogue asset must yield one by unzipping alone — the app will not run
-a third-party installer — so for those the bundle is extracted once and
-re-hosted, with a `PROVENANCE-<slug>.txt` recording where it came from. Only
-for licences that permit redistributing the binary; `validate` refuses a
-self-hosted copyleft plugin with no published source. Re-run it on each upstream
-release rather than hand-editing a hash.
-
-It is **one command that builds the platform it is run on**, and the three
-halves behind it have nothing in common but their purpose. On Windows
-(`hostPlugin.windows.ts`) it is the rare case and the invasive one: the upstream
-installer is genuinely run on this machine, each VST3 it added or changed is
-copied out, and it is uninstalled — with every pre-existing bundle backed up
-first, fingerprinted by content rather than by name, and restored afterwards.
-Nothing is uploaded if that cleanup does not complete. On macOS
-(`hostPlugin.macos.ts`) it is the *common* case — most mac releases ship a
-`.dmg`/`.pkg` — and nothing is executed at all: a dmg mounts and a pkg expands
-as plain data, and the bundle is copied out with its arm64 slice checked. That
-guard is not ceremony either: a mac bundle's permission bits, framework symlinks
-and signature seal would not survive extraction on another OS, and the result
-would hash fine, validate fine and fail to load. On Linux
-(`hostPlugin.linux.ts`) the payload is a tarball the app cannot unpack (it only
-unzips), already in VST3 bundle layout: it is unpacked as plain data, each
-bundle's `Contents/x86_64-linux/*.so` has its ELF header checked for x86-64 —
-upstreams ship arm64, armhf, i686 and riscv64 tarballs side by side — and the
-bundles are re-zipped with their exec bits. `--bundle` narrows the pick on
-macOS and Linux alike (Surge's tarball carries the synth beside the effects
-rack); the link-safe walk and that selection are shared in `hostPlugin.ts`.
-
-`build-plugin` is the harder case: a project that publishes **no** binary for a
-platform at all, only source. Neural Amp Modeler went that way after v0.7.13 — its
-later tags are source-only and the author's own Windows builds moved to
-"Gateway", a separately-copyrighted fork with no published licence that we
-therefore cannot redistribute. So its MIT source is compiled here and the
-resulting VST3 is hosted, which MIT plainly permits. Mark such an entry
-`builtFromSource`, with a `sourceUrl` naming the exact tag and `selfHosted` on
-every one of its assets — `validate` insists on all three, because a binary we
-compiled exists nowhere else to mirror.
-
-Building makes Plectrify the *producer* of a binary rather than its mirror, so two
-things follow. Only ever build from a tag: a moving branch is not provenance.
-And pin `--vst3-sdk` — upstream's `download-vst3-sdk.sh` takes the SDK from
-`master` and then deletes its `.git`, so without the pin a rebuild silently gets
-a different SDK and upstream's own builds cannot say which one they used.
-`build-plugin` records the repo commit, every submodule SHA, the SDK commit and
-the toolchain in the published `PROVENANCE-<slug>.txt`, and runs Steinberg's
-VST3 validator against the binary before it will upload anything.
-
-Like `host-plugin`, it is one command that builds the platform it is run on and
-writes only that platform's `assets` entry: MSBuild with a discovered toolset on
-Windows (`buildPlugin.windows.ts`), xcodebuild plus a codesign and an arm64
-slice check on a Mac (`buildPlugin.macos.ts`). Everything that makes the result
-defensible rather than merely convenient — the exact-tag clone, the submodule
-record, the SDK pin, the validator gate, the reproducible archive — is shared in
-`buildPlugin.ts`, so the two cannot drift on the rules that matter. Build both
-from the same tag and the same `--vst3-sdk` before publishing: a package's
-platforms share one `version`, so half a release is not a release.
-
-#### Releasing a new version of a source-built plugin
-
-This is the whole procedure when Neural Amp Modeler (or any `builtFromSource`
-entry) cuts a release. The Windows build runs on Windows, the mac build on a
-Mac, each about 20 minutes, most of it compiling; both land in the same
-catalogue entry under the same `version`, so do them as one publish.
-
-1. **Confirm there is something to do.** `pnpm --dir packaging check-updates`.
-   For a `builtFromSource` entry this compares against the newest release of any
-   kind, because a source-only tag is a perfectly good build target — that is
-   what the flag is for.
-
-2. **Read the release notes before building.** A new tag can move the source
-   somewhere we cannot follow: a dependency added under a copyleft or
-   no-redistribution licence changes whether the result may be hosted at all.
-   The licence audit is per release, not once ever.
-
-3. **Decide the SDK pin.** Re-use the `--vst3-sdk` commit from the current
-   `PROVENANCE-<slug>.txt` to change one variable at a time. Take a newer SDK only
-   deliberately, and then say so in the commit message.
-
-4. **Build.** One command per platform does clone, build, validate, archive,
-   provenance and upload:
-
-   ```sh
-   # Windows box:
-   pnpm --dir packaging build-plugin -- \
-     --id neural-amp-modeler \
-     --repo https://github.com/sdatkinson/NeuralAmpModelerPlugin.git \
-     --tag <new tag> --vst3-sdk <sha from PROVENANCE-windows-x64.txt>
-
-   # Mac:
-   pnpm --dir packaging build-plugin -- \
-     --id neural-amp-modeler \
-     --repo https://github.com/sdatkinson/NeuralAmpModelerPlugin.git \
-     --tag <new tag> --vst3-sdk <same sha> \
-     --project NeuralAmpModeler/projects/NeuralAmpModeler-macOS.xcodeproj \
-     --scheme <vst3 scheme> --bundle NeuralAmpModeler.vst3
-   ```
-
-   Both refuse to upload a binary that fails VST3 validation. Add `--no-upload`
-   to rehearse, but note that a rehearsal cannot be promoted: the build is not
-   bit-reproducible, so the real run produces a different binary and you must
-   take that one's hash.
-
-5. **Update the entry** in `packaging/catalogue.json`: each build's `url`,
-   `sha256` and `downloadBytes` go into its own `assets` entry — all three
-   together, never one without the others — and both, with the shared
-   `version`, in the same publish, so that `version` never describes one
-   platform's binary and not the other's.
-
-6. **Verify and publish.**
-
-   ```sh
-   pnpm --dir packaging validate -- --verify-assets
-   pnpm --dir packaging publish-catalogue
-   ```
-
-   `publish-catalogue` bumps `revision` itself; commit the bumped revision and
-   the `.sig` so the repo matches what is live.
-
-7. **Install it once through the Packages panel** before calling it done. A
-   Debug build reads `packaging/catalogue.json` straight from the source tree
-   (unsigned — see `CatalogueInstaller.cpp`), so this can be exercised before
-   publishing as well as after. The validator proves the plugin is a conformant
-   VST3; only an actual install exercises the download, the hash gate, the
-   `include` patterns and the scanner.
-
-If a build ever fails to validate, do not publish it and do not "fix" it by
-skipping validation. Diagnose it against the toolset first: the version the
-project pins is often absent from the build host, and `build-plugin` prints and
-records the substitution it made.
+commands to run for a version bump or a publish.
+[`packaging/AGENTS.md`](packaging/AGENTS.md) is the reasoning behind them: why
+the tooling is TypeScript, what `check-updates`, `host-content`, `host-plugin`
+and `build-plugin` each guard against, and the whole procedure for releasing a
+new version of a source-built plugin. Read it before running that procedure or
+changing the tooling itself. Two rules hold wherever the catalogue is touched:
 
 - **The manifest is a trust root.** Its SHA-256 pins authorise DLLs to be loaded
   into this process, so it is signed and verification is mandatory. The private
@@ -728,205 +560,29 @@ records the substitution it made.
   in the same source, as the VST3 pair does), so **adding a patch means adding
   an entry there plus a `COMMAND` in `CMakeLists.txt`'s `PATCH_COMMAND`** —
   nothing else.
-  - `juce-disable-webview2-zoom.patch` — 8.0.14 doesn't expose WebView2 zoom
-    settings via its Options API. Windows-only file; no mac counterpart is
-    needed (WKWebView ships with magnification off and the UI already
-    suppresses ctrl/meta zoom keys and pinch-wheel).
-  - `juce-vst3-no-mac-content-scale.patch` — JUCE reports a content scale
-    factor to hosted VST3s on macOS, where `IPlugViewContentScaleSupport` does
-    not apply (a mac view is measured in logical points and the plugin takes
-    the backing scale from its own NSWindow). JUCE sends 1.0 and merely
-    swallows the failure, which is fine for a plugin that refuses it — but a
-    plugin that *obeys* it loses its real 2× scale and draws its UI at half
-    size in the top-left quarter of its window. Every iPlug2 build before that
-    interface was guarded to Windows does obey it, Neural Amp Modeler included.
-  - `juce-vst3-scale-before-attach.patch` — the mirror-image problem on
-    Windows/Linux. JUCE only learns the display scale through
-    `NativeScaleFactorNotifier`, which reports via `MessageManager::callAsync`,
-    so the real factor cannot land until after `view->attached()` — the call
-    that makes a plugin build its UI — has already run against the 1.0
-    placeholder. A plugin that re-reads the host's scale recovers a message
-    loop later; DPF, iPlug2 and other older frameworks read it once, while
-    constructing the UI, and so draw the whole editor at 1:1 for the life of
-    the window (a little over half size on a 175% display). The patch asks the
-    peer for the scale and reports it before attaching.
-  - `juce-graph-host-owned-bypass.patch` — a bypass the host requested is
-    enforced by `AudioProcessorGraph` itself instead of being delegated to the
-    plugin. Stock JUCE, per the VST3 contract, sets the plugin's exported
-    bypass parameter (`kIsBypass`) and keeps calling `processBlock`, trusting
-    the plugin to pass audio through — and a plugin whose exported parameter
-    is dead (Uhhyou's OrdinaryPhaser exports one and ignores it) then never
-    bypasses at all; `processBlockBypassed` is no escape, since the hosted-VST3
-    override routes it back into the same parameter. The patch makes the graph
-    pass the buffer through itself whenever `Node::setBypassed(true)` was
-    called, skipping the plugin's processing entirely (a hard bypass — tails
-    do not ring out, which is the right trade for a rig's "pedal off"). A
-    plugin bypassing *itself* through its own editor is untouched.
-    `Tests/audio/BypassProbe.cpp` (manual, not a CTest) is how the dead
-    parameter was proven; `testBypassIsHostOwned` in the rack tests pins the
-    patched behaviour so a JUCE bump that loses the patch fails CTest rather
-    than shipping.
-  - `juce-no-double-escape-url.patch` — JUCE's mac web-view backend percent-
-    encodes every URL handed to `goToURL()` with `URLQueryAllowedCharacterSet`,
-    which does not contain `%`, so an escape already in the string is escaped
-    again: `%3A` becomes `%253A` and the server decoding it once receives the
-    literal text. The TONE3000 flow puts a URL inside a query parameter
-    (`redirect_uri`), so it must be escaped and was answered with
-    "redirect_uri must be a valid URL" quoting our own escapes back. The
-    encoding exists to rescue a string that is *not* a valid URL, so the patch
-    keeps it for exactly that case — try the string as given, escape only if
-    NSURL rejects it. (Modern NSURL is lenient and encodes stray characters
-    itself; the fallback is for the 13.3 floor.)
-  - `juce-linux-webkit-gpu.patch` — JUCE's WebKitGTK backend hard-codes
-    `WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER`, so the whole UI is rasterised
-    and composited on the CPU. On the same machine it ran visibly slower than
-    under WebView2: every animation, and every `backdrop-filter` (the UI has
-    dozens), re-rendered in software each frame. The patch asks for `ALWAYS`.
-    JUCE's choice was probably a cautious one, since the view lives in a forked
-    GTK child embedded over XEmbed and forced onto the X11 backend (XWayland
-    on a Wayland session), and not every driver composites there. So
-    `PLECTRIFY_WEBKIT_SOFTWARE_RENDERING=1` in the launch environment restores
-    software rendering; the child inherits it. The policy is necessary but
-    not sufficient — see the next patch.
-  - `juce-linux-webkit-render-device.patch` — on NVIDIA's proprietary driver
-    WebKitGTK 2.52 cannot allocate its GBM buffers ("Failed to create GBM
-    buffer: Invalid argument") and silently stays in non-composited software
-    mode whatever the policy says: the whole page is repainted on one CPU
-    thread every frame, at a cost that grows with the pixel count, so a 4K
-    monitor at 166% (scale 2) is the worst case. Stock MiniBrowser does the
-    same, natively on Wayland too, so neither the XEmbed embedding nor
-    XWayland is the cause. A Mesa render node composites fine, so the forked
-    child — before GTK starts, which keeps the `setenv` single-threaded and
-    out of a DAW's environment — points `WEBKIT_WEB_RENDER_DEVICE_FILE` at the
-    first accessible non-`nvidia` node when an `nvidia` one exists. A device
-    the user set is left alone; an NVIDIA-only machine stays in software mode,
-    since nothing on the WebKit side gets it further (forcing the DMA-BUF
-    renderer there fails to import or crashes). Measured on an RTX 3060 beside
-    a Radeon iGPU at scale 2: a CSS animation's web-process CPU went from ~90%
-    to ~4%, ~19% with backdrop blur — and under JUCE's stock "never" it stays
-    at ~71% even on the iGPU, which is why the two patches come as a pair.
-  - `juce-linux-webkit-persistent-cookies.patch` — JUCE never gives
-    WebKitGTK's cookie manager a persistent store, and every
-    `WebBrowserComponent` runs in a child process of its own, so cookies die
-    with the window. The TONE3000 window is rebuilt for every fresh
-    authorization (see *TONE3000*), so every tone picked asked for the
-    TONE3000 password again. Options has no Linux storage location, so the
-    patch reads the one `WinWebView2::withUserDataFolder` already carries for
-    the same job and keeps `<folder>/cookies.sqlite` there; a browser naming no
-    folder (the main UI) keeps JUCE's in-memory jar. The TONE3000 window names
-    `WebKit-Tone3000` under the data root, its Linux twin of
-    `WebView2-Tone3000`.
-  - `juce-linux-alsa-duplex-prefill.patch` — JUCE's ALSA thread starts a
-    linked capture/playback pair with an empty playback buffer and paces the
-    loop by capture, so every block is written exactly where the hardware is
-    already reading. Its stop threshold is the boundary, so ALSA never calls
-    that an xrun; the stream just stays on the edge for the life of the device.
-    On a USB interface with implicit feedback (a Scarlett Solo 3rd gen, at
-    128/48k) the next playback packet is queued at the instant the capture
-    packet wakes the thread, so the block always loses that race: crackle from
-    launch, cured only by changing the sample rate and back — a reopen that
-    happened to start on a better phase, which is why it looked like a stale
-    rate. `/proc/asound/card*/pcm0p/sub0/status` showed the fill at -4..0
-    frames. The patch writes two periods of silence before the thread starts,
-    which puts playback a full period ahead (124..254 frames, holding across a
-    stall) — the callback's processing budget. One period is not enough: it
-    lands back on the same race. Duplex only; an output-only loop fills its
-    own buffer.
-  - `juce-jack-buffer-size.patch` — JUCE's JACK device offers exactly one
-    buffer size (whatever the server is running) and ignores the size handed
-    to `open()`, so the settings showed a single entry and the first-run 5 ms
-    rule had nothing to choose from. A JACK client may ask the server for a
-    block size, and PipeWire's JACK honours it (jackd changes its period for
-    every client, which is what a rig wants), so the patch offers 32..2048
-    plus the running size and requests the chosen one on open. The sample
-    rate stays single: the JACK API has no way to ask for another, and under
-    PipeWire it is the graph's. The same patch fixes the bug this was found
-    through: PipeWire's JACK reports a buffer size of **0** from
-    `jack_activate` until its first process cycle, and `open()` always
-    deactivates and re-activates, so every reopen (a settings change, or the
-    manager's own restart after launch) read the size inside that window. The
-    player was prepared with a block of 0 and the manager's
-    `CallbackMaxSizeEnforcer` then advanced by 0 samples forever on the audio
-    thread — a full core burnt for the life of the process, no sound, and a
-    crash when the device was next closed under it. The device now answers
-    with the last size the server did report, never 0.
-  - `juce-no-zero-block-spin.patch` — the guard on the other side of that:
-    `CallbackMaxSizeEnforcer` passes a block through whole when its maximum
-    is 0 rather than looping, for the next backend that reports one.
-  - `juce-linux-webkit-versioned-sonames.patch` — JUCE 8.0.14's WebKitGTK
-    backend dlopens `libwebkit2gtk-4.1.so`, `libgtk-3.so` and their
-    dependencies by their **unversioned** names, which Debian and Ubuntu ship
-    only in the `-dev` packages. The .deb depends on the runtime libraries
-    alone, so on a machine that never built anything the backend found
-    nothing, every navigation returned early, and the window stayed black
-    with a clean log (issue #12). It now opens the sonames
-    (`libwebkit2gtk-4.1.so.0` and friends), the names upstream JUCE switched
-    to in `146fdea5` — so a JUCE bump past that commit makes this patch stop
-    applying, which is the cue to keep only its other half. That half reports
-    a backend that cannot start: the loader logs which library or function
-    was missing (read from `dlerror()` before the failed attempt's cleanup
-    `dlclose`s and so clears it), a web view process that dies during start
-    is logged too, and the first navigation hands the reason to
-    `WebBrowserComponent::pageLoadHadNetworkError`. `AmpWebBrowserComponent`
-    paints it over the empty window — on Linux only, and only while no native
-    view exists, since everywhere else that surface is what shows through a
-    resize. The next way to
-    land there is a distribution dropping webkit2gtk-4.1 for webkitgtk-6.0,
-    which JUCE 8.0.14 does not know. Never fix this class of bug by adding a
-    `-dev` package to the .deb's `Depends:`.
-  - `juce-vst2-speaker-arrangement-size.patch` and
-    `juce-vst2-pin-properties-padding.patch` — the pair that makes JUCE's
-    hosting of the older plugin format work against the FST header (see
-    *Legacy plugins*). FST compiles in place of Steinberg's header, but two
-    of its structs have a different `sizeof`: `VstSpeakerArrangement` ends in
-    a flexible array (8 bytes, where the SDK's `speakers[8]` makes 904) and
-    `VstPinProperties` omits the SDK's 48 reserved bytes (80, not 128). JUCE
-    sizes its speaker-arrangement allocation from `sizeof` and puts pin
-    properties on the stack, so the first real plugin loaded overran both —
-    a malloc abort a few calls after `effGetSpeakerArrangement`. The first
-    patch sizes the allocation from `offsetof (speakers)`, the second reads
-    pin properties through a padded buffer; both compute the same thing under
-    the original header. Found with `PlectrifyLegacyPluginProbe` (manual, not
-    a CTest) on DPF's `.so` plugins, which memset the whole SDK-sized struct.
-    Known, accepted differences that remain: `VstTimeInfo`'s two SMPTE fields
-    sit at other offsets in FST, so a plugin reading SMPTE time gets zeros.
-  - `juce-vst2-midi-key-name-storage.patch` — the third struct of that kind:
-    FST declares `MidiKeyName::keyName[]` as a flexible array, so JUCE's
-    `Vst2::MidiKeyName keyName{};` in `getNameForMidiNoteNumber` holds no
-    name at all. GCC and Clang accepted it and let `effGetMidiKeyName` write
-    past it on the stack; MSVC refuses it outright (C2466), which is how the
-    Windows build found it. It now sits at the start of a zeroed buffer with
-    room for the name.
-  - `juce-vst2-scale-before-open.patch` — the older format's twin of
-    `juce-vst3-scale-before-attach.patch`: JUCE sent a plugin declaring
-    `supportsViewDpiScaling` its scale (`effVendorSpecific` `PreS`/`AeCs`)
-    as 1.0 right before `effEditOpen` and the real factor a message loop
-    later, so DPF plugins drew at half size on a 200% display. The format has
-    no other scale channel, so a plugin that does not declare it (LSP's
-    VST2 build, most Windows freeware of that era) still opens at 1:1 and
-    offers its own zoom, if any.
-  - `juce-linux-webkit-utf8-ipc.patch` — JUCE's WebKitGTK backend talks to
-    its forked view process over a pipe of JSON written as UTF-8 and read
-    back with `String (const char*, n)`, which takes each byte as one
-    character; the child read the page's script messages the same way. So
-    every non-ASCII character was re-encoded as Latin-1 once per crossing,
-    and text the page saved and read again grew a layer each time — a
-    TONE3000 tone named "5150III®" ended up as a screen of `ÃÂ` (issue #48).
-    Both ends now read UTF-8. What was already written stays damaged on disk,
-    so the page repairs it — **once, and on Linux only**, because the repair
-    (`ui/src/lib/engine/mojibake.ts`) is a heuristic: text that was never
-    damaged can pass for a layer of it ("É" before a no-break space is a
-    well-formed sequence), so it must not run on every read for the life of
-    the app, nor at all where nothing was garbled. `JuceEngine`'s
-    `repairStoredText` goes through every document the page keeps under the
-    data root before the page reads any of them, rewrites the ones carrying
-    the damage, and records it in `AppSettings.storedTextRepaired`; the flag
-    is in settings.json so that a backup carries its own answer. The platform
-    is baked into the web view's initialisation data beside `host`, since the
-    decision precedes any `appInfo` push. A DAW project's session document
-    cannot be reached by a pass, so the plugin's page repairs one as it reads
-    it (`parseHostSession`) unless it carries the `textIntact` stamp every
-    session written since carries.
+
+  Why each patch exists — the symptom, the plugin or machine it was found on,
+  what a JUCE bump has to re-check — is in
+  [`cmake/JUCE_PATCHES.md`](cmake/JUCE_PATCHES.md), one entry per file. Read
+  the entry before touching a patch and write one with every patch added. What
+  is there, by area:
+  - **Web view** — `juce-disable-webview2-zoom` (Windows),
+    `juce-no-double-escape-url` (macOS), and five for WebKitGTK:
+    `juce-linux-webkit-gpu` and `-render-device` (a pair; GPU compositing, with
+    `PLECTRIFY_WEBKIT_SOFTWARE_RENDERING=1` as the way back),
+    `-persistent-cookies`, `-versioned-sonames` (issue #12) and `-utf8-ipc`
+    (issue #48, whose entry also covers the page's one-time stored-text repair,
+    `mojibake.ts`).
+  - **Hosted plugins** — `juce-vst3-no-mac-content-scale`,
+    `juce-vst3-scale-before-attach` and `juce-graph-host-owned-bypass` (a
+    host-requested bypass is enforced by the graph, pinned by
+    `testBypassIsHostOwned`).
+  - **Linux audio** — `juce-linux-alsa-duplex-prefill`,
+    `juce-jack-buffer-size` and `juce-no-zero-block-spin`.
+  - **The older plugin format against FST** —
+    `juce-vst2-speaker-arrangement-size`, `juce-vst2-pin-properties-padding`,
+    `juce-vst2-midi-key-name-storage` and `juce-vst2-scale-before-open` (see
+    *Legacy plugins*).
 
   After changing the JUCE tag, regenerate them all against the new sources and
   delete `build*/_deps/juce-*` so FetchContent re-populates. Editing a
@@ -2131,7 +1787,7 @@ carrying the marker is rewritten, or a stale path silently undoes the change.
 It validates before it edits and returns `unsupportedLayout` rather than
 producing a blob that would corrupt a plugin's state. **After bumping NAM, re-run
 `ctest -R Plectrify.NamStateCodec` and load a tone by hand** (see step 7 of the
-source-built-plugin procedure); `Tests/tone3000/NamStateProbe.cpp` drives the
+source-built-plugin procedure in `packaging/AGENTS.md`); `Tests/tone3000/NamStateProbe.cpp` drives the
 real plugin and is deliberately not a CTest, because `ctest` must stay free of
 third-party binaries.
 
@@ -2354,3 +2010,15 @@ as are AU and CLAP hosting.
   catalogue manifest stays the trust root for what gets installed.
 - User data lives under the per-user root (`%APPDATA%/Plectrify/` /
   `~/Library/Application Support/Plectrify/`); don't write outside it.
+
+## Keeping this file loadable
+
+This file is read whole into every agent session, and the tooling warns past
+150k characters (`wc -m AGENTS.md`). What belongs here is what an agent needs
+wherever it is working. A deep dive that only matters inside one folder lives
+beside that folder's code, with a pointer and the rules that hold everywhere
+left behind here: [`packaging/AGENTS.md`](packaging/AGENTS.md) (catalogue
+tooling and the source-built release procedure) and
+[`cmake/JUCE_PATCHES.md`](cmake/JUCE_PATCHES.md) (why each JUCE patch exists).
+When this file nears the limit, move the next such section out the same way
+rather than trimming the reasoning.

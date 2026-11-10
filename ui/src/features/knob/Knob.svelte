@@ -227,15 +227,13 @@
     position: absolute;
     inset: -4px;
     border-radius: 50%;
-    border: 1px dashed color-mix(in srgb, var(--color-ink) 20%, transparent);
+    /* No ring at rest: the face's own border is the knob's one outline. The
+       ring exists to carry the detents and the fine-adjust cue below. */
+    border: 1px solid transparent;
     pointer-events: none;
     transition:
       border-color 0.3s ease,
-      transform 0.3s ease,
       inset 150ms ease;
-  }
-  .knob-ring.discrete {
-    border-color: transparent;
   }
   .detent {
     position: absolute;
@@ -263,22 +261,16 @@
     box-shadow: var(--shadow-glow-accent);
     transform: translateX(-50%) scale(1.6);
   }
-  .knob-container:hover .knob-ring:not(.discrete),
-  .knob-container:focus-visible .knob-ring:not(.discrete) {
-    border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
-    transform: rotate(5deg);
-  }
   .knob-container:hover .detent::after,
   .knob-container:focus-visible .detent::after {
     background: color-mix(in srgb, var(--color-accent) 55%, var(--color-ink));
   }
 
   /* Fine adjust reads as the control getting sharper: the pointer narrows to a
-     hairline and the loose dashed ring resolves into one solid line, pulled out
-     clear of the face. Geometry rather than a badge, so the cue never competes
-     with the value readout sitting directly above. Only continuous knobs can
-     enter this state (see `fine`), but the hover rule above is selector-for-
-     selector as specific, so this one matches its weight to win on order. */
+     hairline and a solid ring appears, pulled out clear of the face. Geometry
+     rather than a badge, so the cue never competes with the value readout
+     sitting directly above. Only continuous knobs can enter this state (see
+     `fine`). */
   .knob-container.fine .knob-indicator::after {
     width: 1px;
     height: 13px;
@@ -287,7 +279,6 @@
   }
   .knob-container.fine .knob-ring:not(.discrete) {
     inset: -7px;
-    border-style: solid;
     border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
   }
 

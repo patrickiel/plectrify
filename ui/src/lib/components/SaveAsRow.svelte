@@ -50,7 +50,21 @@
   }
 </script>
 
-{#if editing}
+<!-- Both states share one grid cell and are always rendered, the inactive one
+     hidden and inert: the row is then as tall as the taller of the two in
+     either state, and the input stretches to the button's height, so nothing
+     below the row moves when it swaps (issue #45). Swapping one element for
+     the other let each size itself, and they never agreed. -->
+<div class="grid">
+  <RowButton
+    class={['col-start-1 row-start-1 w-full gap-1.5 px-3', textSize, editing && 'invisible']}
+    {disabled}
+    inert={editing}
+    onclick={begin}
+  >
+    <PlusIcon size={13} />
+    {label}
+  </RowButton>
   <TextField
     bind:element={input}
     bind:value={name}
@@ -61,11 +75,7 @@
     )}
     {placeholder}
     aria-label={inputLabel}
-    class="w-full {textSize}"
+    inert={!editing}
+    class={['col-start-1 row-start-1 w-full', textSize, !editing && 'invisible']}
   />
-{:else}
-  <RowButton class="w-full gap-1.5 px-3 {textSize}" {disabled} onclick={begin}>
-    <PlusIcon size={13} />
-    {label}
-  </RowButton>
-{/if}
+</div>

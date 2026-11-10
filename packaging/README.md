@@ -203,4 +203,6 @@ in `CMakeLists.txt` for the app — and the two must agree, which is what
 `verify-live` checks end to end.
 
 Deeper background — why each rule exists, and what to watch for when changing
-the tooling — is in [AGENTS.md](../AGENTS.md).
+the tooling — is in [AGENTS.md](AGENTS.md) beside this file; what the
+catalogue is and how the app consumes it is in the root
+[AGENTS.md](../AGENTS.md).
